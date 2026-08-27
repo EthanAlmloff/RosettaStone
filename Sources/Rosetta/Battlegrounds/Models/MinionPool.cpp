@@ -12,7 +12,7 @@
 
 #include <stdexcept>
 
-using Random = effolkronium::random_static;
+using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds
 {
@@ -128,7 +128,8 @@ void MinionPool::InitializeSupported(const std::vector<std::string>& cardIDs)
         if (card.id.empty() || card.GetCardType() != CardType::MINION ||
             card.GetTier() < 1)
         {
-            throw std::invalid_argument("unsupported minion pool card ID");
+            throw std::invalid_argument("unsupported minion pool card ID: " +
+                                        id);
         }
         cards.emplace_back(std::move(card));
     }

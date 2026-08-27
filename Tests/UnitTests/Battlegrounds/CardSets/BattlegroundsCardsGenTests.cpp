@@ -556,9 +556,9 @@ TEST_CASE("[Battlegrounds : Minion] - UNG_073 : Rockpool Hunter")
     Player& player1 = game.GetGameState().players[0];
     Player& player2 = game.GetGameState().players[1];
 
-    Minion minion1(Cards::FindCardByID("UNG_073"));
+    Minion minion1(Cards::FindCardByID("BG_UNG_073"));
     Minion minion2(Cards::FindCardByID("BGS_039"));
-    Minion minion3(Cards::FindCardByID("UNG_073"));
+    Minion minion3(Cards::FindCardByID("BG_UNG_073"));
 
     player1.hero.Initialize(Cards::FindCardByDbfID(59397));
     player2.hero.Initialize(Cards::FindCardByDbfID(59397));

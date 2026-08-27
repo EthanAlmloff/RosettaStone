@@ -11,10 +11,11 @@
 
 #include <effolkronium/random.hpp>
 
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
-using Random = effolkronium::random_static;
+using Random = effolkronium::random_thread_local;
 
 namespace
 {
@@ -39,6 +40,23 @@ Game::Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs)
 GameState& Game::GetGameState()
 {
     return m_gameState;
+}
+
+std::string Game::CaptureRandomState() const
+{
+    std::ostringstream output;
+    output << Random::engine();
+    return output.str();
+}
+
+void Game::RestoreRandomState(const std::string& state) const
+{
+    std::istringstream input(state);
+    input >> Random::engine();
+    if (!input)
+    {
+        throw std::invalid_argument("Invalid Battlegrounds random state");
+    }
 }
 
 void Game::Start()
@@ -428,9 +446,8 @@ std::size_t Game::DeterminePlayerToFightGhost(
     // Bottom 3 have a chance to play the ghost
     std::vector<int> ghostCandidates;
 
-    const std::size_t firstCandidate = playerData.size() > 3
-                                           ? playerData.size() - 3
-                                           : 0;
+    const std::size_t firstCandidate =
+        playerData.size() > 3 ? playerData.size() - 3 : 0;
     for (std::size_t i = firstCandidate; i < playerData.size(); ++i)
     {
         const int playerIdx = std::get<0>(playerData.at(i));

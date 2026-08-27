@@ -11,7 +11,7 @@
 
 #include <effolkronium/random.hpp>
 
-using Random = effolkronium::random_static;
+using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds::SimpleTasks
 {

@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <vector>
 #include <tuple>
 #include <vector>
 
@@ -42,6 +41,14 @@ class Game
     //! Gets the game state.
     //! \return The game state.
     GameState& GetGameState();
+
+    //! Captures the Battlegrounds random engine for deterministic interleaving.
+    //! \return A serialized random engine state.
+    std::string CaptureRandomState() const;
+
+    //! Restores a previously captured Battlegrounds random engine state.
+    //! \param state The serialized random engine state.
+    void RestoreRandomState(const std::string& state) const;
 
     //! Starts the game.
     void Start();

@@ -7,6 +7,10 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Builds/CMake")
 # Declare project
 project(RosettaStone)
 
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "" FORCE)
+endif()
+
 # Set RosettaStone's root directory
 if (NOT ROSETTA_ROOT)
 	set(ROSETTA_ROOT ${PROJECT_SOURCE_DIR})

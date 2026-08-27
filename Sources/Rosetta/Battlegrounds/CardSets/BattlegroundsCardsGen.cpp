@@ -215,7 +215,7 @@ void BattlegroundsCardsGen::AddTier1Minions(
     power.AddBattlecryTask(
         AddEnchantmentTask{ "UNG_073e", EntityType::TARGET });
     cards.emplace(
-        "UNG_073",
+        "BG_UNG_073",
         CardDef{ power, PlayReqs{ { PlayReq::REQ_TARGET_IF_AVAILABLE, 0 },
                                   { PlayReq::REQ_MINION_TARGET, 0 },
                                   { PlayReq::REQ_TARGET_WITH_RACE, 14 },
