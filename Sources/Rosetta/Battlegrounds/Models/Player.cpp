@@ -148,6 +148,8 @@ void Player::RefreshTavern()
 void Player::FreezeTavern()
 {
     freezeTavern = !freezeTavern;
+    tavern.fieldZone.ForEach(
+        [this](MinionData& minion) { minion.value().SetFrozen(freezeTavern); });
 }
 
 void Player::RearrangeMinion(std::size_t curIdx, std::size_t newIdx)

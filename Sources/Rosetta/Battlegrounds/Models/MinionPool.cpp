@@ -118,7 +118,15 @@ std::size_t MinionPool::GetCount() const
 
 void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern)
 {
-    const std::size_t numMinions = GetNumMinionsCanPurchase(player.currentTier);
+    const std::size_t targetCount =
+        GetNumMinionsCanPurchase(player.currentTier);
+    const std::size_t currentCount =
+        static_cast<std::size_t>(tavern.fieldZone.GetCount());
+    if (currentCount >= targetCount)
+    {
+        return;
+    }
+    const std::size_t numMinions = targetCount - currentCount;
     auto minions = GetMinions(1, player.currentTier, true);
 
     Random::shuffle(minions.begin(), minions.end());

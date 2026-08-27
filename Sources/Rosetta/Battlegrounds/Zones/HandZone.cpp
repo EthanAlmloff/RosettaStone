@@ -15,6 +15,11 @@ CardData& HandZone::operator[](int zonePos)
     return m_cards.at(zonePos).value();
 }
 
+const CardData& HandZone::operator[](int zonePos) const
+{
+    return m_cards.at(zonePos).value();
+}
+
 void HandZone::Add(CardData card, int zonePos)
 {
     if (zonePos > m_count)

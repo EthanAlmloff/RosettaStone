@@ -270,6 +270,57 @@ TEST_CASE("[Game] - Freeze")
     CHECK_EQ(player1.remainCoin, 5);
 }
 
+TEST_CASE("[Game] - Seeded start is deterministic")
+{
+    auto snapshot = [](std::uint64_t seed) {
+        Game game(seed);
+        game.Start();
+
+        std::vector<int> result;
+        for (auto& player : game.GetGameState().players)
+        {
+            result.insert(result.end(), player.heroChoices.begin(),
+                          player.heroChoices.end());
+            player.SelectHero(0);
+        }
+
+        for (const auto& player : game.GetGameState().players)
+        {
+            player.tavern.fieldZone.ForEach(
+                [&result](const MinionData& minion) {
+                    result.emplace_back(minion.value().GetDbfID());
+                });
+        }
+        return result;
+    };
+
+    CHECK_EQ(snapshot(123456), snapshot(123456));
+    CHECK_NE(snapshot(123456), snapshot(654321));
+}
+
+TEST_CASE("[Game] - Per-card freeze survives normal end turn")
+{
+    Game game(42);
+    game.Start();
+    for (auto& player : game.GetGameState().players)
+    {
+        player.SelectHero(0);
+    }
+
+    Player& player = game.GetGameState().players.at(0);
+    const int preservedPoolIndex = player.tavern.fieldZone[0].GetPoolIndex();
+    player.tavern.fieldZone[0].SetFrozen(true);
+
+    for (auto& currentPlayer : game.GetGameState().players)
+    {
+        currentPlayer.CompleteRecruit();
+    }
+
+    CHECK_EQ(player.tavern.fieldZone[0].GetPoolIndex(), preservedPoolIndex);
+    CHECK_EQ(player.tavern.fieldZone[0].IsFrozen(), false);
+    CHECK_EQ(player.tavern.fieldZone.GetCount(), 3);
+}
+
 TEST_CASE("[Game] - Ghost")
 {
     Game game;

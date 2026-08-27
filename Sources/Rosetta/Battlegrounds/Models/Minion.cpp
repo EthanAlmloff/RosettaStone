@@ -58,6 +58,16 @@ std::string_view Minion::GetName() const
     return m_card.name;
 }
 
+std::string_view Minion::GetCardID() const
+{
+    return m_card.id;
+}
+
+int Minion::GetDbfID() const
+{
+    return m_card.dbfID;
+}
+
 int Minion::GetGameTag(GameTag tag) const
 {
     switch (tag)
@@ -154,6 +164,16 @@ bool Minion::HasTaunt() const
 bool Minion::HasDivineShield() const
 {
     return m_hasDivineShield;
+}
+
+bool Minion::IsFrozen() const
+{
+    return m_isFrozen;
+}
+
+void Minion::SetFrozen(bool frozen)
+{
+    m_isFrozen = frozen;
 }
 
 void Minion::TakeDamage(Minion& source)

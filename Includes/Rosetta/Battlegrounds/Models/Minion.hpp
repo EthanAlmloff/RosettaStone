@@ -49,6 +49,14 @@ class Minion
     //! \return The value of name.
     std::string_view GetName() const;
 
+    //! Returns the stable Hearthstone card ID.
+    //! \return The stable card ID.
+    std::string_view GetCardID() const;
+
+    //! Returns the stable Hearthstone database ID.
+    //! \return The database ID.
+    int GetDbfID() const;
+
     //! Returns the value of game tag.
     //! \param tag The game tag of card.
     //! \return The value of game tag.
@@ -118,6 +126,14 @@ class Minion
     //! Returns the flag that indicates whether it has divine shield.
     //! \return The flag that indicates whether it has divine shield.
     bool HasDivineShield() const;
+
+    //! Returns whether this Tavern entity is frozen.
+    //! \return true if this entity is frozen, false otherwise.
+    bool IsFrozen() const;
+
+    //! Sets whether this Tavern entity is frozen.
+    //! \param frozen The new frozen state.
+    void SetFrozen(bool frozen);
 
     //! Takes damage from a certain other minion.
     //! \param source A minion to give damage.
@@ -195,6 +211,7 @@ class Minion
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
     bool m_hasDivineShield = false;
+    bool m_isFrozen = false;
     bool m_isDestroyed = false;
 };
 }  // namespace RosettaStone::Battlegrounds

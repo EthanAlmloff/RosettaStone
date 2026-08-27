@@ -10,6 +10,8 @@
 #include <Rosetta/Battlegrounds/Games/GameState.hpp>
 
 #include <atomic>
+#include <cstdint>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -25,6 +27,13 @@ namespace RosettaStone::Battlegrounds
 class Game
 {
  public:
+    //! Default constructor using a nondeterministic process seed.
+    Game() = default;
+
+    //! Constructs a reproducible game.
+    //! \param seed The seed used by Battlegrounds random operations.
+    explicit Game(std::uint64_t seed);
+
     //! Gets the game state.
     //! \return The game state.
     GameState& GetGameState();
@@ -72,6 +81,7 @@ class Game
     std::size_t FindPlayerNextFight(std::size_t playerIdx);
 
  private:
+    std::optional<std::uint64_t> m_seed;
     GameState m_gameState{};
 
     Race m_excludeRace = Race::INVALID;

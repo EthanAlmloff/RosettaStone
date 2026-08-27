@@ -26,6 +26,10 @@ class OpponentNotFound final : public std::logic_error
 
 namespace RosettaStone::Battlegrounds
 {
+Game::Game(std::uint64_t seed) : m_seed(seed)
+{
+}
+
 GameState& Game::GetGameState()
 {
     return m_gameState;
@@ -33,6 +37,15 @@ GameState& Game::GetGameState()
 
 void Game::Start()
 {
+    if (m_seed.has_value())
+    {
+        Random::seed(m_seed.value());
+    }
+
+    // Card arrays must be populated before the minion pool reads them. Do not
+    // rely on another test or game having initialized the singleton first.
+    static_cast<void>(Cards::GetInstance());
+
     // Choose a race to exclude from the minion pool at random
     const auto raceIdx =
         Random::get<std::size_t>(0, RACES_IN_BATTLEGROUNDS.size() - 1);
@@ -78,10 +91,15 @@ void Game::Start()
 
     // Create callback to clear a list of minions in Tavern's field
     auto clearTavernMinionsCallback = [this](Player& player) {
-        while (!player.tavern.fieldZone.IsEmpty())
+        for (int i = player.tavern.fieldZone.GetCount() - 1; i >= 0; --i)
         {
-            Minion minion =
-                player.tavern.fieldZone.Remove(player.tavern.fieldZone[0]);
+            if (player.tavern.fieldZone[i].IsFrozen())
+            {
+                continue;
+            }
+
+            Minion minion = player.tavern.fieldZone.Remove(
+                player.tavern.fieldZone[static_cast<std::size_t>(i)]);
             m_gameState.minionPool.ReturnMinion(minion.GetPoolIndex());
         }
     };
@@ -249,20 +267,33 @@ void Game::Recruit()
             --player.coinToUpgradeTavern;
         }
 
-        if (!player.freezeTavern)
+        const bool manuallyFrozen = player.freezeTavern;
+
+        // Return only cards that were not preserved. Frozen state belongs to
+        // each Tavern entity rather than to the Tavern as a whole.
+        for (int i = player.tavern.fieldZone.GetCount() - 1; i >= 0; --i)
         {
-            // Clear a list of minions in Tavern
-            while (!player.tavern.fieldZone.IsEmpty())
+            if (player.tavern.fieldZone[i].IsFrozen())
             {
-                Minion minion =
-                    player.tavern.fieldZone.Remove(player.tavern.fieldZone[0]);
-                m_gameState.minionPool.ReturnMinion(minion.GetPoolIndex());
+                continue;
             }
 
-            // Prepare a list of minions to each player for purchase
+            Minion minion = player.tavern.fieldZone.Remove(
+                player.tavern.fieldZone[static_cast<std::size_t>(i)]);
+            m_gameState.minionPool.ReturnMinion(minion.GetPoolIndex());
+        }
+
+        // A manual whole-shop freeze preserves exactly the remaining cards.
+        // Independently frozen entities do not prevent ordinary vacancies
+        // from being filled on a normal end turn.
+        if (!manuallyFrozen)
+        {
             player.PrepareTavern();
         }
 
+        // Consume the one-turn frozen state.
+        player.tavern.fieldZone.ForEach(
+            [](MinionData& minion) { minion.value().SetFrozen(false); });
         player.freezeTavern = false;
     }
 }
