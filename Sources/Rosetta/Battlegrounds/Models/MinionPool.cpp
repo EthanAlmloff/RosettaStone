@@ -10,6 +10,8 @@
 
 #include <effolkronium/random.hpp>
 
+#include <stdexcept>
+
 using Random = effolkronium::random_static;
 
 namespace RosettaStone::Battlegrounds
@@ -109,6 +111,35 @@ void MinionPool::Initialize(Race excludeRace)
     }
 
     m_count = idx;
+}
+
+void MinionPool::InitializeSupported(const std::vector<std::string>& cardIDs)
+{
+    if (cardIDs.empty())
+    {
+        throw std::invalid_argument("supported minion pool cannot be empty");
+    }
+
+    std::vector<Card> cards;
+    cards.reserve(cardIDs.size());
+    for (const auto& id : cardIDs)
+    {
+        Card card = Cards::FindCardByID(id);
+        if (card.id.empty() || card.GetCardType() != CardType::MINION ||
+            card.GetTier() < 1)
+        {
+            throw std::invalid_argument("unsupported minion pool card ID");
+        }
+        cards.emplace_back(std::move(card));
+    }
+
+    for (std::size_t idx = 0; idx < m_minions.size(); ++idx)
+    {
+        const Card& card = cards.at(idx % cards.size());
+        m_minions.at(idx) = { Minion(card, static_cast<int>(idx)),
+                              static_cast<int>(idx), true };
+    }
+    m_count = m_minions.size();
 }
 
 std::size_t MinionPool::GetCount() const

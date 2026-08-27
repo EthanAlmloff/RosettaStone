@@ -12,6 +12,8 @@
 #include <atomic>
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <vector>
 #include <tuple>
 #include <vector>
 
@@ -33,6 +35,9 @@ class Game
     //! Constructs a reproducible game.
     //! \param seed The seed used by Battlegrounds random operations.
     explicit Game(std::uint64_t seed);
+
+    //! Constructs a seeded game with an explicitly supported minion pool.
+    Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs);
 
     //! Gets the game state.
     //! \return The game state.
@@ -82,6 +87,7 @@ class Game
 
  private:
     std::optional<std::uint64_t> m_seed;
+    std::vector<std::string> m_supportedCardIDs;
     GameState m_gameState{};
 
     Race m_excludeRace = Race::INVALID;

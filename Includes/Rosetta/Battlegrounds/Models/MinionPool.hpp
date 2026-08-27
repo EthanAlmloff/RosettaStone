@@ -13,6 +13,8 @@
 #include <Rosetta/Common/Constants.hpp>
 
 #include <array>
+#include <string>
+#include <vector>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -29,6 +31,11 @@ class MinionPool
     //! Initializes the pool to add a list of minions.
     //! \param excludeRace The race to exclude from the pool.
     void Initialize(Race excludeRace);
+
+    //! Initializes a deterministic experimental pool containing only the
+    //! supplied card IDs. Copies are repeated to pool capacity.
+    //! \param cardIDs The supported minion card IDs.
+    void InitializeSupported(const std::vector<std::string>& cardIDs);
 
     //! Returns the count of minions in the pool.
     //! \return The count of minions in the pool.

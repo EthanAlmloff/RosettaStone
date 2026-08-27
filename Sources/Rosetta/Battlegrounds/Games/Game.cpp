@@ -12,6 +12,7 @@
 #include <effolkronium/random.hpp>
 
 #include <stdexcept>
+#include <utility>
 
 using Random = effolkronium::random_static;
 
@@ -27,6 +28,11 @@ class OpponentNotFound final : public std::logic_error
 namespace RosettaStone::Battlegrounds
 {
 Game::Game(std::uint64_t seed) : m_seed(seed)
+{
+}
+
+Game::Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs)
+    : m_seed(seed), m_supportedCardIDs(std::move(supportedCardIDs))
 {
 }
 
@@ -52,7 +58,14 @@ void Game::Start()
     m_excludeRace = RACES_IN_BATTLEGROUNDS.at(raceIdx);
 
     // Initialize the minion pool
-    m_gameState.minionPool.Initialize(m_excludeRace);
+    if (m_supportedCardIDs.empty())
+    {
+        m_gameState.minionPool.Initialize(m_excludeRace);
+    }
+    else
+    {
+        m_gameState.minionPool.InitializeSupported(m_supportedCardIDs);
+    }
     m_playerFightPair.reserve(NUM_BATTLEGROUNDS_PLAYERS / 2);
 
     // Create callback to increase player count and process next phase
@@ -123,6 +136,9 @@ void Game::Start()
             case 5:
                 player.coinToUpgradeTavern = NUM_COIN_UPGRADE_TAVERN_TIER_6;
                 break;
+            case 6:
+                player.coinToUpgradeTavern = 0;
+                break;
             default:
                 throw std::logic_error("Invalid player's current tier");
         }
@@ -132,7 +148,7 @@ void Game::Start()
     auto completeRecruitCallback = [this]() {
         ++m_playerCount;
 
-        if (m_playerCount >= NUM_BATTLEGROUNDS_PLAYERS)
+        if (m_playerCount >= m_gameState.numRemainPlayer)
         {
             // Set next phase
             m_gameState.nextPhase = Phase::COMBAT;
@@ -264,7 +280,8 @@ void Game::Recruit()
         // Decrease the value of coin to upgrade player's Tavern to next tier
         if (player.currentTier < TIER_UPPER_LIMIT)
         {
-            --player.coinToUpgradeTavern;
+            player.coinToUpgradeTavern =
+                std::max(0, player.coinToUpgradeTavern - 1);
         }
 
         const bool manuallyFrozen = player.freezeTavern;
@@ -319,6 +336,21 @@ void Game::Combat()
         player2.getBattleCallback = [&battle]() -> Battle& { return battle; };
 
         battle.Run();
+
+        const auto player1Idx = std::get<0>(pair);
+        const auto player2Idx = std::get<1>(pair);
+        const bool player1Ghost = player1.playState != PlayState::PLAYING;
+        const bool player2Ghost = player2.playState != PlayState::PLAYING;
+        if (!player1Ghost)
+        {
+            player1.playerIdxFoughtLastTurn = player2Idx;
+            player1.isFoughtGhostLastTurn = player2Ghost;
+        }
+        if (!player2Ghost)
+        {
+            player2.playerIdxFoughtLastTurn = player1Idx;
+            player2.isFoughtGhostLastTurn = player1Ghost;
+        }
     }
 
     // Set next phase
@@ -328,6 +360,14 @@ void Game::Combat()
 
 void Game::GameOver()
 {
+    for (auto& player : m_gameState.players)
+    {
+        if (player.playState == PlayState::PLAYING)
+        {
+            player.playState = PlayState::WON;
+            player.rank = 1;
+        }
+    }
     m_gameState.phase = Phase::COMPLETE;
 }
 
@@ -388,30 +428,43 @@ std::size_t Game::DeterminePlayerToFightGhost(
     // Bottom 3 have a chance to play the ghost
     std::vector<int> ghostCandidates;
 
-    for (std::size_t i = playerData.size() - 3; i < playerData.size(); ++i)
+    const std::size_t firstCandidate = playerData.size() > 3
+                                           ? playerData.size() - 3
+                                           : 0;
+    for (std::size_t i = firstCandidate; i < playerData.size(); ++i)
     {
+        const int playerIdx = std::get<0>(playerData.at(i));
         // Can't fight a ghost 2 turns in a row
-        if (m_gameState.players.at(i).isFoughtGhostLastTurn)
+        if (m_gameState.players.at(playerIdx).isFoughtGhostLastTurn)
         {
             continue;
         }
 
-        ghostCandidates.emplace_back(i);
+        ghostCandidates.emplace_back(playerIdx);
+    }
+
+    // With very few players, the no-repeat constraint may exclude everyone.
+    if (ghostCandidates.empty())
+    {
+        for (std::size_t i = firstCandidate; i < playerData.size(); ++i)
+        {
+            ghostCandidates.emplace_back(std::get<0>(playerData.at(i)));
+        }
     }
 
     // Fight randomly selected player and the ghost
-    const std::size_t idx =
+    const std::size_t choice =
         Random::get<std::size_t>(0, ghostCandidates.size() - 1);
+    const int playerIdx = ghostCandidates.at(choice);
 
     // Remove the index of randomly selected player from player data
     playerData.erase(std::remove_if(playerData.begin(), playerData.end(),
-                                    [idx](std::tuple<int, int> data) {
-                                        return std::get<0>(data) ==
-                                               static_cast<int>(idx);
+                                    [playerIdx](std::tuple<int, int> data) {
+                                        return std::get<0>(data) == playerIdx;
                                     }),
                      playerData.end());
 
-    return idx;
+    return static_cast<std::size_t>(playerIdx);
 }
 
 void Game::SetPlayerPair(int player1Idx, int player2Idx)
@@ -421,44 +474,12 @@ void Game::SetPlayerPair(int player1Idx, int player2Idx)
 
 void Game::PairPlayers(std::vector<std::tuple<int, int>>& playerData)
 {
-    // Shuffle indefinitely until the conditions are met
-    while (true)
+    Random::shuffle(playerData.begin(), playerData.end());
+    for (std::size_t i = 0; i < playerData.size(); i += 2)
     {
-        bool isSucceed = true;
-        Random::shuffle(playerData.begin(), playerData.end());
-
-        for (std::size_t i = 0; i < playerData.size(); i += 2)
-        {
-            const int player1Idx = std::get<0>(playerData.at(i));
-            const int player2Idx = std::get<0>(playerData.at(i + 1));
-
-            // Check this player is the player you've been playing
-            // against before
-            if (m_gameState.players.at(player1Idx).playerIdxFoughtLastTurn ==
-                static_cast<std::size_t>(player2Idx))
-            {
-                isSucceed = false;
-                break;
-            }
-        }
-
-        // If the conditions are not met, repeat while statement again
-        if (!isSucceed)
-        {
-            continue;
-        }
-
-        // If the conditions are met, save the player's index pair
-        for (std::size_t i = 0; i < playerData.size(); i += 2)
-        {
-            const int player1Idx = std::get<0>(playerData.at(i));
-            const int player2Idx = std::get<0>(playerData.at(i + 1));
-
-            m_playerFightPair.emplace_back(
-                std::make_tuple(player1Idx, player2Idx));
-        }
-
-        break;
+        const int player1Idx = std::get<0>(playerData.at(i));
+        const int player2Idx = std::get<0>(playerData.at(i + 1));
+        m_playerFightPair.emplace_back(std::make_tuple(player1Idx, player2Idx));
     }
 }
 
@@ -477,6 +498,7 @@ std::size_t Game::FindPlayerNextFight(std::size_t playerIdx)
         }
     }
 
-    throw OpponentNotFound("Opponent player not found");
+    throw OpponentNotFound("Opponent player not found for player " +
+                           std::to_string(playerIdx));
 }
 }  // namespace RosettaStone::Battlegrounds
