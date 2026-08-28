@@ -59,6 +59,10 @@ class Game
     //! Processes the recruit phase.
     void Recruit();
 
+    //! Completes the current recruit phase after all living players have
+    //! submitted their decisions.
+    void CompleteRecruitPhase();
+
     //! Processes the combat phase.
     void Combat();
 

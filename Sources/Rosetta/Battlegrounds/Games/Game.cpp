@@ -333,6 +333,18 @@ void Game::Recruit()
     }
 }
 
+void Game::CompleteRecruitPhase()
+{
+    if (m_gameState.phase != Phase::RECRUIT)
+    {
+        throw std::logic_error("Cannot complete recruit outside recruit phase");
+    }
+
+    m_playerCount = 0;
+    m_gameState.nextPhase = Phase::COMBAT;
+    GameManager::ProcessNextPhase(*this, m_gameState.nextPhase);
+}
+
 void Game::Combat()
 {
     for (auto& player : m_gameState.players)
