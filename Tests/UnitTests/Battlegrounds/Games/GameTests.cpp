@@ -374,6 +374,24 @@ TEST_CASE("[Game] - Ghost")
     CHECK_EQ(game.GetGameState().ghostPlayerIdx, 3);
 }
 
+TEST_CASE("[Game] - Duplicate Defeat Is Ignored")
+{
+    Game game;
+    game.Start();
+
+    auto& player = game.GetGameState().players.at(7);
+    player.SelectHero(1);
+    player.ProcessDefeat();
+
+    const auto rank = player.rank;
+    const auto remaining = game.GetGameState().numRemainPlayer;
+    player.ProcessDefeat();
+
+    CHECK_EQ(player.playState, PlayState::LOST);
+    CHECK_EQ(player.rank, rank);
+    CHECK_EQ(game.GetGameState().numRemainPlayer, remaining);
+}
+
 TEST_CASE("[Game] - Rank")
 {
     Game game;

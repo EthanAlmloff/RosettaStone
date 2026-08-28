@@ -157,6 +157,13 @@ void Player::CompleteRecruit() const
 
 void Player::ProcessDefeat()
 {
+    // Dead players may be selected as Battlegrounds ghosts and can receive
+    // combat damage again. Defeat must be idempotent: processing the same
+    // player twice corrupts the remaining-player count and placement ranks.
+    if (playState != PlayState::PLAYING)
+    {
+        return;
+    }
     processDefeatCallback(*this);
 }
 }  // namespace RosettaStone::Battlegrounds
