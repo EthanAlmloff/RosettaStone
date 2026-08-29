@@ -30,6 +30,7 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/MinionPool.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
+#include <Rosetta/Battlegrounds/Models/Season14.hpp>
 #include <Rosetta/Battlegrounds/Models/Spell.hpp>
 #include <Rosetta/Battlegrounds/Models/Tavern.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>

@@ -9,6 +9,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
 #include <string_view>
 
 namespace
@@ -134,12 +135,19 @@ namespace RosettaStone::Battlegrounds
 void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
 {
     // Read card data from JSON file
-    std::ifstream cardFile(RESOURCES_DIR "cards.json");
+#ifdef ROSETTA_BATTLEGROUNDS_CARDS_JSON
+    constexpr const char* configuredPath = ROSETTA_BATTLEGROUNDS_CARDS_JSON;
+#else
+    constexpr const char* configuredPath = RESOURCES_DIR "cards.json";
+#endif
+    std::ifstream cardFile(configuredPath);
     nlohmann::json j;
 
     if (!cardFile.is_open())
     {
-        throw std::runtime_error("Can't open cards.json");
+        throw std::runtime_error(
+            "Can't open configured Battlegrounds card snapshot: "
+            + std::string(configuredPath));
     }
 
     cardFile >> j;
@@ -270,6 +278,12 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
             card.isCurHero = true;
         }
 
+        if (idx >= cards.size())
+        {
+            throw std::length_error(
+                "Battlegrounds cards.json exceeds NUM_BATTLEGROUNDS_CARDS=" +
+                std::to_string(cards.size()) + ": " + id);
+        }
         cards.at(idx) = card;
         ++idx;
     }

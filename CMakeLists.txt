@@ -49,9 +49,19 @@ set(CMAKE_MACOSX_RPATH ON)
 
 # Set resources
 set(RESOURCES_DIR ${ROSETTA_ROOT}/Resources)
+set(ROSETTA_BATTLEGROUNDS_CARDS_JSON
+    "${RESOURCES_DIR}/cards.json"
+    CACHE FILEPATH
+    "Explicit HearthstoneJSON snapshot used by the Battlegrounds loader")
+if (NOT EXISTS "${ROSETTA_BATTLEGROUNDS_CARDS_JSON}")
+    message(FATAL_ERROR
+        "ROSETTA_BATTLEGROUNDS_CARDS_JSON does not exist: ${ROSETTA_BATTLEGROUNDS_CARDS_JSON}")
+endif()
+file(TO_CMAKE_PATH "${ROSETTA_BATTLEGROUNDS_CARDS_JSON}"
+     ROSETTA_BATTLEGROUNDS_CARDS_JSON_CMAKE)
 set(RESOURCES_JSONS
     ${RESOURCES_DIR}/cards.collectible.json
-    ${RESOURCES_DIR}/cards.json)
+    ${ROSETTA_BATTLEGROUNDS_CARDS_JSON})
 
 # Project modules
 add_subdirectory(Sources/Rosetta)

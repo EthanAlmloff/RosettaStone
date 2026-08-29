@@ -8,6 +8,7 @@
 #define ROSETTASTONE_BATTLEGROUNDS_PLAYER_HPP
 
 #include <Rosetta/Battlegrounds/Models/Hero.hpp>
+#include <Rosetta/Battlegrounds/Models/Season14.hpp>
 #include <Rosetta/Battlegrounds/Models/Tavern.hpp>
 #include <Rosetta/Battlegrounds/Tasks/TaskStack.hpp>
 #include <Rosetta/Battlegrounds/Zones/FieldZone.hpp>
@@ -92,6 +93,7 @@ class Player
     FieldZone battleField;
 
     TaskStack taskStack;
+    Season14State season14;
 
     std::function<void(Player&)> selectHeroCallback;
     std::function<void(Player&)> prepareTavernMinionsCallback;

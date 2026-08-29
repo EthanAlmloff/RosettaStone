@@ -8,6 +8,8 @@
 #include <Rosetta/Battlegrounds/Loaders/CardLoader.hpp>
 #include <Rosetta/Battlegrounds/Loaders/InternalCardLoader.hpp>
 
+#include <stdexcept>
+
 namespace RosettaStone::Battlegrounds
 {
 std::array<Card, NUM_BATTLEGROUNDS_CARDS> Cards::m_cards;
@@ -29,52 +31,68 @@ Cards::Cards()
     std::size_t tier1Idx = 0, tier2Idx = 0, tier3Idx = 0, tier4Idx = 0,
                 tier5Idx = 0, tier6Idx = 0, tier7Idx = 0;
 
+    const auto append = [](auto& destination, std::size_t& index,
+                           const Card& card, const char* category) {
+        if (index >= destination.size())
+        {
+            throw std::length_error(
+                std::string("Battlegrounds ") + category +
+                " metadata exceeds configured capacity at index " +
+                std::to_string(index) + "/" +
+                std::to_string(destination.size()) + " (" + card.id + ")");
+        }
+        destination.at(index++) = card;
+    };
+
     for (auto& card : m_cards)
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         card.Initialize();
 
-        if (card.GetCardType() == CardType::HERO && card.isCurHero)
+        if (card.GetCardType() == CardType::HERO && card.isCurHero &&
+            !card.isBattlegroundsDuosExclusive)
         {
-            m_curHeroes.at(heroIdx) = card;
-            ++heroIdx;
+            append(m_curHeroes, heroIdx, card, "hero");
         }
 
-        if (card.isBattlegroundsPoolMinion)
+        if (card.isBattlegroundsPoolMinion &&
+            !card.isBattlegroundsDuosExclusive)
         {
             if (card.GetTier() == 1)
             {
-                m_tier1Minions.at(tier1Idx) = card;
-                ++tier1Idx;
+                append(m_tier1Minions, tier1Idx, card, "tier 1");
             }
             else if (card.GetTier() == 2)
             {
-                m_tier2Minions.at(tier2Idx) = card;
-                ++tier2Idx;
+                append(m_tier2Minions, tier2Idx, card, "tier 2");
             }
             else if (card.GetTier() == 3)
             {
-                m_tier3Minions.at(tier3Idx) = card;
-                ++tier3Idx;
+                append(m_tier3Minions, tier3Idx, card, "tier 3");
             }
             else if (card.GetTier() == 4)
             {
-                m_tier4Minions.at(tier4Idx) = card;
-                ++tier4Idx;
+                append(m_tier4Minions, tier4Idx, card, "tier 4");
             }
             else if (card.GetTier() == 5)
             {
-                m_tier5Minions.at(tier5Idx) = card;
-                ++tier5Idx;
+                append(m_tier5Minions, tier5Idx, card, "tier 5");
             }
             else if (card.GetTier() == 6)
             {
-                m_tier6Minions.at(tier6Idx) = card;
-                ++tier6Idx;
+                append(m_tier6Minions, tier6Idx, card, "tier 6");
             }
             else if (card.GetTier() == 7)
             {
-                m_tier7Minions.at(tier7Idx) = card;
-                ++tier7Idx;
+                append(m_tier7Minions, tier7Idx, card, "tier 7");
+            }
+            else
+            {
+                throw std::invalid_argument(
+                    "Battlegrounds pool minion has invalid tier: " + card.id);
             }
         }
     }

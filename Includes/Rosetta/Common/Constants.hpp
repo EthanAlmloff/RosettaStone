@@ -77,8 +77,10 @@ constexpr std::array<CardSet, 1> CLASSIC_CARD_SETS = {
 //! The number of Play mode cards.
 constexpr int NUM_PLAY_MODE_CARDS = 15818;
 
-//! The number of Battlegrounds cards.
-constexpr int NUM_BATTLEGROUNDS_CARDS = 17611;
+//! The number of non-Lettuce cards in the pinned HearthstoneJSON 36.4 snapshot.
+//! Keep this in sync with the snapshot's validated record count; CardLoader
+//! rejects a larger input instead of truncating into the fixed ABI storage.
+constexpr int NUM_BATTLEGROUNDS_CARDS = 28656;
 
 //! The number of player class.
 //! \note Druid, Hunter, Mage, Paladin, Priest, Rogue, Shaman, Warlock, Warrior,
@@ -115,8 +117,9 @@ constexpr int MAX_SECERT_SIZE = 5;
 //! The number of players in Battlegrounds.
 constexpr int NUM_BATTLEGROUNDS_PLAYERS = 8;
 
-//! The number of heroes in Battlegrounds.
-constexpr int NUM_BATTLEGROUNDS_HEROES = 89;
+//! The number of heroes in the pinned Patch 36.4 solo pool plus the legacy
+//! Lady Vashj compatibility entry injected by CardLoader.
+constexpr int NUM_BATTLEGROUNDS_HEROES = 117;
 
 //! The number of heroes on the selection list in Battlegrounds.
 constexpr int NUM_HEROES_ON_SELECTION_LIST = 4;
@@ -143,22 +146,22 @@ constexpr int NUM_COPIES_OF_EACH_TIER6_MINIONS = 7;
 constexpr int NUM_COPIES_OF_EACH_TIER7_MINIONS = 5;
 
 //! The number of tier 1 minions in Battlegrounds.
-constexpr int NUM_TIER1_MINIONS = 21;
+constexpr int NUM_TIER1_MINIONS = 22;
 
 //! The number of tier 2 minions in Battlegrounds.
-constexpr int NUM_TIER2_MINIONS = 30;
+constexpr int NUM_TIER2_MINIONS = 34;
 
 //! The number of tier 3 minions in Battlegrounds.
-constexpr int NUM_TIER3_MINIONS = 33;
+constexpr int NUM_TIER3_MINIONS = 43;
 
 //! The number of tier 4 minions in Battlegrounds.
-constexpr int NUM_TIER4_MINIONS = 35;
+constexpr int NUM_TIER4_MINIONS = 55;
 
 //! The number of tier 5 minions in Battlegrounds.
-constexpr int NUM_TIER5_MINIONS = 30;
+constexpr int NUM_TIER5_MINIONS = 46;
 
 //! The number of tier 6 minions in Battlegrounds.
-constexpr int NUM_TIER6_MINIONS = 22;
+constexpr int NUM_TIER6_MINIONS = 35;
 
 //! The number of tier 7 minions in the pinned Patch 36.4 Battlegrounds pool.
 constexpr int NUM_TIER7_MINIONS = 12;
@@ -174,10 +177,11 @@ constexpr int NUM_TOTAL_TAVERN_MINIONS =
     NUM_TIER7_MINIONS * NUM_COPIES_OF_EACH_TIER7_MINIONS;
 
 //! A list of races in Battlegrounds.
-constexpr std::array<Race, 9> RACES_IN_BATTLEGROUNDS = {
+constexpr std::array<Race, 10> RACES_IN_BATTLEGROUNDS = {
     Race::BEAST,     Race::DEMON,      Race::DRAGON,
     Race::ELEMENTAL, Race::MECHANICAL, Race::MURLOC,
-    Race::PIRATE,    Race::QUILBOAR,   Race::NAGA
+    Race::PIRATE,    Race::QUILBOAR,   Race::NAGA,
+    Race::UNDEAD
 };
 
 //! The number of coin to purchase a minion.

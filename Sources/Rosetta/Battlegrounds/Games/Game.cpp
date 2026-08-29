@@ -285,6 +285,9 @@ void Game::Recruit()
             continue;
         }
 
+        player.season14.Emit(Season14Event::RECRUIT_START);
+        player.season14.heroPowerUsed = false;
+
         // Set the flag
         player.isInCombat = true;
 
@@ -343,6 +346,13 @@ void Game::CompleteRecruitPhase()
         throw std::logic_error("Cannot complete recruit outside recruit phase");
     }
 
+    for (auto& player : m_gameState.players)
+    {
+        if (player.playState == PlayState::PLAYING)
+        {
+            player.season14.Emit(Season14Event::RECRUIT_END);
+        }
+    }
     m_playerCount = 0;
     m_gameState.nextPhase = Phase::COMBAT;
     GameManager::ProcessNextPhase(*this, m_gameState.nextPhase);
@@ -354,6 +364,10 @@ void Game::Combat()
     {
         // Set the flag
         player.isInCombat = true;
+        if (player.playState == PlayState::PLAYING)
+        {
+            player.season14.Emit(Season14Event::COMBAT_START);
+        }
     }
 
     // Simulates a battle for each pair
@@ -369,6 +383,15 @@ void Game::Combat()
         player2.getBattleCallback = [&battle]() -> Battle& { return battle; };
 
         battle.Run();
+
+        if (player1.playState == PlayState::PLAYING)
+        {
+            player1.season14.Emit(Season14Event::COMBAT_END);
+        }
+        if (player2.playState == PlayState::PLAYING)
+        {
+            player2.season14.Emit(Season14Event::COMBAT_END);
+        }
 
         const auto player1Idx = std::get<0>(pair);
         const auto player2Idx = std::get<1>(pair);

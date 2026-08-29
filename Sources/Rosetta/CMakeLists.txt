@@ -64,6 +64,7 @@ target_compile_options(${target}
 target_compile_definitions(${target}
     PRIVATE
     RESOURCES_DIR="${ROSETTA_ROOT}/Resources/"
+    ROSETTA_BATTLEGROUNDS_CARDS_JSON="${ROSETTA_BATTLEGROUNDS_CARDS_JSON_CMAKE}"
 )
 
 target_link_libraries(${target}

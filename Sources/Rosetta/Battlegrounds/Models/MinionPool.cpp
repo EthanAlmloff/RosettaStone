@@ -23,6 +23,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 1
     for (const auto& card : Cards::GetTier1Minions())
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         if (!card.hasBehavior)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
@@ -42,6 +46,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 2
     for (const auto& card : Cards::GetTier2Minions())
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         if (!card.hasBehavior)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
@@ -61,6 +69,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 3
     for (const auto& card : Cards::GetTier3Minions())
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         if (!card.hasBehavior)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
@@ -80,6 +92,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 4
     for (const auto& card : Cards::GetTier4Minions())
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         if (!card.hasBehavior)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
@@ -99,6 +115,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 5
     for (const auto& card : Cards::GetTier5Minions())
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         if (!card.hasBehavior)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
@@ -118,6 +138,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 6
     for (const auto& card : Cards::GetTier6Minions())
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         if (!card.hasBehavior)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
@@ -137,6 +161,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 7
     for (const auto& card : Cards::GetTier7Minions())
     {
+        if (card.id.empty())
+        {
+            continue;
+        }
         if (!card.hasBehavior)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
