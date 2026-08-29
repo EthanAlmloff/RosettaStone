@@ -9,10 +9,17 @@
 
 #include <Rosetta/Battlegrounds/Actions/Generic.hpp>
 #include <Rosetta/Battlegrounds/CardSets/BattlegroundsCardsGen.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch2.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch3.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/Cards/Card.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDef.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Cards/HeroPowerMetadataRegistry.hpp>
+#include <Rosetta/Battlegrounds/Cards/HeroPowerRegistry.hpp>
 #include <Rosetta/Battlegrounds/Cards/TargetingPredicates.hpp>
 #include <Rosetta/Battlegrounds/Conditions/SelfCondition.hpp>
 #include <Rosetta/Battlegrounds/Enchants/Effect.hpp>

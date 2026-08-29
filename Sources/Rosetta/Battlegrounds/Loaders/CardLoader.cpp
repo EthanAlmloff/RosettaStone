@@ -70,7 +70,7 @@ template <typename Enum>
 Enum ParseEnumString(std::string_view raw, const char* field,
                      std::string_view cardLabel)
 {
-    const Enum parsed = StrToEnum<Enum>(raw);
+    const Enum parsed = RosettaStone::StrToEnum<Enum>(raw);
     if (raw != "INVALID" && static_cast<int>(parsed) == 0)
     {
         throw std::invalid_argument("card " + std::string(cardLabel) +
@@ -276,7 +276,8 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
             cardData["health"].is_null() ? 0 : cardData["health"].get<int>();
         const int cost =
             !cardData.contains("cost") || cardData.at("cost").is_null()
-
+                ? 0
+                : MetadataInt(cardData, "cost");
         std::map<GameTag, int> gameTags;
         if (cardData.contains("mechanics") &&
             !cardData.at("mechanics").is_null())

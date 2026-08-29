@@ -4,6 +4,7 @@
 // Copyright (c) 2017-2024 Chris Ohk
 
 #include <Rosetta/Battlegrounds/CardSets/BattlegroundsCardsGen.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 
 namespace RosettaStone::Battlegrounds
@@ -13,6 +14,7 @@ std::map<std::string, CardDef> CardDefs::m_data;
 CardDefs::CardDefs()
 {
     BattlegroundsCardsGen::AddAll(m_data);
+    ModernMinionBehaviors::AddAll(m_data);
 }
 
 CardDefs::~CardDefs()

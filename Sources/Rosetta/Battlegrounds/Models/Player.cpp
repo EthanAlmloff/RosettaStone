@@ -104,11 +104,23 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
 
 namespace
 {
+enum class SpellBoardEffect
+{
+    NONE,
+    ALL_STATS,
+    LEFTMOST_STATS,
+    DIVINE_SHIELD_ATTACK,
+    ALL_AND_RACE,
+    ALL_RACE_AND_DIVINE_SHIELD,
+};
+
 struct SupportedSpellEffect
 {
     int gold = -1;
     int attack = 0;
     int health = 0;
+    SpellBoardEffect board = SpellBoardEffect::NONE;
+    Race race = Race::INVALID;
 };
 
 SupportedSpellEffect SupportedSpell(const Spell& spell)
@@ -124,6 +136,25 @@ SupportedSpellEffect SupportedSpell(const Spell& spell)
     {
         return { 0, 4, 4 };
     }
+    if (spell.GetID() == "BG33_813") // Selfish Bounty: left-most +6/+6.
+    {
+        return { 0, 6, 6, SpellBoardEffect::LEFTMOST_STATS };
+    }
+    if (spell.GetID() == "BG33_817") // Sanctify: Divine Shield minions +6 Attack.
+    {
+        return { 0, 6, 0, SpellBoardEffect::DIVINE_SHIELD_ATTACK };
+    }
+    if (spell.GetID() == "BG35_922") // Naga minions get another +2/+2.
+    {
+        return { 0, 2, 2, SpellBoardEffect::ALL_AND_RACE, Race::NAGA };
+    }
+    if (spell.GetID() == "BG36_246") // Dragons and Divine Shields repeat +2/+1.
+    {
+        return {
+            0, 2, 1, SpellBoardEffect::ALL_RACE_AND_DIVINE_SHIELD,
+            Race::DRAGON
+        };
+    }
     if (spell.GetID() == "BG28_810") // Tavern Coin: Gain 1 Gold.
     {
         return { 1, 0, 0 };
@@ -133,6 +164,69 @@ SupportedSpellEffect SupportedSpell(const Spell& spell)
         return { 2, 0, 0 };
     }
     return {};
+}
+void ApplySpellBoardEffect(Player& player, const SupportedSpellEffect& effect)
+{
+    const auto addStats = [&effect](MinionData& aliveMinion) {
+        Minion& minion = aliveMinion.value();
+        minion.SetAttack(minion.GetAttack() + effect.attack);
+        minion.SetHealth(minion.GetHealth() + effect.health);
+    };
+
+    switch (effect.board)
+    {
+        case SpellBoardEffect::NONE:
+            return;
+        case SpellBoardEffect::ALL_STATS:
+            player.recruitField.ForEachAlive(addStats);
+            return;
+        case SpellBoardEffect::LEFTMOST_STATS:
+        {
+            bool applied = false;
+            player.recruitField.ForEachAlive(
+                [&applied, &addStats](MinionData& aliveMinion) {
+                    if (!applied)
+                    {
+                        addStats(aliveMinion);
+                        applied = true;
+                    }
+                });
+            return;
+        }
+        case SpellBoardEffect::DIVINE_SHIELD_ATTACK:
+            player.recruitField.ForEachAlive(
+                [&effect](MinionData& aliveMinion) {
+                    Minion& minion = aliveMinion.value();
+                    if (minion.HasDivineShield())
+                    {
+                        minion.SetAttack(minion.GetAttack() + effect.attack);
+                    }
+                });
+            return;
+        case SpellBoardEffect::ALL_AND_RACE:
+            player.recruitField.ForEachAlive(
+                [&effect, &addStats](MinionData& aliveMinion) {
+                    addStats(aliveMinion);
+                    Minion& minion = aliveMinion.value();
+                    if (minion.GetRace() == effect.race)
+                    {
+                        addStats(aliveMinion);
+                    }
+                });
+            return;
+        case SpellBoardEffect::ALL_RACE_AND_DIVINE_SHIELD:
+            player.recruitField.ForEachAlive(
+                [&effect, &addStats](MinionData& aliveMinion) {
+                    addStats(aliveMinion);
+                    Minion& minion = aliveMinion.value();
+                    if (minion.GetRace() == effect.race ||
+                        minion.HasDivineShield())
+                    {
+                        addStats(aliveMinion);
+                    }
+                });
+            return;
+    }
 }
 }  // namespace
 
@@ -167,13 +261,7 @@ bool Player::PlaySpell(std::size_t handIdx)
     remainCoin -= cost;
     remainCoin += effect.gold;
     season14.Emit(Season14Event::SPELL_CAST);
-    if (effect.attack != 0 || effect.health != 0)
-    {
-        recruitField.ForEachAlive([&effect](Minion& minion) {
-            minion.SetAttack(minion.GetAttack() + effect.attack);
-            minion.SetHealth(minion.GetHealth() + effect.health);
-        });
-    }
+    ApplySpellBoardEffect(*this, effect);
     return true;
 }
 
