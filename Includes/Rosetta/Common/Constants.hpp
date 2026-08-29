@@ -139,6 +139,9 @@ constexpr int NUM_COPIES_OF_EACH_TIER5_MINIONS = 9;
 //! The number of copies of each tier 6 minion.
 constexpr int NUM_COPIES_OF_EACH_TIER6_MINIONS = 7;
 
+//! The number of copies of each tier 7 minion in the pinned Patch 36.4 pool.
+constexpr int NUM_COPIES_OF_EACH_TIER7_MINIONS = 5;
+
 //! The number of tier 1 minions in Battlegrounds.
 constexpr int NUM_TIER1_MINIONS = 21;
 
@@ -157,6 +160,9 @@ constexpr int NUM_TIER5_MINIONS = 30;
 //! The number of tier 6 minions in Battlegrounds.
 constexpr int NUM_TIER6_MINIONS = 22;
 
+//! The number of tier 7 minions in the pinned Patch 36.4 Battlegrounds pool.
+constexpr int NUM_TIER7_MINIONS = 12;
+
 //! The total number of tier minions in Battlegrounds Tavern.
 constexpr int NUM_TOTAL_TAVERN_MINIONS =
     NUM_TIER1_MINIONS * NUM_COPIES_OF_EACH_TIER1_MINIONS +
@@ -164,7 +170,8 @@ constexpr int NUM_TOTAL_TAVERN_MINIONS =
     NUM_TIER3_MINIONS * NUM_COPIES_OF_EACH_TIER3_MINIONS +
     NUM_TIER4_MINIONS * NUM_COPIES_OF_EACH_TIER4_MINIONS +
     NUM_TIER5_MINIONS * NUM_COPIES_OF_EACH_TIER5_MINIONS +
-    NUM_TIER6_MINIONS * NUM_COPIES_OF_EACH_TIER6_MINIONS;
+    NUM_TIER6_MINIONS * NUM_COPIES_OF_EACH_TIER6_MINIONS +
+    NUM_TIER7_MINIONS * NUM_COPIES_OF_EACH_TIER7_MINIONS;
 
 //! A list of races in Battlegrounds.
 constexpr std::array<Race, 9> RACES_IN_BATTLEGROUNDS = {
@@ -195,7 +202,7 @@ constexpr int NUM_COIN_UPGRADE_TAVERN_TIER_6 = 10;
 constexpr int NUM_COIN_REFRESH_TAVERN = 1;
 
 //! The maximum number of tier.
-constexpr int TIER_UPPER_LIMIT = 6;
+constexpr int TIER_UPPER_LIMIT = 7;
 
 //! The maximum number of coin.
 constexpr int COIN_UPPER_LIMIT = 10;

@@ -18,6 +18,7 @@ std::array<Card, NUM_TIER3_MINIONS> Cards::m_tier3Minions;
 std::array<Card, NUM_TIER4_MINIONS> Cards::m_tier4Minions;
 std::array<Card, NUM_TIER5_MINIONS> Cards::m_tier5Minions;
 std::array<Card, NUM_TIER6_MINIONS> Cards::m_tier6Minions;
+std::array<Card, NUM_TIER7_MINIONS> Cards::m_tier7Minions;
 
 Cards::Cards()
 {
@@ -26,7 +27,7 @@ Cards::Cards()
 
     std::size_t heroIdx = 0;
     std::size_t tier1Idx = 0, tier2Idx = 0, tier3Idx = 0, tier4Idx = 0,
-                tier5Idx = 0, tier6Idx = 0;
+                tier5Idx = 0, tier6Idx = 0, tier7Idx = 0;
 
     for (auto& card : m_cards)
     {
@@ -69,6 +70,11 @@ Cards::Cards()
             {
                 m_tier6Minions.at(tier6Idx) = card;
                 ++tier6Idx;
+            }
+            else if (card.GetTier() == 7)
+            {
+                m_tier7Minions.at(tier7Idx) = card;
+                ++tier7Idx;
             }
         }
     }
@@ -159,5 +165,10 @@ const std::array<Card, NUM_TIER5_MINIONS>& Cards::GetTier5Minions()
 const std::array<Card, NUM_TIER6_MINIONS>& Cards::GetTier6Minions()
 {
     return m_tier6Minions;
+}
+
+const std::array<Card, NUM_TIER7_MINIONS>& Cards::GetTier7Minions()
+{
+    return m_tier7Minions;
 }
 }  // namespace RosettaStone::Battlegrounds

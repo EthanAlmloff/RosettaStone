@@ -85,6 +85,9 @@ class Cards
     //! \return A list of tier 6 minions in Battlegrounds Tavern.
     static const std::array<Card, NUM_TIER6_MINIONS>& GetTier6Minions();
 
+    //! Returns a list of tier 7 minions in Battlegrounds Tavern.
+    static const std::array<Card, NUM_TIER7_MINIONS>& GetTier7Minions();
+
  private:
     //! Constructor: Loads card data.
     Cards();
@@ -97,6 +100,7 @@ class Cards
     static std::array<Card, NUM_TIER4_MINIONS> m_tier4Minions;
     static std::array<Card, NUM_TIER5_MINIONS> m_tier5Minions;
     static std::array<Card, NUM_TIER6_MINIONS> m_tier6Minions;
+    static std::array<Card, NUM_TIER7_MINIONS> m_tier7Minions;
 };
 }  // namespace RosettaStone::Battlegrounds
 

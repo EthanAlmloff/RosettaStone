@@ -14,6 +14,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -68,6 +69,17 @@ class Card
     int dbfID;
     int normalDbfID;
     int premiumDbfID;
+    int heroPowerDbfID = 0;
+    int relatedDbfID = 0;
+
+    //! DBF IDs referenced by generated choices, options, or other links.
+    std::vector<int> linkedDbfIDs;
+    //! Associated tribes may be multiple values (for example, Trinkets).
+    std::vector<std::string> associatedRaces;
+    //! The source metadata's Trinket tier marker (LESSER_TRINKET/GREATER_TRINKET).
+    std::string trinketType;
+    //! String IDs for generated choice/option entities referenced by metadata.
+    std::vector<std::string> generatedChoiceLinks;
 
     std::string name;
     std::string text;
@@ -82,6 +94,12 @@ class Card
 
     bool isCurHero = false;
     bool isBattlegroundsPoolMinion = false;
+    bool isBattlegroundsPoolSpell = false;
+    bool isBattlegroundsDarkGift = false;
+    bool isBattlegroundsDuosExclusive = false;
+    bool isBattlegroundsTrinket = false;
+    //! True only when a generated Rosetta behavior definition is registered.
+    bool hasBehavior = false;
     bool mustHaveToTargetToPlay = false;
 };
 }  // namespace RosettaStone::Battlegrounds

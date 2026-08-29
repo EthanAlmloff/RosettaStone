@@ -157,6 +157,9 @@ void Game::Start()
             case 6:
                 player.coinToUpgradeTavern = 0;
                 break;
+            case 7:
+                player.coinToUpgradeTavern = 0;
+                break;
             default:
                 throw std::logic_error("Invalid player's current tier");
         }

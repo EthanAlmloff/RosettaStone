@@ -20,7 +20,7 @@ TEST_CASE("[Game] - Basic")
 
     CHECK_EQ(game.GetGameState().phase, Phase::SELECT_HERO);
 
-    auto minions = game.GetGameState().minionPool.GetMinions(1, 6, true);
+    auto minions = game.GetGameState().minionPool.GetMinions(1, 7, true);
     CHECK_EQ(static_cast<int>(minions.size()),
              game.GetGameState().minionPool.GetCount());
 
@@ -63,7 +63,7 @@ TEST_CASE("[Game] - Basic")
     CHECK_EQ(player1.tavern.fieldZone.GetCount(), 2);
     CHECK_EQ(player1.remainCoin, 0);
 
-    minions = game.GetGameState().minionPool.GetMinions(1, 6, true);
+    minions = game.GetGameState().minionPool.GetMinions(1, 7, true);
     CHECK_EQ(static_cast<int>(minions.size()),
              game.GetGameState().minionPool.GetCount() - 3 * 8);
 
@@ -372,6 +372,11 @@ TEST_CASE("[Game] - Ghost")
     }
 
     CHECK_EQ(game.GetGameState().ghostPlayerIdx, 3);
+}
+
+TEST_CASE("[Game] - Tier 7 offer size")
+{
+    CHECK_EQ(GetNumMinionsCanPurchase(7), 7);
 }
 
 TEST_CASE("[Game] - Duplicate Defeat Is Ignored")

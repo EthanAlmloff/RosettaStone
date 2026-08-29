@@ -42,6 +42,9 @@ class CardDefs
     //! \return The card def data that matches \p id.
     static CardDef FindCardDefByID(const std::string_view& id);
 
+    //! Returns whether generated behavior exists for p id.
+    static bool HasDefinition(const std::string_view& id);
+
  private:
     //! Constructor: Loads card data (powers and play requirements).
     CardDefs();

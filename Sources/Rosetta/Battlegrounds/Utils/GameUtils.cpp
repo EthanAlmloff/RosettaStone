@@ -28,6 +28,10 @@ std::size_t GetNumMinionsCanPurchase(int tier)
     {
         return 6;
     }
+    else if (tier == 7)
+    {
+        return 7;
+    }
 
     throw std::invalid_argument("GetNumMinionsCanPurchase() - Incorrect tier");
 }

@@ -18,3 +18,10 @@ TEST_CASE("[Cards] - GetAllCards")
     CHECK_FALSE(cards.empty());
     CHECK_EQ(static_cast<int>(cards.size()), NUM_BATTLEGROUNDS_CARDS);
 }
+
+TEST_CASE("[Cards] - Tier 7 registry")
+{
+    const auto& cards = Cards::GetTier7Minions();
+
+    CHECK_EQ(static_cast<int>(cards.size()), NUM_TIER7_MINIONS);
+}

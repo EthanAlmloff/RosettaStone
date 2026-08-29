@@ -7,6 +7,127 @@
 #include <Rosetta/Battlegrounds/Loaders/CardLoader.hpp>
 
 #include <fstream>
+#include <algorithm>
+#include <cctype>
+#include <string_view>
+
+namespace
+{
+using Json = nlohmann::json;
+
+bool IsMetadataFlag(const Json& object, const char* key)
+{
+    if (!object.contains(key) || object.at(key).is_null())
+    {
+        return false;
+    }
+
+    return !object.at(key).is_boolean() || object.at(key).get<bool>();
+}
+
+int MetadataInt(const Json& object, const char* key)
+{
+    if (!object.contains(key) || object.at(key).is_null() ||
+        !object.at(key).is_number_integer())
+    {
+        return 0;
+    }
+
+    return object.at(key).get<int>();
+}
+
+bool IsLinkKey(const std::string& key)
+{
+    std::string normalized;
+    normalized.reserve(key.size());
+    for (const char value : key)
+    {
+        if (value != '_' && value != '-')
+        {
+            normalized.push_back(static_cast<char>(
+                std::tolower(static_cast<unsigned char>(value))));
+        }
+    }
+
+    constexpr std::array<std::string_view, 10> parts = {
+        "dbfid", "relatedcard", "normaldbfid", "premiumdbfid",
+        "heropowerdbfid", "entourage", "choice", "option", "token",
+        "generated"
+    };
+    return std::any_of(parts.begin(), parts.end(), [&normalized](const auto& part) {
+        return normalized.find(part) != std::string::npos;
+    });
+}
+
+bool IsChoiceKey(const std::string& key)
+{
+    std::string normalized;
+    normalized.reserve(key.size());
+    for (const char value : key)
+    {
+        if (value != '_' && value != '-')
+        {
+            normalized.push_back(static_cast<char>(
+                std::tolower(static_cast<unsigned char>(value))));
+        }
+    }
+
+    return normalized.find("choice") != std::string::npos ||
+           normalized.find("option") != std::string::npos;
+}
+
+void CollectGeneratedChoiceLinks(const Json& value, const std::string& key,
+                                 std::vector<std::string>& result)
+{
+    if (value.is_object())
+    {
+        for (const auto& [childKey, childValue] : value.items())
+        {
+            if (IsChoiceKey(childKey))
+            {
+                CollectGeneratedChoiceLinks(childValue, childKey, result);
+            }
+        }
+    }
+    else if (value.is_array())
+    {
+        for (const auto& child : value)
+        {
+            CollectGeneratedChoiceLinks(child, key, result);
+        }
+    }
+    else if (IsChoiceKey(key) && value.is_string())
+    {
+        result.push_back(value.get<std::string>());
+    }
+}
+
+void CollectLinkedDbfIDs(const Json& value, const std::string& key,
+                         std::vector<int>& result)
+{
+    if (value.is_object())
+    {
+        for (const auto& [childKey, childValue] : value.items())
+        {
+            if (IsLinkKey(childKey))
+            {
+                CollectLinkedDbfIDs(childValue, childKey, result);
+            }
+        }
+    }
+    else if (value.is_array())
+    {
+        for (const auto& child : value)
+        {
+            CollectLinkedDbfIDs(child, key, result);
+        }
+    }
+    else if (IsLinkKey(key) && value.is_number_integer())
+    {
+        result.push_back(value.get<int>());
+    }
+}
+}  // namespace
 
 namespace RosettaStone::Battlegrounds
 {
@@ -42,17 +163,13 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         const int dbfID =
             cardData["dbfId"].is_null() ? 0 : cardData["dbfId"].get<int>();
         const int normalDbfID =
-            cardData["battlegroundsNormalDbfId"].is_null()
-                ? 0
-                : cardData["battlegroundsNormalDbfId"].get<int>();
+            MetadataInt(cardData, "battlegroundsNormalDbfId");
         const int premiumDbfID =
-            cardData["battlegroundsPremiumDbfId"].is_null()
-                ? 0
-                : cardData["battlegroundsPremiumDbfId"].get<int>();
+            MetadataInt(cardData, "battlegroundsPremiumDbfId");
         const bool isBattlegroundsHero =
-            !cardData["battlegroundsHero"].is_null();
+            IsMetadataFlag(cardData, "battlegroundsHero");
         const bool isBattlegroundsPoolMinion =
-            !cardData["isBattlegroundsPoolMinion"].is_null();
+            IsMetadataFlag(cardData, "isBattlegroundsPoolMinion");
 
         const std::string name = cardData["name"].is_null()
                                      ? ""
@@ -90,10 +207,53 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         card.dbfID = dbfID;
         card.normalDbfID = normalDbfID;
         card.premiumDbfID = premiumDbfID;
+        card.heroPowerDbfID = MetadataInt(cardData, "heroPowerDbfId");
+        card.relatedDbfID = MetadataInt(cardData, "battlegroundsRelatedCard");
         card.name = name;
         card.text = text;
         card.isCurHero = isBattlegroundsHero;
         card.isBattlegroundsPoolMinion = isBattlegroundsPoolMinion;
+        card.isBattlegroundsPoolSpell =
+            IsMetadataFlag(cardData, "isBattlegroundsPoolSpell");
+        card.isBattlegroundsDarkGift =
+            IsMetadataFlag(cardData, "isBattlegroundsDarkGift");
+        card.isBattlegroundsDuosExclusive =
+            IsMetadataFlag(cardData, "isBattlegroundsDuosExclusive");
+        card.isBattlegroundsTrinket = type == CardType::BATTLEGROUND_TRINKET;
+        if (card.isBattlegroundsTrinket && cardData.contains("spellSchool") &&
+            cardData.at("spellSchool").is_string())
+        {
+            card.trinketType = cardData.at("spellSchool").get<std::string>();
+        }
+        if (cardData.contains("battlegroundsAssociatedRaces") &&
+            cardData.at("battlegroundsAssociatedRaces").is_array())
+        {
+            for (const auto& associatedRace :
+                 cardData.at("battlegroundsAssociatedRaces"))
+            {
+                if (associatedRace.is_string())
+                {
+                    card.associatedRaces.push_back(
+                        associatedRace.get<std::string>());
+                }
+            }
+        }
+        CollectLinkedDbfIDs(cardData, "", card.linkedDbfIDs);
+        CollectGeneratedChoiceLinks(cardData, "", card.generatedChoiceLinks);
+        std::sort(card.generatedChoiceLinks.begin(),
+                  card.generatedChoiceLinks.end());
+        card.generatedChoiceLinks.erase(
+            std::unique(card.generatedChoiceLinks.begin(),
+                        card.generatedChoiceLinks.end()),
+            card.generatedChoiceLinks.end());
+        card.linkedDbfIDs.erase(
+            std::remove(card.linkedDbfIDs.begin(), card.linkedDbfIDs.end(),
+                        dbfID),
+            card.linkedDbfIDs.end());
+        std::sort(card.linkedDbfIDs.begin(), card.linkedDbfIDs.end());
+        card.linkedDbfIDs.erase(
+            std::unique(card.linkedDbfIDs.begin(), card.linkedDbfIDs.end()),
+            card.linkedDbfIDs.end());
 
         card.gameTags = gameTags;
         card.gameTags[GameTag::CARD_SET] = static_cast<int>(cardSet);

@@ -23,6 +23,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 1
     for (const auto& card : Cards::GetTier1Minions())
     {
+        if (!card.hasBehavior)
+        {
+            throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
+        }
         if (card.GetRace() == excludeRace)
         {
             continue;
@@ -38,6 +42,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 2
     for (const auto& card : Cards::GetTier2Minions())
     {
+        if (!card.hasBehavior)
+        {
+            throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
+        }
         if (card.GetRace() == excludeRace)
         {
             continue;
@@ -53,6 +61,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 3
     for (const auto& card : Cards::GetTier3Minions())
     {
+        if (!card.hasBehavior)
+        {
+            throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
+        }
         if (card.GetRace() == excludeRace)
         {
             continue;
@@ -68,6 +80,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 4
     for (const auto& card : Cards::GetTier4Minions())
     {
+        if (!card.hasBehavior)
+        {
+            throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
+        }
         if (card.GetRace() == excludeRace)
         {
             continue;
@@ -83,6 +99,10 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 5
     for (const auto& card : Cards::GetTier5Minions())
     {
+        if (!card.hasBehavior)
+        {
+            throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
+        }
         if (card.GetRace() == excludeRace)
         {
             continue;
@@ -98,12 +118,35 @@ void MinionPool::Initialize(Race excludeRace)
     // Tier 6
     for (const auto& card : Cards::GetTier6Minions())
     {
+        if (!card.hasBehavior)
+        {
+            throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
+        }
         if (card.GetRace() == excludeRace)
         {
             continue;
         }
 
         for (std::size_t i = 0; i < NUM_COPIES_OF_EACH_TIER6_MINIONS; ++i)
+        {
+            m_minions.at(idx) = { Minion(card, idx), idx, true };
+            ++idx;
+        }
+    }
+
+    // Tier 7
+    for (const auto& card : Cards::GetTier7Minions())
+    {
+        if (!card.hasBehavior)
+        {
+            throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
+        }
+        if (card.GetRace() == excludeRace)
+        {
+            continue;
+        }
+
+        for (std::size_t i = 0; i < NUM_COPIES_OF_EACH_TIER7_MINIONS; ++i)
         {
             m_minions.at(idx) = { Minion(card, idx), idx, true };
             ++idx;

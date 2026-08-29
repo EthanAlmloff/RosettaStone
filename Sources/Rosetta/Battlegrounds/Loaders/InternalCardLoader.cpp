@@ -13,6 +13,12 @@ void InternalCardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
 {
     for (auto& card : cards)
     {
+        card.hasBehavior = CardDefs::HasDefinition(card.id);
+        if (!card.hasBehavior)
+        {
+            continue;
+        }
+
         const auto cardDef = CardDefs::GetInstance().FindCardDefByID(card.id);
 
         card.power = cardDef.power;

@@ -38,4 +38,10 @@ CardDef CardDefs::FindCardDefByID(const std::string_view& id)
 
     return CardDef();
 }
+
+bool CardDefs::HasDefinition(const std::string_view& id)
+{
+    (void)GetInstance();
+    return m_data.contains(std::string(id));
+}
 }  // namespace RosettaStone::Battlegrounds
