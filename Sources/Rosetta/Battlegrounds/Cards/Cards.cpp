@@ -14,6 +14,8 @@ namespace RosettaStone::Battlegrounds
 {
 std::array<Card, NUM_BATTLEGROUNDS_CARDS> Cards::m_cards;
 std::array<Card, NUM_BATTLEGROUNDS_HEROES> Cards::m_curHeroes;
+std::array<Card, HeroPowerRegistry::EXPECTED_POWER_COUNT>
+    Cards::m_heroPowerMetadata;
 std::array<Card, NUM_TIER1_MINIONS> Cards::m_tier1Minions;
 std::array<Card, NUM_TIER2_MINIONS> Cards::m_tier2Minions;
 std::array<Card, NUM_TIER3_MINIONS> Cards::m_tier3Minions;
@@ -96,6 +98,11 @@ Cards::Cards()
             }
         }
     }
+    // Validate the imported inventory separately from generated CardDefs.
+    // The registry is metadata-only and must never imply executable effects.
+    m_heroPowerMetadata =
+        HeroPowerRegistry::BuildMetadataRegistry(m_cards, m_curHeroes);
+
 }
 
 Cards& Cards::GetInstance()
@@ -154,6 +161,12 @@ const std::array<Card, NUM_BATTLEGROUNDS_HEROES>& Cards::GetCurrentHeroes()
 {
     return m_curHeroes;
 }
+const std::array<Card, HeroPowerRegistry::EXPECTED_POWER_COUNT>&
+Cards::GetHeroPowerMetadata()
+{
+    return m_heroPowerMetadata;
+}
+
 
 const std::array<Card, NUM_TIER1_MINIONS>& Cards::GetTier1Minions()
 {

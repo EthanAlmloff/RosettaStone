@@ -8,6 +8,7 @@
 #define ROSETTASTONE_BATTLEGROUNDS_CARDS_HPP
 
 #include <Rosetta/Battlegrounds/Cards/Card.hpp>
+#include <Rosetta/Battlegrounds/Cards/HeroPowerMetadataRegistry.hpp>
 #include <Rosetta/Common/Constants.hpp>
 
 #include <array>
@@ -61,6 +62,10 @@ class Cards
     //! \return A list of current heroes.
     static const std::array<Card, NUM_BATTLEGROUNDS_HEROES>& GetCurrentHeroes();
 
+    //! Returns the pinned Patch 36.4 metadata-only hero-power registry.
+    static const std::array<Card, HeroPowerRegistry::EXPECTED_POWER_COUNT>&
+    GetHeroPowerMetadata();
+
     //! Returns a list of tier 1 minions in Battlegrounds Tavern.
     //! \return A list of tier 1 minions in Battlegrounds Tavern.
     static const std::array<Card, NUM_TIER1_MINIONS>& GetTier1Minions();
@@ -94,6 +99,8 @@ class Cards
 
     static std::array<Card, NUM_BATTLEGROUNDS_CARDS> m_cards;
     static std::array<Card, NUM_BATTLEGROUNDS_HEROES> m_curHeroes;
+    static std::array<Card, HeroPowerRegistry::EXPECTED_POWER_COUNT>
+        m_heroPowerMetadata;
     static std::array<Card, NUM_TIER1_MINIONS> m_tier1Minions;
     static std::array<Card, NUM_TIER2_MINIONS> m_tier2Minions;
     static std::array<Card, NUM_TIER3_MINIONS> m_tier3Minions;

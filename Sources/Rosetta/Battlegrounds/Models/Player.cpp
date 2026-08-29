@@ -104,20 +104,35 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
 
 namespace
 {
-int SupportedSpellGold(const Spell& spell)
+struct SupportedSpellEffect
 {
-    // These are the only no-target economy spells promoted from the pinned
-    // 36.4 inventory.  Every other spell remains fail-closed until its
-    // target/effect semantics have a simulator implementation.
+    int gold = -1;
+    int attack = 0;
+    int health = 0;
+};
+
+SupportedSpellEffect SupportedSpell(const Spell& spell)
+{
+    // These are exact no-target effects promoted from the pinned 36.4
+    // inventory. Every other spell remains fail-closed until its target and
+    // effect semantics have a simulator implementation.
+    if (spell.GetID() == "BG28_168") // Shiny Ring: Give your minions +1/+1.
+    {
+        return { 0, 1, 1 };
+    }
+    if (spell.GetID() == "BG28_169") // Azerite Empowerment: +2/+2 twice.
+    {
+        return { 0, 4, 4 };
+    }
     if (spell.GetID() == "BG28_810") // Tavern Coin: Gain 1 Gold.
     {
-        return 1;
+        return { 1, 0, 0 };
     }
     if (spell.GetID() == "BG33_815") // Wealthy Bounty: Gain 2 Gold.
     {
-        return 2;
+        return { 2, 0, 0 };
     }
-    return -1;
+    return {};
 }
 }  // namespace
 
@@ -133,7 +148,7 @@ bool Player::CanPlaySpell(std::size_t handIdx) const
         return false;
     }
     const Spell& spell = std::get<Spell>(card);
-    return SupportedSpellGold(spell) >= 0 && spell.GetCost() >= 0 &&
+    return SupportedSpell(spell).gold >= 0 && spell.GetCost() >= 0 &&
            remainCoin >= spell.GetCost();
 }
 
@@ -147,11 +162,18 @@ bool Player::PlaySpell(std::size_t handIdx)
     CardData& card = hand[static_cast<int>(handIdx)];
     const Spell& spell = std::get<Spell>(card);
     const int cost = spell.GetCost();
-    const int gold = SupportedSpellGold(spell);
+    const SupportedSpellEffect effect = SupportedSpell(spell);
     hand.Remove(card);
     remainCoin -= cost;
-    remainCoin += gold;
+    remainCoin += effect.gold;
     season14.Emit(Season14Event::SPELL_CAST);
+    if (effect.attack != 0 || effect.health != 0)
+    {
+        recruitField.ForEachAlive([&effect](Minion& minion) {
+            minion.SetAttack(minion.GetAttack() + effect.attack);
+            minion.SetHealth(minion.GetHealth() + effect.health);
+        });
+    }
     return true;
 }
 
