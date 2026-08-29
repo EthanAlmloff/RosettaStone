@@ -15,6 +15,27 @@ Spell::Spell(Card card) : m_card(std::move(card))
     // Do nothing
 }
 
+int Spell::GetDbfID() const
+{
+    return m_card.dbfID;
+}
+
+int Spell::GetCost() const
+{
+    const auto cost = m_card.gameTags.find(GameTag::COST);
+    return cost == m_card.gameTags.end() ? 0 : cost->second;
+}
+
+const std::string& Spell::GetID() const
+{
+    return m_card.id;
+}
+
+const std::string& Spell::GetText() const
+{
+    return m_card.text;
+}
+
 ZoneType Spell::GetZoneType() const
 {
     return m_zoneType;

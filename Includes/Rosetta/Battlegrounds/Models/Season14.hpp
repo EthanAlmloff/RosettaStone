@@ -27,6 +27,7 @@ enum class Season14Event : std::uint8_t
     RECRUIT_END,
     COMBAT_START,
     COMBAT_END,
+    SPELL_CAST,
     COUNT
 };
 
@@ -45,6 +46,8 @@ struct Season14PersistentEffect
     bool active = true;
 };
 
+inline constexpr std::size_t SEASON14_TRINKET_SLOTS = 2;
+inline constexpr std::size_t SEASON14_DARK_GIFT_SLOTS = 16;
 //! Small, simulator-independent state machine for modern modal mechanics.
 class Season14State
 {
@@ -83,6 +86,12 @@ class Season14State
 
     //! Consumes the power for this turn.
     bool UseHeroPower();
+
+    //! Returns whether another Trinket fits in the persistent slots.
+    bool CanAddTrinket() const;
+
+    //! Returns whether another Dark Gift fits in the persistent slots.
+    bool CanAddDarkGift() const;
 
     //! Adds a persistent effect to a player-visible slot.
     void AddTrinket(Season14PersistentEffect effect);

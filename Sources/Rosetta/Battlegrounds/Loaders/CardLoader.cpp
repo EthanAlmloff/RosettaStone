@@ -23,7 +23,9 @@ bool IsMetadataFlag(const Json& object, const char* key)
         return false;
     }
 
-    return !object.at(key).is_boolean() || object.at(key).get<bool>();
+    // Optional metadata with an unexpected type is ignored rather than
+    // coercing arbitrary strings/numbers to true.
+    return object.at(key).is_boolean() && object.at(key).get<bool>();
 }
 
 int MetadataInt(const Json& object, const char* key)
@@ -35,6 +37,74 @@ int MetadataInt(const Json& object, const char* key)
     }
 
     return object.at(key).get<int>();
+}
+
+std::string CardLabel(const Json& object, std::size_t recordIndex)
+{
+    if (object.is_object() && object.contains("id") &&
+        object.at("id").is_string())
+    {
+        return object.at("id").get<std::string>();
+    }
+    return "<record " + std::to_string(recordIndex) + ">";
+}
+
+std::string RequiredString(const Json& object, const char* field,
+                           std::string_view cardLabel)
+{
+    if (!object.contains(field) || !object.at(field).is_string())
+    {
+        throw std::invalid_argument("card " + std::string(cardLabel) +
+                                    " field " + field + " must be a string");
+    }
+    const auto value = object.at(field).get<std::string>();
+    if (value.empty())
+    {
+        throw std::invalid_argument("card " + std::string(cardLabel) +
+                                    " field " + field + " must not be empty");
+    }
+    return value;
+}
+
+template <typename Enum>
+Enum ParseEnumString(std::string_view raw, const char* field,
+                     std::string_view cardLabel)
+{
+    const Enum parsed = StrToEnum<Enum>(raw);
+    if (raw != "INVALID" && static_cast<int>(parsed) == 0)
+    {
+        throw std::invalid_argument("card " + std::string(cardLabel) +
+                                    " field " + field +
+                                    " has unsupported value " +
+                                    std::string(raw));
+    }
+    return parsed;
+}
+
+template <typename Enum>
+Enum ParseOptionalEnum(const Json& object, const char* field,
+                       std::string_view cardLabel, Enum fallback)
+{
+    if (!object.contains(field) || object.at(field).is_null())
+    {
+        return fallback;
+    }
+    if (!object.at(field).is_string())
+    {
+        throw std::invalid_argument("card " + std::string(cardLabel) +
+                                    " field " + field + " must be a string");
+    }
+    return ParseEnumString<Enum>(object.at(field).get<std::string>(), field,
+                                 cardLabel);
+}
+
+std::string OptionalString(const Json& object, const char* field)
+{
+    if (object.contains(field) && object.at(field).is_string())
+    {
+        return object.at(field).get<std::string>();
+    }
+    return {};
 }
 
 bool IsLinkKey(const std::string& key)
@@ -151,22 +221,32 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
     }
 
     cardFile >> j;
+    if (!j.is_array())
+    {
+        throw std::invalid_argument(
+            "configured Battlegrounds card snapshot must be a JSON array");
+    }
 
     std::size_t idx = 0;
 
-    for (auto& cardData : j)
+    for (std::size_t recordIndex = 0; recordIndex < j.size(); ++recordIndex)
     {
-        const int cardSet = cardData["set"].is_null()
-                                ? 1
-                                : static_cast<int>(StrToEnum<CardSet>(
-                                      cardData["set"].get<std::string>()));
+        const auto& cardData = j.at(recordIndex);
+        if (!cardData.is_object())
+        {
+            throw std::invalid_argument(
+                "card <record " + std::to_string(recordIndex) +
+                "> must be a JSON object");
+        }
+        const std::string cardLabel = CardLabel(cardData, recordIndex);
+        const std::string id = RequiredString(cardData, "id", cardLabel);
+        const CardSet cardSet = ParseOptionalEnum(
+            cardData, "set", cardLabel, CardSet::INVALID);
 
-        if (static_cast<CardSet>(cardSet) == CardSet::LETTUCE)
+        if (cardSet == CardSet::LETTUCE)
         {
             continue;
         }
-
-        const std::string id = cardData["id"].get<std::string>();
 
         const int dbfID =
             cardData["dbfId"].is_null() ? 0 : cardData["dbfId"].get<int>();
@@ -179,21 +259,13 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         const bool isBattlegroundsPoolMinion =
             IsMetadataFlag(cardData, "isBattlegroundsPoolMinion");
 
-        const std::string name = cardData["name"].is_null()
-                                     ? ""
-                                     : cardData["name"].get<std::string>();
-        const std::string text = cardData["text"].is_null()
-                                     ? ""
-                                     : cardData["text"].get<std::string>();
+        const std::string name = OptionalString(cardData, "name");
+        const std::string text = OptionalString(cardData, "text");
 
-        const CardType type =
-            cardData["type"].is_null()
-                ? CardType::INVALID
-                : StrToEnum<CardType>(cardData["type"].get<std::string>());
-        const Race race =
-            cardData["race"].is_null()
-                ? Race::INVALID
-                : StrToEnum<Race>(cardData["race"].get<std::string>());
+        const CardType type = ParseOptionalEnum(
+            cardData, "type", cardLabel, CardType::INVALID);
+        const Race race = ParseOptionalEnum(cardData, "race", cardLabel,
+                                            Race::INVALID);
 
         const int techLevel = cardData["techLevel"].is_null()
                                   ? 0
@@ -202,12 +274,32 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
             cardData["attack"].is_null() ? 0 : cardData["attack"].get<int>();
         const int health =
             cardData["health"].is_null() ? 0 : cardData["health"].get<int>();
+        const int cost =
+            !cardData.contains("cost") || cardData.at("cost").is_null()
 
         std::map<GameTag, int> gameTags;
-        for (auto& mechanic : cardData["mechanics"])
+        if (cardData.contains("mechanics") &&
+            !cardData.at("mechanics").is_null())
         {
-            GameTag gameTag = StrToEnum<GameTag>(mechanic.get<std::string>());
-            gameTags.emplace(gameTag, 1);
+            if (!cardData.at("mechanics").is_array())
+            {
+                throw std::invalid_argument("card " + cardLabel +
+                                            " field mechanics must be an array");
+            }
+            std::size_t mechanicIndex = 0;
+            for (const auto& mechanic : cardData.at("mechanics"))
+            {
+                if (!mechanic.is_string())
+                {
+                    throw std::invalid_argument(
+                        "card " + cardLabel + " field mechanics[" +
+                        std::to_string(mechanicIndex) + "] must be a string");
+                }
+                const GameTag gameTag = ParseEnumString<GameTag>(
+                    mechanic.get<std::string>(), "mechanics", cardLabel);
+                gameTags.emplace(gameTag, 1);
+                ++mechanicIndex;
+            }
         }
 
         Card card;
@@ -270,6 +362,7 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         card.gameTags[GameTag::TECH_LEVEL] = techLevel;
         card.gameTags[GameTag::ATK] = attack;
         card.gameTags[GameTag::HEALTH] = health;
+        card.gameTags[GameTag::COST] = cost;
 
         // NOTE: The value "isBattlegroundsHero" of Lady Vashj
         //       (TB_BaconShop_HERO_61) is missing.

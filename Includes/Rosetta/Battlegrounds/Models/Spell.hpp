@@ -35,6 +35,18 @@ class Spell
     //! \return The value of zone type.
     ZoneType GetZoneType() const;
 
+    //! Returns the immutable card DBF identifier.
+    int GetDbfID() const;
+
+    //! Returns the card's current base cost.
+    int GetCost() const;
+
+    //! Returns the stable card identifier.
+    const std::string& GetID() const;
+
+    //! Returns the source card text used for diagnostics only.
+    const std::string& GetText() const;
+
     //! Sets the value of zone type.
     //! \param type The value of zone type.
     void SetZoneType(ZoneType type);

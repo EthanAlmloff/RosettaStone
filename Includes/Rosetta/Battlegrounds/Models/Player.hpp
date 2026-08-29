@@ -52,6 +52,15 @@ class Player
     void PlayCard(std::size_t handIdx, std::size_t fieldIdx,
                   int targetIdx = -1);
 
+    //! Returns whether a supported no-target Tavern spell can be played.
+    //! \param handIdx The index of the spell in the player's hand.
+    bool CanPlaySpell(std::size_t handIdx) const;
+
+    //! Pays for and resolves a supported no-target Tavern spell.
+    //! \param handIdx The index of the spell in the player's hand.
+    //! \return false when the card, cost, or behavior is unsupported.
+    bool PlaySpell(std::size_t handIdx);
+
     //! Sells a minion to Tavern.
     //! \param idx The index of a list of minions in player's field.
     void SellMinion(std::size_t idx);

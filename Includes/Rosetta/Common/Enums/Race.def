@@ -38,3 +38,8 @@ X(NAGA)
 X(OLDGOD)
 X(PANDAREN)
 X(GRONN)
+// Modern metadata tribes, appended to preserve ABI values.
+X(CELESTIAL)
+X(GNOLL)
+X(GOLEM)
+X(VULPERA)

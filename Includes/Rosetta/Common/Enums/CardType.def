@@ -18,3 +18,6 @@ X(LOCATION)
 X(BATTLEGROUND_QUEST_REWARD)
 X(BATTLEGROUND_SPELL)
 X(BATTLEGROUND_TRINKET)
+// Modern HearthstoneJSON metadata types retained for Battlegrounds snapshots.
+X(BATTLEGROUND_ANOMALY)
+X(PET)

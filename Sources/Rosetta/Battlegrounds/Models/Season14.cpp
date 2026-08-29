@@ -69,14 +69,30 @@ bool Season14State::UseHeroPower()
     return true;
 }
 
+bool Season14State::CanAddTrinket() const
+{
+    return trinkets.size() < SEASON14_TRINKET_SLOTS;
+}
+
+bool Season14State::CanAddDarkGift() const
+{
+    return darkGifts.size() < SEASON14_DARK_GIFT_SLOTS;
+}
+
 void Season14State::AddTrinket(Season14PersistentEffect effect)
 {
-    trinkets.push_back(effect);
+    if (CanAddTrinket())
+    {
+        trinkets.push_back(effect);
+    }
 }
 
 void Season14State::AddDarkGift(Season14PersistentEffect effect)
 {
-    darkGifts.push_back(effect);
+    if (CanAddDarkGift())
+    {
+        darkGifts.push_back(effect);
+    }
 }
 
 bool Season14State::ConsumeEffect(

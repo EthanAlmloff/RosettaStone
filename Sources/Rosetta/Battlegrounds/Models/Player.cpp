@@ -95,8 +95,64 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
     }
     else
     {
-        // TODO: Cast spell
+        if (targetIdx == -1)
+        {
+            static_cast<void>(PlaySpell(handIdx));
+        }
     }
+}
+
+namespace
+{
+int SupportedSpellGold(const Spell& spell)
+{
+    // These are the only no-target economy spells promoted from the pinned
+    // 36.4 inventory.  Every other spell remains fail-closed until its
+    // target/effect semantics have a simulator implementation.
+    if (spell.GetID() == "BG28_810") // Tavern Coin: Gain 1 Gold.
+    {
+        return 1;
+    }
+    if (spell.GetID() == "BG33_815") // Wealthy Bounty: Gain 2 Gold.
+    {
+        return 2;
+    }
+    return -1;
+}
+}  // namespace
+
+bool Player::CanPlaySpell(std::size_t handIdx) const
+{
+    if (handIdx >= static_cast<std::size_t>(hand.GetCount()))
+    {
+        return false;
+    }
+    const CardData& card = hand[static_cast<int>(handIdx)];
+    if (!std::holds_alternative<Spell>(card))
+    {
+        return false;
+    }
+    const Spell& spell = std::get<Spell>(card);
+    return SupportedSpellGold(spell) >= 0 && spell.GetCost() >= 0 &&
+           remainCoin >= spell.GetCost();
+}
+
+bool Player::PlaySpell(std::size_t handIdx)
+{
+    if (!CanPlaySpell(handIdx))
+    {
+        return false;
+    }
+
+    CardData& card = hand[static_cast<int>(handIdx)];
+    const Spell& spell = std::get<Spell>(card);
+    const int cost = spell.GetCost();
+    const int gold = SupportedSpellGold(spell);
+    hand.Remove(card);
+    remainCoin -= cost;
+    remainCoin += gold;
+    season14.Emit(Season14Event::SPELL_CAST);
+    return true;
 }
 
 void Player::SellMinion(std::size_t idx)
