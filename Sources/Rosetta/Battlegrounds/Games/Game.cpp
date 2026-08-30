@@ -306,6 +306,9 @@ void Game::Recruit()
 
         player.season14.Emit(Season14Event::RECRUIT_START);
         player.season14.heroPowerUsed = false;
+        player.recruitField.ForEach([](MinionData& minion) {
+            minion.value().ResetActivateUses();
+        });
 
         // Assign the index of the player to fight next.
         player.playerIdxNextFight = FindPlayerNextFight(player.idx);

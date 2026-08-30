@@ -197,6 +197,8 @@ bool Minion::MakeGolden()
     const int currentAttack = m_attack;
     const int currentHealth = m_health;
     const int globalMinionAttack = m_globalMinionAttack;
+    const int futureLobsterAttack = m_futureLobsterAttack;
+    const int futureLobsterHealth = m_futureLobsterHealth;
     // The premium card supplies the new identity and its static keywords,
     // but conversion must not erase state accumulated by this particular
     // instance.  Dark Gifts and other recruit effects mutate these fields
@@ -220,6 +222,8 @@ bool Minion::MakeGolden()
     m_attack = currentAttack;
     m_health = currentHealth;
     m_globalMinionAttack = globalMinionAttack;
+    m_futureLobsterAttack = futureLobsterAttack;
+    m_futureLobsterHealth = futureLobsterHealth;
 
     m_hasDeathrattle = false;
     m_hasTaunt = false;
@@ -319,6 +323,20 @@ void Minion::ApplyGlobalMinionAttack(int attack)
 int Minion::GetGlobalMinionAttack() const
 {
     return m_globalMinionAttack;
+}
+
+void Minion::ApplyFutureLobsterStats(int attack, int health)
+{
+    if (attack > m_futureLobsterAttack)
+    {
+        m_attack += attack - m_futureLobsterAttack;
+        m_futureLobsterAttack = attack;
+    }
+    if (health > m_futureLobsterHealth)
+    {
+        m_health += health - m_futureLobsterHealth;
+        m_futureLobsterHealth = health;
+    }
 }
 
 int Minion::GetHealth() const
@@ -624,13 +642,64 @@ void Minion::ActivateRally([[maybe_unused]] Player& player, Minion& source,
                             Minion& target)
 {
     auto& trigger = m_card.power.GetTrigger();
-    if (!trigger.has_value() ||
-        trigger.value().GetTriggerType() != TriggerType::RALLY)
+    if (trigger.has_value() &&
+        trigger.value().GetTriggerType() == TriggerType::RALLY)
     {
-        return;
+        trigger.value().Run(*this, source, target);
     }
+    for (auto& task : m_card.power.GetRallyTask())
+    {
+        std::visit(
+            [this, &player, &target](auto& rallyTask) {
+                rallyTask.Run(player, *this, target);
+            },
+            task);
+    }
+}
 
-    trigger.value().Run(*this, source, target);
+bool Minion::CanActivate(const Player& player, int targetIdx) const
+{
+    const auto& definition = m_card.power.GetActivate();
+    if (!definition.has_value() || definition->effect == ActivateEffect::NONE ||
+        m_activateUses <= 0 || player.remainCoin < definition->cost)
+    {
+        return false;
+    }
+    if (definition->effect == ActivateEffect::BUFF_TARGET ||
+        definition->effect == ActivateEffect::SET_TARGET_STATS)
+    {
+        return targetIdx >= 0 && targetIdx < player.recruitField.GetCount() &&
+               !player.recruitField[static_cast<std::size_t>(targetIdx)].IsDestroyed();
+    }
+    return targetIdx < 0;
+}
+
+bool Minion::Activate(Player& player, int targetIdx)
+{
+    if (!CanActivate(player, targetIdx))
+    {
+        return false;
+    }
+    const auto definition = *m_card.power.GetActivate();
+    player.remainCoin -= definition.cost;
+    auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
+    if (definition.effect == ActivateEffect::BUFF_TARGET)
+    {
+        target.SetAttack(target.GetAttack() + definition.attack);
+        target.SetHealth(target.GetHealth() + definition.health);
+    }
+    else if (definition.effect == ActivateEffect::SET_TARGET_STATS)
+    {
+        target.SetAttack(definition.attack);
+        target.SetHealth(definition.health);
+    }
+    --m_activateUses;
+    return true;
+}
+
+void Minion::ResetActivateUses()
+{
+    m_activateUses = m_card.power.GetActivate().has_value() ? 1 : 0;
 }
 
 std::vector<TaskType> Minion::GetTasks(PowerType type)

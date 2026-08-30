@@ -22,6 +22,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomFriendlyRaceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberEndTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberStartTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SetGameTagTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 
@@ -41,7 +42,8 @@ using TaskType =
                  SimpleTasks::ReduceTavernCostTask,
                  SimpleTasks::RepeatNumberEndTask,
                  SimpleTasks::RepeatNumberStartTask,
-                 SimpleTasks::SetGameTagTask, SimpleTasks::SummonTask>;
+                 SimpleTasks::SetGameTagTask, SimpleTasks::SummonTask,
+                 SimpleTasks::RallyBuffTask>;
 }  // namespace RosettaStone::Battlegrounds
 
 #endif  // ROSETTASTONE_BATTLEGROUNDS_TASK_TYPE_HPP

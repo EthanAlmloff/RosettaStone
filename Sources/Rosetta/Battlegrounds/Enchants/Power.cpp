@@ -16,6 +16,7 @@ void Power::ClearData()
     m_startCombatTask.clear();
     m_deathrattleTask.clear();
     m_rallyTask.clear();
+    m_activate.reset();
     m_enchant.reset();
     m_trigger.reset();
 }
@@ -38,6 +39,16 @@ std::vector<TaskType>& Power::GetDeathrattleTask()
 std::vector<TaskType>& Power::GetRallyTask()
 {
     return m_rallyTask;
+}
+
+std::optional<ActivateDefinition>& Power::GetActivate()
+{
+    return m_activate;
+}
+
+const std::optional<ActivateDefinition>& Power::GetActivate() const
+{
+    return m_activate;
 }
 
 std::optional<Enchant>& Power::GetEnchant()
@@ -68,6 +79,11 @@ void Power::AddDeathrattleTask(TaskType&& task)
 void Power::AddRallyTask(TaskType&& task)
 {
     m_rallyTask.emplace_back(std::move(task));
+}
+
+void Power::AddActivate(ActivateDefinition definition)
+{
+    m_activate = definition;
 }
 
 void Power::AddEnchant(Enchant&& enchant)

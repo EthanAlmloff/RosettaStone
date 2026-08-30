@@ -15,6 +15,9 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch8.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch9.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch10.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch11.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch12.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ActivateBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 
@@ -36,6 +39,9 @@ CardDefs::CardDefs()
     ModernMinionBehaviorsBatch8::AddAll(m_data);
     ModernMinionBehaviorsBatch9::AddAll(m_data);
     ModernMinionBehaviorsBatch10::AddAll(m_data);
+    ModernMinionBehaviorsBatch11::AddAll(m_data);
+    ModernMinionBehaviorsBatch12::AddAll(m_data);
+    ActivateBehaviors::AddAll(m_data);
     TrinketBehaviors::AddAll(m_data);
 }
 

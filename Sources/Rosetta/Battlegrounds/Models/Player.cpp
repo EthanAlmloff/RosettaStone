@@ -33,6 +33,17 @@ void Player::ApplyFreshMinionModifiers(Minion& minion) const
     {
         minion.ApplyGlobalMinionAttack(batch4.globalMinionAttack);
     }
+
+    // Tasty Lobster's deathrattle improves only copies created afterwards.
+    // Apply the player-owned cumulative aura at every fresh-instance boundary
+    // (Tavern, purchase, hand play, and summon), including generated normal
+    // and golden Lobsters.  Existing instances are intentionally untouched.
+    if (minion.GetCardID() == "BG36_202" ||
+        minion.GetCardID() == "BG36_202_G")
+    {
+        const auto [attack, health] = season14.FutureLobsterStats();
+        minion.ApplyFutureLobsterStats(attack, health);
+    }
 }
 
 void Player::SelectHero(std::size_t idx)
@@ -51,6 +62,8 @@ void Player::SelectHero(std::size_t idx)
         FindSeason14HeroPowerBehaviorBatch2(hero.card.heroPowerDbfID);
     const auto* batch3 =
         FindSeason14HeroPowerBehaviorBatch3(hero.card.heroPowerDbfID);
+    const auto* batch5 =
+        FindSeason14HeroPowerBehaviorBatch5(hero.card.heroPowerDbfID);
     const int heroPowerCost = batch1 != nullptr
                                   ? (batch4 != nullptr
                                          ? batch4->cost
@@ -61,7 +74,9 @@ void Player::SelectHero(std::size_t idx)
                                                 ? batch3->cost
                                                 : (batch4 != nullptr
                                                        ? batch4->cost
-                                                       : 0)));
+                                                       : (batch5 != nullptr
+                                                              ? batch5->cost
+                                                              : 0))));
     season14.SetHeroPower(hero.card.heroPowerDbfID, heroPowerCost,
                           hero.card.heroPowerDbfID != 0);
 
@@ -706,6 +721,69 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             }
             return;
         }
+        case TavernSpellEffect::TARGET_CONSUME_SHOP_STATS:
+        {
+            Minion& target =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            int attack = 0;
+            int health = 0;
+            // Rebuild positions after every removal.  FieldZone::Remove
+            // compacts the array, so retaining a shuffled list of positions
+            // would consume the wrong cards (or an out-of-range slot).
+            for (int i = 0; i < effect.randomCount; ++i)
+            {
+                std::vector<int> candidates;
+                player.tavern.fieldZone.ForEach(
+                    [&candidates](const MinionData& minion) {
+                        if (!minion.value().IsDestroyed() &&
+                            minion.value().GetPoolIndex() >= 0)
+                        {
+                            candidates.push_back(
+                                minion.value().GetZonePosition());
+                        }
+                    });
+                if (candidates.empty())
+                {
+                    break;
+                }
+                Random::shuffle(candidates.begin(), candidates.end());
+                Minion& consumed = player.tavern.fieldZone[
+                    static_cast<std::size_t>(candidates.front())];
+                attack += consumed.GetAttack();
+                health += consumed.GetHealth();
+                const int poolIndex = consumed.GetPoolIndex();
+                player.tavern.fieldZone.Remove(consumed);
+                player.returnMinionCallback(poolIndex);
+            }
+            target.SetAttack(target.GetAttack() + attack);
+            target.SetHealth(target.GetHealth() + health);
+            return;
+        }
+        case TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS:
+        {
+            const Minion& soldTarget =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            const int attack = soldTarget.GetAttack();
+            const int health = soldTarget.GetHealth();
+            Minion sold = player.recruitField.Remove(
+                player.recruitField[static_cast<std::size_t>(targetIdx)]);
+            player.returnMinionCallback(sold.GetPoolIndex());
+            player.remainCoin += 1;
+            player.season14.OnSellMinion();
+            bool applied = false;
+            player.recruitField.ForEachAlive(
+                [&applied, &effect, attack, health](MinionData& minion) {
+                    if (!applied && minion.value().HasRace(effect.race))
+                    {
+                        minion.value().SetAttack(minion.value().GetAttack() +
+                                                 attack);
+                        minion.value().SetHealth(minion.value().GetHealth() +
+                                                 health);
+                        applied = true;
+                    }
+                });
+            return;
+        }
         case TavernSpellEffect::SET_PLAYER_ARMOR:
             player.armor = effect.value;
             return;
@@ -765,6 +843,11 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
     if (targetIdx >= 0)
     {
         const Minion& target = recruitField[static_cast<std::size_t>(targetIdx)];
+        if (behavior.effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS &&
+            !target.HasRace(behavior.race))
+        {
+            return false;
+        }
         if (!TavernSpellTargetIsLegal(behavior.effect, target.GetTier(),
                                       target.IsGolden()))
         {
@@ -805,6 +888,40 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         tavern.fieldZone.IsEmpty())
     {
         return false;
+    }
+    if (behavior.effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS)
+    {
+        std::size_t available = 0;
+        tavern.fieldZone.ForEach([&available](const MinionData& minion) {
+            if (!minion.value().IsDestroyed() &&
+                minion.value().GetPoolIndex() >= 0)
+            {
+                ++available;
+            }
+        });
+        if (available < static_cast<std::size_t>(behavior.randomCount))
+        {
+            return false;
+        }
+    }
+    if (behavior.effect == TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS)
+    {
+        bool recipient = false;
+        for (int i = 0; i < recruitField.GetCount(); ++i)
+        {
+            if (i != targetIdx && !recruitField[static_cast<std::size_t>(i)]
+                                      .IsDestroyed() &&
+                recruitField[static_cast<std::size_t>(i)].HasRace(
+                    behavior.race))
+            {
+                recipient = true;
+                break;
+            }
+        }
+        if (!recipient || AliveFriendlyMinionCount(*this) < 2)
+        {
+            return false;
+        }
     }
     if (behavior.effect == TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS &&
         AliveFriendlyMinionCount(*this) < 2)
@@ -894,6 +1011,19 @@ bool Player::ApplySeason14HeroPowerBatch3Activation(
                                  activation.health);
     }
     return true;
+}
+
+bool Player::ActivateMinion(std::size_t boardIdx, int targetIdx)
+{
+    if (boardIdx >= static_cast<std::size_t>(recruitField.GetCount()))
+    {
+        return false;
+    }
+    if (targetIdx >= 0 && boardIdx == static_cast<std::size_t>(targetIdx))
+    {
+        return false;
+    }
+    return recruitField[boardIdx].Activate(*this, targetIdx);
 }
 
 void Player::SellMinion(std::size_t idx)

@@ -50,6 +50,8 @@ enum class TavernSpellEffect
     STEAL_RANDOM_SHOP_MINION,
     RANDOM_SHOP_STATS_ON_REFRESH,
     SELL_TARGET_GIVE_RANDOM_STATS,
+    TARGET_CONSUME_SHOP_STATS,
+    SELL_TARGET_GIVE_LEFTMOST_RACE_STATS,
 };
 
 struct TavernSpellBehavior
@@ -263,6 +265,17 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     {
         return { 0, 0, 0, TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS };
     }
+    if (id == "BG28_607") // Corrupted Cupcakes: Demon consumes three Tavern minions.
+    {
+        return { 0, 0, 0, TavernSpellEffect::TARGET_CONSUME_SHOP_STATS,
+                 Race::DEMON, 3 };
+    }
+    if (id == "BG33_899") // Mounting Avalanche: sell into leftmost Elemental.
+    {
+        return { 0, 0, 0,
+                 TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS,
+                 Race::ELEMENTAL };
+    }
 
     return {};
 }
@@ -280,7 +293,9 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::TARGET_SHARED_RACE_STATS ||
            effect == TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT ||
            effect == TavernSpellEffect::TARGET_GOLDEN ||
-           effect == TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS;
+           effect == TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS ||
+           effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS ||
+           effect == TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS;
 }
 
 //! Returns whether a target satisfies additional spell-specific constraints.

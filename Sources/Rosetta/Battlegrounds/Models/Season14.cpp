@@ -304,6 +304,19 @@ void Season14State::AddPersistentShopStats(std::int32_t attack,
     persistentShopHealth += health;
 }
 
+void Season14State::ImproveFutureLobsters(std::int32_t attack,
+                                          std::int32_t health) noexcept
+{
+    futureLobsterAttack += attack;
+    futureLobsterHealth += health;
+}
+
+std::pair<std::int32_t, std::int32_t>
+Season14State::FutureLobsterStats() const noexcept
+{
+    return { futureLobsterAttack, futureLobsterHealth };
+}
+
 void Season14State::AddPersistentShopRaceStats(Race race,
                                                std::int32_t attack,
                                                std::int32_t health)

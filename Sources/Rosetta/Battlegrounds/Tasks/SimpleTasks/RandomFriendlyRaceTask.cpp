@@ -15,13 +15,15 @@ namespace RosettaStone::Battlegrounds::SimpleTasks
 {
 RandomFriendlyRaceTask::RandomFriendlyRaceTask(Race race, int attack,
                                                int health, int amount,
-                                               bool grantDivineShield)
+                                               bool grantDivineShield,
+                                               bool improveFutureLobsters)
     : m_race(race),
       m_attack(attack),
       m_health(health),
       m_amount(amount),
       m_grantReborn(false),
-      m_grantDivineShield(grantDivineShield)
+      m_grantDivineShield(grantDivineShield),
+      m_improveFutureLobsters(improveFutureLobsters)
 {
 }
 
@@ -32,6 +34,11 @@ RandomFriendlyRaceTask::RandomFriendlyRaceTask(Race race, int amount)
 
 TaskStatus RandomFriendlyRaceTask::Run(Player& player, Minion& source)
 {
+    if (m_improveFutureLobsters)
+    {
+        player.season14.ImproveFutureLobsters(m_attack, m_health);
+    }
+
     std::vector<Minion*> candidates;
     player.GetField().ForEachAlive(
         [&candidates, &source, this](MinionData& minionData) {

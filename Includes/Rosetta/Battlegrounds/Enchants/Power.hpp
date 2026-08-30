@@ -16,6 +16,23 @@
 
 namespace RosettaStone::Battlegrounds
 {
+//! The small, explicitly supported subset of manual Activate effects.
+//! Complex choice/random effects remain unregistered and therefore fail closed.
+enum class ActivateEffect : unsigned char
+{
+    NONE,
+    BUFF_TARGET,
+    SET_TARGET_STATS,
+};
+
+struct ActivateDefinition
+{
+    ActivateEffect effect = ActivateEffect::NONE;
+    int cost = 0;
+    int attack = 0;
+    int health = 0;
+};
+
 //!
 //! \brief Power class.
 //!
@@ -43,6 +60,10 @@ class Power
     //! declares an attack.
     std::vector<TaskType>& GetRallyTask();
 
+    //! Returns the explicit manual Activate definition, when present.
+    std::optional<ActivateDefinition>& GetActivate();
+    const std::optional<ActivateDefinition>& GetActivate() const;
+
     //! Returns enchant.
     //! \return A reference to enchant.
     std::optional<Enchant>& GetEnchant();
@@ -66,6 +87,10 @@ class Power
     //! Adds a Rally task.
     void AddRallyTask(TaskType&& task);
 
+    //! Adds a manual Activate definition. This is intentionally separate from
+    //! Battlecry/Rally task storage: Activate is a player decision.
+    void AddActivate(ActivateDefinition definition);
+
     //! Adds enchant.
     //! \param enchant An enchant to add.
     void AddEnchant(Enchant&& enchant);
@@ -79,6 +104,7 @@ class Power
     std::vector<TaskType> m_startCombatTask;
     std::vector<TaskType> m_deathrattleTask;
     std::vector<TaskType> m_rallyTask;
+    std::optional<ActivateDefinition> m_activate;
     std::optional<Enchant> m_enchant;
     std::optional<Trigger> m_trigger;
 };

@@ -26,7 +26,8 @@ class RandomFriendlyRaceTask
  public:
     //! Construct a random friendly race stat effect.
     RandomFriendlyRaceTask(Race race, int attack, int health, int amount = 1,
-                           bool grantDivineShield = false);
+                           bool grantDivineShield = false,
+                           bool improveFutureLobsters = false);
 
     //! Construct a random friendly race Reborn effect.
     RandomFriendlyRaceTask(Race race, int amount);
@@ -37,6 +38,15 @@ class RandomFriendlyRaceTask
     //! Run the task against an explicit target (unused for this task).
     TaskStatus Run(Player& player, Minion& source, Minion& target);
 
+    //! Exposes the configured stat grant for focused behavior tests.
+    int GetAttack() const noexcept { return m_attack; }
+    int GetHealth() const noexcept { return m_health; }
+    int GetAmount() const noexcept { return m_amount; }
+    bool ImprovesFutureLobsters() const noexcept
+    {
+        return m_improveFutureLobsters;
+    }
+
  private:
     Race m_race = Race::INVALID;
     int m_attack = 0;
@@ -44,6 +54,7 @@ class RandomFriendlyRaceTask
     int m_amount = 1;
     bool m_grantReborn = false;
     bool m_grantDivineShield = false;
+    bool m_improveFutureLobsters = false;
 };
 }  // namespace SimpleTasks
 }  // namespace RosettaStone::Battlegrounds

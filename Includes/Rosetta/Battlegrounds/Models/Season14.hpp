@@ -7,6 +7,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch4.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch5.hpp>
 #include <Rosetta/Common/Enums/CardEnums.hpp>
 
 #include <array>
@@ -87,6 +88,7 @@ class Season14State
     Season14HeroPowerBatch1State heroPowerBatch1;
     Season14HeroPowerBatch2State heroPowerBatch2;
     Season14HeroPowerBatch4State heroPowerBatch4;
+    Season14HeroPowerBatch5State heroPowerBatch5;
 
     //! Batch 3 currently contains stateless combat/activation families.  It
     //! is kept as an explicit state member for schema clarity and future
@@ -104,6 +106,11 @@ class Season14State
     std::int32_t freeRefreshes = 0;
     std::int32_t persistentShopAttack = 0;
     std::int32_t persistentShopHealth = 0;
+    //! Cumulative improvement applied to newly created Tasty Lobsters.  This
+    //! is player-owned game state, so it survives combat, deaths, Tavern
+    //! refreshes, and recruit-phase transitions.
+    std::int32_t futureLobsterAttack = 0;
+    std::int32_t futureLobsterHealth = 0;
     std::int32_t trinketExtraShopSlots = 0;
     std::int32_t trinketHigherTierRefreshes = 0;
     std::int32_t trinketMaxGoldDelta = 0;
@@ -227,6 +234,13 @@ class Season14State
     //! Adds a persistent stat bonus to newly generated Tavern minions.
     void AddPersistentShopStats(std::int32_t attack,
                                 std::int32_t health) noexcept;
+
+    //! Improves every future Tasty Lobster created for this player.
+    void ImproveFutureLobsters(std::int32_t attack,
+                               std::int32_t health) noexcept;
+
+    //! Returns the cumulative future-Lobster bonus.
+    std::pair<std::int32_t, std::int32_t> FutureLobsterStats() const noexcept;
 
     //! Adds a persistent Tavern stat bonus scoped to a concrete tribe.
     void AddPersistentShopRaceStats(Race race, std::int32_t attack,

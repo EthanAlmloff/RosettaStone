@@ -244,3 +244,21 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - generated and tribal batch")
     CHECK(!TavernSpellTargetIsLegal(TavernSpellEffect::TARGET_GOLDEN, 4,
                                     true));
 }
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - accelerated consume and sell batch")
+{
+    const auto cupcakes = FindTavernSpellBehavior("BG28_607");
+    CHECK(cupcakes.effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS);
+    CHECK(cupcakes.race == Race::DEMON);
+    CHECK(cupcakes.randomCount == 3);
+    CHECK(cupcakes.gold == 0);
+    CHECK(TavernSpellRequiresTarget(cupcakes.effect));
+
+    const auto avalanche = FindTavernSpellBehavior("BG33_899");
+    CHECK(avalanche.effect ==
+          TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS);
+    CHECK(avalanche.race == Race::ELEMENTAL);
+    CHECK(TavernSpellRequiresTarget(avalanche.effect));
+    CHECK(FindTavernSpellBehavior("BG28_607").effect !=
+          TavernSpellEffect::NONE);
+}

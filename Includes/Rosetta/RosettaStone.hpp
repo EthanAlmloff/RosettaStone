@@ -8,10 +8,13 @@
 #define ROSSETASTONE_ROSETTA_HPP
 
 #include <Rosetta/Battlegrounds/Actions/Generic.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ActivateBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/BattlegroundsCardsGen.hpp>
 #include <Rosetta/Battlegrounds/CardSets/DarkGiftBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch10.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch11.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch12.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch3.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch4.hpp>
@@ -62,6 +65,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GetGameTagTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/IncludeTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeftmostFriendlyRaceTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomFriendlyRaceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ReduceTavernCostTask.hpp>

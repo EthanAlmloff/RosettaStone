@@ -84,6 +84,9 @@ class Player
     bool ApplySeason14HeroPowerBatch3Activation(
         const Season14HeroPowerBatch3Activation& activation);
 
+    //! Applies a manual Activate action from a recruit-board minion.
+    bool ActivateMinion(std::size_t boardIdx, int targetIdx = -1);
+
     //! Sells a minion to Tavern.
     //! \param idx The index of a list of minions in player's field.
     void SellMinion(std::size_t idx);

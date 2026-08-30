@@ -138,6 +138,11 @@ class Minion
     //! Returns the ALL Will Burn! attack already applied to this instance.
     int GetGlobalMinionAttack() const;
 
+    //! Applies the player's cumulative future-Lobster aura exactly once to
+    //! this instance.  Re-running fresh-instance hooks while a card moves
+    //! between Tavern, hand, and board must not stack the same aura.
+    void ApplyFutureLobsterStats(int attack, int health);
+
     //! Returns the value of health.
     //! \return The value of health.
     int GetHealth() const;
@@ -256,6 +261,15 @@ class Minion
     //! declared. The target is the selected opposing minion.
     void ActivateRally(Player& player, Minion& source, Minion& target);
 
+    //! Returns whether this instance has a legal manual Activate available.
+    bool CanActivate(const Player& player, int targetIdx = -1) const;
+
+    //! Consumes gold and resolves this instance's manual Activate effect.
+    bool Activate(Player& player, int targetIdx = -1);
+
+    //! Re-arms a once-per-recruit-turn Activate.
+    void ResetActivateUses();
+
     Trigger activatedTrigger;
 
     std::function<Player&()> getPlayerCallback;
@@ -277,6 +291,8 @@ class Minion
     int m_attack = 0;
     int m_health = 0;
     int m_globalMinionAttack = 0;
+    int m_futureLobsterAttack = 0;
+    int m_futureLobsterHealth = 0;
 
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
@@ -288,6 +304,7 @@ class Minion
     bool m_hasStealth = false;
     bool m_isFrozen = false;
     bool m_isDestroyed = false;
+    int m_activateUses = 1;
     int m_startCombatAttackMultiplier = 1;
     int m_startCombatHealthMultiplier = 1;
     bool m_startCombatStatsApplied = false;
