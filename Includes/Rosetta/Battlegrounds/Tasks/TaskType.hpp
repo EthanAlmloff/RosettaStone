@@ -14,6 +14,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GetGameTagTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/IncludeTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeftmostFriendlyRaceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FriendlyRaceEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTask.hpp>
@@ -36,6 +37,7 @@ using TaskType =
                  SimpleTasks::FreeRefreshTask,
                  SimpleTasks::IncludeTask, SimpleTasks::RandomTask,
                  SimpleTasks::RandomFriendlyRaceTask,
+                 SimpleTasks::LeftmostFriendlyRaceTask,
                  SimpleTasks::ReduceTavernCostTask,
                  SimpleTasks::RepeatNumberEndTask,
                  SimpleTasks::RepeatNumberStartTask,

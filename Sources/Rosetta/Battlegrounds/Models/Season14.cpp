@@ -52,6 +52,7 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     heroPowerUsed = false;
     heroPowerBatch1 = Season14HeroPowerBatch1Modifiers(dbfID);
     heroPowerBatch2 = {};
+    heroPowerBatch4 = {};
 }
 
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
@@ -64,7 +65,24 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     ResolveSeason14HeroPowerBatch2Event(
         heroPowerDbfID, Season14HeroPowerBatch2Event::BEGIN_TURN,
         heroPowerBatch2, result);
+    BeginRecruitTurnBatch4();
     return result;
+}
+
+void Season14State::BeginRecruitTurnBatch4()
+{
+    Season14HeroPowerBatch4Result result{};
+    ResolveSeason14HeroPowerBatch4Event(
+        heroPowerDbfID, Season14HeroPowerBatch4Event::BEGIN_TURN,
+        heroPowerBatch4, result);
+}
+
+void Season14State::BeginCombatBatch4()
+{
+    Season14HeroPowerBatch4Result result{};
+    ResolveSeason14HeroPowerBatch4Event(
+        heroPowerDbfID, Season14HeroPowerBatch4Event::COMBAT_START,
+        heroPowerBatch4, result);
 }
 
 void Season14State::OnSellMinion()
@@ -81,12 +99,40 @@ std::int32_t Season14State::OnBuyMinion(bool purchasedPirate) const
                                                purchasedPirate);
 }
 
+std::int32_t Season14State::OnBuyMinionBatch4()
+{
+    Season14HeroPowerBatch4Result result{};
+    ResolveSeason14HeroPowerBatch4Event(
+        heroPowerDbfID, Season14HeroPowerBatch4Event::BUY_MINION,
+        heroPowerBatch4, result);
+    return result.purchaseAttack;
+}
+
 Season14HeroPowerBatch2Result Season14State::OnPlayElemental()
 {
     Season14HeroPowerBatch2Result result{};
     ResolveSeason14HeroPowerBatch2Event(
         heroPowerDbfID, Season14HeroPowerBatch2Event::PLAY_ELEMENTAL,
         heroPowerBatch2, result);
+    return result;
+}
+
+Season14HeroPowerBatch4Result Season14State::OnPlayMinionBatch4()
+{
+    Season14HeroPowerBatch4Result result{};
+    ResolveSeason14HeroPowerBatch4Event(
+        heroPowerDbfID, Season14HeroPowerBatch4Event::PLAY_MINION,
+        heroPowerBatch4, result);
+    return result;
+}
+
+Season14HeroPowerBatch4Result
+Season14State::OnFriendlyMinionDiedBatch4()
+{
+    Season14HeroPowerBatch4Result result{};
+    ResolveSeason14HeroPowerBatch4Event(
+        heroPowerDbfID, Season14HeroPowerBatch4Event::FRIENDLY_MINION_DIED,
+        heroPowerBatch4, result);
     return result;
 }
 
@@ -125,13 +171,35 @@ std::int32_t Season14State::UpgradeCost(std::int32_t baseCost) const
 std::size_t Season14State::TavernOfferCount(std::size_t baseCount) const
 {
     const auto modifiers = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
-    const auto delta = modifiers.tavernSlotsDelta;
+    const auto delta = modifiers.tavernSlotsDelta +
+                       HeroPowerBatch4PassiveModifiers().tavernSlotsDelta;
     if (delta < 0)
     {
         const auto reduction = static_cast<std::size_t>(-delta);
         return reduction >= baseCount ? 0 : baseCount - reduction;
     }
     return baseCount + static_cast<std::size_t>(delta);
+}
+
+Season14HeroPowerBatch4PassiveModifiers
+Season14State::HeroPowerBatch4PassiveModifiers() const noexcept
+{
+    return Season14HeroPowerBatch4Modifiers(heroPowerDbfID);
+}
+
+bool Season14State::ResolveHeroPowerBatch4Activation(
+    Season14HeroPowerBatch4Result& result) const noexcept
+{
+    auto candidateState = heroPowerBatch4;
+    return ResolveSeason14HeroPowerBatch4Activation(
+        heroPowerDbfID, candidateState, result);
+}
+
+bool Season14State::ApplyHeroPowerBatch4Activation(
+    Season14HeroPowerBatch4Result& result) noexcept
+{
+    return ResolveSeason14HeroPowerBatch4Activation(
+        heroPowerDbfID, heroPowerBatch4, result);
 }
 
 void Season14State::ArmHigherTierRefresh(std::int32_t count)

@@ -36,10 +36,12 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 8 inventory table")
         REQUIRE_FALSE(metadata.id.empty());
         CHECK_EQ(metadata.id, id);
     }
+    // HearthstoneJSON's pinned 36.4 snapshot omits the generated golden
+    // enchantment records.  Batch8 intentionally reuses the corresponding
+    // normal enchantment twice for golden effects, so only these five
+    // metadata-backed enchantments are registered.
     constexpr std::array enchantmentIDs{
-        "BGS_018e",          "TB_BaconUps_085e", "BGS_041e",
-        "TB_BaconUps_109e",  "BGS_071e",         "TB_BaconUps_123e",
-        "BGS_127e",          "TB_Baconups_203e" };
+        "BGS_018e", "BGS_041e", "BGS_071e", "BGS_127e", "TB_Baconups_203e" };
     for (const auto* id : enchantmentIDs)
     {
         CAPTURE(id);
@@ -59,9 +61,9 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 8 race buff scaling")
     };
     constexpr std::array expected{
         Expected{ "BGS_018", "BGS_018e", Race::BEAST },
-        Expected{ "TB_BaconUps_085", "TB_BaconUps_085e", Race::BEAST },
+        Expected{ "TB_BaconUps_085", "BGS_018e", Race::BEAST },
         Expected{ "BGS_041", "BGS_041e", Race::DRAGON },
-        Expected{ "TB_BaconUps_109", "TB_BaconUps_109e", Race::DRAGON },
+        Expected{ "TB_BaconUps_109", "BGS_041e", Race::DRAGON },
     };
 
     std::map<std::string, CardDef> cards;
@@ -71,11 +73,12 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 8 race buff scaling")
         CAPTURE(row.id);
         REQUIRE(cards.contains(row.id));
         auto& def = cards.at(row.id);
+        const auto expectedDeathrattleTasks =
+            row.id == std::string_view{ "BGS_018" }
+                ? 1
+                : row.id == std::string_view{ "TB_BaconUps_085" } ? 2 : 0;
         REQUIRE_EQ(def.power.GetDeathrattleTask().size(),
-                   row.id == std::string_view{ "BGS_018" } ||
-                           row.id == std::string_view{ "TB_BaconUps_085" }
-                       ? 1
-                       : 0);
+                   expectedDeathrattleTasks);
         if (row.id == std::string_view{ "BGS_018" } ||
             row.id == std::string_view{ "TB_BaconUps_085" })
         {

@@ -6,6 +6,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch4.hpp>
 #include <Rosetta/Common/Enums/CardEnums.hpp>
 
 #include <array>
@@ -85,6 +86,7 @@ class Season14State
     //! action-cost checks.
     Season14HeroPowerBatch1State heroPowerBatch1;
     Season14HeroPowerBatch2State heroPowerBatch2;
+    Season14HeroPowerBatch4State heroPowerBatch4;
 
     //! Batch 3 currently contains stateless combat/activation families.  It
     //! is kept as an explicit state member for schema clarity and future
@@ -124,14 +126,29 @@ class Season14State
     //! The result contains effects paid immediately by Player/Game.
     Season14HeroPowerBatch2Result BeginRecruitTurn();
 
+    //! Advances target-free Batch-4 lifecycle state at recruit start.
+    void BeginRecruitTurnBatch4();
+
+    //! Resets per-combat Avenge progress before combat starts.
+    void BeginCombatBatch4();
+
     //! Applies a successful minion sale to deferred hero-power state.
     void OnSellMinion();
 
     //! Returns immediate bonus gold for a successfully purchased minion.
     std::int32_t OnBuyMinion(bool purchasedPirate) const;
 
+    //! Returns the one-time attack bonus for the next minion purchase.
+    std::int32_t OnBuyMinionBatch4();
+
     //! Applies a successfully played Elemental to hero-power state.
     Season14HeroPowerBatch2Result OnPlayElemental();
+
+    //! Applies a successful minion-play lifecycle event.
+    Season14HeroPowerBatch4Result OnPlayMinionBatch4();
+
+    //! Applies a combat death to an Avenge hero power.
+    Season14HeroPowerBatch4Result OnFriendlyMinionDiedBatch4();
 
     //! Applies a successful Tavern upgrade and returns its gold/cost effects.
     Season14HeroPowerBatch2Result OnUpgradeTavern();
@@ -147,6 +164,18 @@ class Season14State
 
     //! Returns the number of Tavern offers after passive hero modifiers.
     std::size_t TavernOfferCount(std::size_t baseCount) const;
+
+    //! Returns passive fixed modifiers from the target-free Batch-4 family.
+    Season14HeroPowerBatch4PassiveModifiers
+    HeroPowerBatch4PassiveModifiers() const noexcept;
+
+    //! Resolves the target-free Batch-4 activation, if complete.
+    bool ResolveHeroPowerBatch4Activation(
+        Season14HeroPowerBatch4Result& result) const noexcept;
+
+    //! Commits an already-validated target-free Batch-4 activation.
+    bool ApplyHeroPowerBatch4Activation(
+        Season14HeroPowerBatch4Result& result) noexcept;
 
     //! Arms the next Tavern fill with minions from one tier above the player.
     //! The count is consumed by MinionPool when that fill occurs.

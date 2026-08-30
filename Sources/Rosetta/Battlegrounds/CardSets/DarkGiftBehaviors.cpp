@@ -27,12 +27,75 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
         return { DarkGiftEffect::TARGET_KEYWORDS, 0, 0, false, false, true,
                  1 };
     }
+    if (id == "BG36_MidGameEffect_000t14") // Gilding: golden, no triple.
+    {
+        return { DarkGiftEffect::TARGET_GOLDEN, 0, 0, false, false, false,
+                 1, true, false, false, 1, 1 };
+    }
+    if (id == "BG36_MidGameEffect_000t12") // Persisting Horror: Reborn.
+    {
+        return { DarkGiftEffect::TARGET_REBORN, 0, 0, false, false, false,
+                 1, false, true, false, 1, 1 };
+    }
+    if (id == "BG36_MidGameEffect_000t79") // Furtiveness: Stealth.
+    {
+        return { DarkGiftEffect::TARGET_STEALTH, 0, 0, false, false, false,
+                 1, false, false, true, 1, 1 };
+    }
+    if (id == "BG36_MidGameEffect_000t7") // Resistance: double Health at combat start.
+    {
+        return { DarkGiftEffect::START_COMBAT_STATS, 0, 0, false, false,
+                 false, 1, false, false, false, 1, 2 };
+    }
+    if (id == "BG36_MidGameEffect_000t71") // Hostility: double Attack at combat start.
+    {
+        return { DarkGiftEffect::START_COMBAT_STATS, 0, 0, false, false,
+                 false, 1, false, false, false, 2, 1 };
+    }
+    if (id == "BG36_MidGameEffect_000t81") // Transcendence: triple stats at combat start.
+    {
+        return { DarkGiftEffect::START_COMBAT_STATS, 0, 0, false, false,
+                 false, 1, false, false, false, 3, 3 };
+    }
     return {};
+}
+
+bool DarkGiftTargetIsLegal(const Minion& target,
+                           const DarkGiftBehavior& behavior)
+{
+    // A stale destroyed entry can remain in a zone until death processing
+    // compacts it.  It is never a legal friendly target for a persistent
+    // effect, and rejecting it here keeps masks and execution identical.
+    if (behavior.effect == DarkGiftEffect::NONE || behavior.uses == 0 ||
+        target.IsDestroyed())
+    {
+        return false;
+    }
+    switch (behavior.effect)
+    {
+        case DarkGiftEffect::TARGET_GOLDEN:
+            return behavior.golden && target.CanMakeGolden();
+        case DarkGiftEffect::TARGET_REBORN:
+            return behavior.reborn && !target.HasReborn();
+        case DarkGiftEffect::TARGET_STEALTH:
+            return behavior.stealth && !target.HasStealth();
+        case DarkGiftEffect::START_COMBAT_STATS:
+            return behavior.startCombatAttackMultiplier >= 1 &&
+                   behavior.startCombatHealthMultiplier >= 1;
+        case DarkGiftEffect::TARGET_STATS:
+            return behavior.attack != 0 || behavior.health != 0;
+        case DarkGiftEffect::TARGET_KEYWORDS:
+            return behavior.divineShield || behavior.windfury ||
+                   behavior.venomous;
+        case DarkGiftEffect::NONE:
+            return false;
+    }
+    return false;
 }
 
 bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior)
 {
-    if (behavior.effect == DarkGiftEffect::NONE || behavior.uses == 0)
+    if (!DarkGiftTargetIsLegal(target, behavior))
     {
         return false;
     }
@@ -59,6 +122,44 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior)
         }
     }
 
+    if (behavior.effect == DarkGiftEffect::TARGET_GOLDEN)
+    {
+        return behavior.golden && target.MakeGolden();
+    }
+
+    if (behavior.effect == DarkGiftEffect::TARGET_REBORN)
+    {
+        if (!behavior.reborn || target.HasReborn())
+        {
+            return false;
+        }
+        target.SetReborn(true);
+        return true;
+    }
+
+    if (behavior.effect == DarkGiftEffect::TARGET_STEALTH)
+    {
+        if (!behavior.stealth || target.HasStealth())
+        {
+            return false;
+        }
+        target.SetGameTag(GameTag::STEALTH, 1);
+        return true;
+    }
+
+    if (behavior.effect == DarkGiftEffect::START_COMBAT_STATS)
+    {
+        if (behavior.startCombatAttackMultiplier < 1 ||
+            behavior.startCombatHealthMultiplier < 1)
+        {
+            return false;
+        }
+        target.SetStartCombatStatMultipliers(
+            behavior.startCombatAttackMultiplier,
+            behavior.startCombatHealthMultiplier);
+        return true;
+    }
+
     return true;
 }
 
@@ -70,7 +171,13 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     for (const auto* id : { "BG36_MidGameEffect_000t73",
                             "BG36_MidGameEffect_000t72",
                             "BG36_MidGameEffect_000t13",
-                            "BG36_MidGameEffect_000t69" })
+                            "BG36_MidGameEffect_000t69",
+                            "BG36_MidGameEffect_000t14",
+                            "BG36_MidGameEffect_000t12",
+                            "BG36_MidGameEffect_000t79",
+                            "BG36_MidGameEffect_000t7",
+                            "BG36_MidGameEffect_000t71",
+                            "BG36_MidGameEffect_000t81" })
     {
         cards.emplace(id, CardDef{});
     }

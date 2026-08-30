@@ -46,6 +46,9 @@ Minion::Minion(Card card, int poolIdx)
             case GameTag::VENOMOUS:
                 m_hasVenomous = true;
                 break;
+            case GameTag::STEALTH:
+                m_hasStealth = true;
+                break;
             default:
                 break;
         }
@@ -116,6 +119,9 @@ void Minion::SetGameTag(GameTag tag, int value)
         case GameTag::POISONOUS:
         case GameTag::VENOMOUS:
             m_hasVenomous = value == 1 ? true : false;
+            break;
+        case GameTag::STEALTH:
+            m_hasStealth = value == 1 ? true : false;
             break;
         default:
             break;
@@ -202,6 +208,7 @@ bool Minion::MakeGolden()
     m_hasWindfury = false;
     m_hasMegaWindfury = false;
     m_hasVenomous = false;
+    m_hasStealth = false;
     for (const auto& tag : m_card.gameTags)
     {
         switch (tag.first)
@@ -227,6 +234,9 @@ bool Minion::MakeGolden()
             case GameTag::POISONOUS:
             case GameTag::VENOMOUS:
                 m_hasVenomous = true;
+                break;
+            case GameTag::STEALTH:
+                m_hasStealth = true;
                 break;
             default:
                 break;
@@ -298,6 +308,34 @@ bool Minion::HasWindfury() const
 bool Minion::HasVenomous() const
 {
     return m_hasVenomous;
+}
+
+bool Minion::HasStealth() const
+{
+    return m_hasStealth;
+}
+
+void Minion::SetStartCombatStatMultipliers(int attackMultiplier,
+                                           int healthMultiplier)
+{
+    if (attackMultiplier < 1 || healthMultiplier < 1)
+    {
+        return;
+    }
+    m_startCombatAttackMultiplier = attackMultiplier;
+    m_startCombatHealthMultiplier = healthMultiplier;
+    m_startCombatStatsApplied = false;
+}
+
+void Minion::ApplyStartCombatStatMultipliers()
+{
+    if (m_startCombatStatsApplied)
+    {
+        return;
+    }
+    m_attack *= m_startCombatAttackMultiplier;
+    m_health *= m_startCombatHealthMultiplier;
+    m_startCombatStatsApplied = true;
 }
 
 int Minion::GetAttackCount() const

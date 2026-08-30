@@ -4,6 +4,7 @@
 
 #include <array>
 
+using namespace RosettaStone;
 using namespace RosettaStone::Battlegrounds;
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - initial lookup table batch")
@@ -126,7 +127,7 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - seeded random batch")
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - unsupported is fail closed")
 {
-    const auto behavior = FindTavernSpellBehavior("BG28_504");
+    const auto behavior = FindTavernSpellBehavior("BG36_UNSUPPORTED");
     CHECK(behavior.effect == TavernSpellEffect::NONE);
     CHECK(behavior.gold < 0);
 }
@@ -185,34 +186,53 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - generated and tribal batch")
     {
         const char* id;
         TavernSpellEffect effect;
+        int attack;
+        int health;
+        int randomCount;
         bool target;
     };
 
     constexpr std::array expected{
-        Expected{ "BG28_845", TavernSpellEffect::TARGET_SHARED_RACE_STATS,
-                  true },
+        Expected{ "BG28_845", TavernSpellEffect::TARGET_SHARED_RACE_STATS, 3,
+                  3, 0, true },
         Expected{ "BG35_912",
                   TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT,
+                  3,
+                  3,
+                  0,
                   true },
-        Expected{ "EBG_Spell_017", TavernSpellEffect::TARGET_GOLDEN, true },
-        Expected{ "BG28_830", TavernSpellEffect::RANDOM_SHOP_GOLDEN, false },
-        Expected{ "BG28_504", TavernSpellEffect::RANDOM_MINION_TO_HAND,
+        Expected{ "EBG_Spell_017", TavernSpellEffect::TARGET_GOLDEN, 0, 0, 0,
+                  true },
+        Expected{ "BG28_830", TavernSpellEffect::RANDOM_SHOP_GOLDEN, 0, 0, 0,
                   false },
+        Expected{ "BG28_504", TavernSpellEffect::RANDOM_MINION_TO_HAND,
+                  0, 0, 0, false },
         Expected{ "BG33_814",
                   TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND,
+                  0,
+                  0,
+                  0,
                   false },
-        Expected{ "BG28_512", TavernSpellEffect::STEAL_RANDOM_SHOP_MINION,
-                  false },
+        Expected{ "BG28_512", TavernSpellEffect::STEAL_RANDOM_SHOP_MINION, 0,
+                  0, 0, false },
         Expected{ "BG34_444",
-                  TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH, false },
+                  TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH,
+                  8,
+                  8,
+                  0,
+                  false },
         Expected{ "EBG_Spell_032",
-                  TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS, true },
+                  TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS, 0, 0, 0,
+                  true },
     };
 
     for (const auto& item : expected)
     {
         const auto behavior = FindTavernSpellBehavior(item.id);
         CHECK(behavior.effect == item.effect);
+        CHECK(behavior.attack == item.attack);
+        CHECK(behavior.health == item.health);
+        CHECK(behavior.randomCount == item.randomCount);
         CHECK(TavernSpellRequiresTarget(behavior.effect) == item.target);
         CHECK(behavior.gold == 0);
     }

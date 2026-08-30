@@ -21,6 +21,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch4.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/Card.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDef.hpp>

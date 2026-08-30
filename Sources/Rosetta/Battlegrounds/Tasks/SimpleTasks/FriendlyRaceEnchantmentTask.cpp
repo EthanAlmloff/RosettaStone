@@ -9,23 +9,25 @@
 namespace RosettaStone::Battlegrounds::SimpleTasks
 {
 FriendlyRaceEnchantmentTask::FriendlyRaceEnchantmentTask(
-    const std::string_view& cardID, Race race)
-    : m_cardID(cardID), m_race(race)
+    const std::string_view& cardID, Race race, bool excludeSource)
+    : m_cardID(cardID), m_race(race), m_excludeSource(excludeSource)
 {
     // Do nothing
 }
 
 TaskStatus FriendlyRaceEnchantmentTask::Run(
-    Player& player, [[maybe_unused]] Minion& source)
+    Player& player, Minion& source)
 {
     Card enchantmentCard = Cards::FindCardByID(m_cardID);
-    player.GetField().ForEachAlive([this, &enchantmentCard](MinionData& data) {
+    player.GetField().ForEachAlive(
+        [this, &enchantmentCard, &source](MinionData& data) {
         Minion& minion = data.value();
-        if (minion.HasRace(m_race))
+        if (minion.HasRace(m_race) &&
+            (!m_excludeSource || &minion != &source))
         {
             Generic::AddEnchantment(enchantmentCard, minion);
         }
-    });
+        });
 
     return TaskStatus::COMPLETE;
 }

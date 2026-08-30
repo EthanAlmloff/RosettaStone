@@ -21,6 +21,10 @@ enum class DarkGiftEffect
     NONE,
     TARGET_STATS,
     TARGET_KEYWORDS,
+    TARGET_GOLDEN,
+    TARGET_REBORN,
+    TARGET_STEALTH,
+    START_COMBAT_STATS,
 };
 
 struct DarkGiftBehavior
@@ -32,11 +36,22 @@ struct DarkGiftBehavior
     bool windfury = false;
     bool venomous = false;
     unsigned char uses = 1;
+    bool golden = false;
+    bool reborn = false;
+    bool stealth = false;
+    int startCombatAttackMultiplier = 1;
+    int startCombatHealthMultiplier = 1;
 };
 
 //! Returns the complete behavior for a supported gift, or NONE when the
 //! entity remains intentionally fail-closed.
 DarkGiftBehavior FindDarkGiftBehavior(std::string_view id);
+
+//! Returns whether a board minion is a legal target for this behavior.
+//! This predicate is shared by action-mask construction and execution so a
+//! known gift never enters the bridge with an impossible target.
+bool DarkGiftTargetIsLegal(const Minion& target,
+                           const DarkGiftBehavior& behavior);
 
 //! Applies a previously validated gift to one friendly board minion.
 //! Returns false for an unsupported behavior and performs no mutation then.

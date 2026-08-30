@@ -26,7 +26,8 @@ class FriendlyRaceEnchantmentTask
  public:
     //! Constructs a race-filtered friendly-board enchantment task.
     explicit FriendlyRaceEnchantmentTask(const std::string_view& cardID,
-                                         Race race);
+                                         Race race,
+                                         bool excludeSource = false);
 
     //! Runs the task against the source minion.
     TaskStatus Run(Player& player, Minion& source);
@@ -37,6 +38,7 @@ class FriendlyRaceEnchantmentTask
  private:
     std::string_view m_cardID;
     Race m_race = Race::INVALID;
+    bool m_excludeSource = false;
 };
 }  // namespace SimpleTasks
 }  // namespace RosettaStone::Battlegrounds

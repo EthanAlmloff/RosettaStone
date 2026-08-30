@@ -25,7 +25,8 @@ class RandomFriendlyRaceTask
 {
  public:
     //! Construct a random friendly race stat effect.
-    RandomFriendlyRaceTask(Race race, int attack, int health, int amount = 1);
+    RandomFriendlyRaceTask(Race race, int attack, int health, int amount = 1,
+                           bool grantDivineShield = false);
 
     //! Construct a random friendly race Reborn effect.
     RandomFriendlyRaceTask(Race race, int amount);
@@ -42,6 +43,7 @@ class RandomFriendlyRaceTask
     int m_health = 0;
     int m_amount = 1;
     bool m_grantReborn = false;
+    bool m_grantDivineShield = false;
 };
 }  // namespace SimpleTasks
 }  // namespace RosettaStone::Battlegrounds

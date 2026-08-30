@@ -40,12 +40,17 @@ void Player::SelectHero(std::size_t idx)
         FindSeason14HeroPowerBehaviorBatch2(hero.card.heroPowerDbfID);
     const auto* batch3 =
         FindSeason14HeroPowerBehaviorBatch3(hero.card.heroPowerDbfID);
+    const auto* batch4 =
+        FindSeason14HeroPowerBehaviorBatch4(hero.card.heroPowerDbfID);
     const int heroPowerCost = batch1 != nullptr
                                   ? batch1->cost
                                   : (batch2 != nullptr
                                          ? batch2->cost
-                                         : (batch3 != nullptr ? batch3->cost
-                                                              : 0));
+                                         : (batch3 != nullptr
+                                                ? batch3->cost
+                                                : (batch4 != nullptr
+                                                       ? batch4->cost
+                                                       : 0)));
     season14.SetHeroPower(hero.card.heroPowerDbfID, heroPowerCost,
                           hero.card.heroPowerDbfID != 0);
 
@@ -62,12 +67,15 @@ void Player::PrepareTavern()
         existingPoolIndices.insert(minion.value().GetPoolIndex());
     });
     prepareTavernMinionsCallback(*this);
+    const auto batch4 = season14.HeroPowerBatch4PassiveModifiers();
     if (season14.persistentShopAttack != 0 ||
         season14.persistentShopHealth != 0 ||
-        !season14.persistentShopRaceStats.empty())
+        !season14.persistentShopRaceStats.empty() ||
+        batch4.globalMinionAttack != 0 || batch4.mechShopAttack != 0 ||
+        batch4.mechShopHealth != 0)
     {
         tavern.fieldZone.ForEach(
-            [this, &existingPoolIndices](MinionData& minion) {
+            [this, &existingPoolIndices, batch4](MinionData& minion) {
                 if (existingPoolIndices.contains(
                         minion.value().GetPoolIndex()))
                 {
@@ -86,6 +94,20 @@ void Player::PrepareTavern()
                         minion.value().SetHealth(
                             minion.value().GetHealth() + raceBonus.health);
                     }
+                }
+                if (batch4.globalMinionAttack != 0)
+                {
+                    minion.value().SetAttack(
+                        minion.value().GetAttack() +
+                        batch4.globalMinionAttack);
+                }
+                if (batch4.mechShopAttack != 0 &&
+                    minion.value().HasRace(Race::MECHANICAL))
+                {
+                    minion.value().SetAttack(
+                        minion.value().GetAttack() + batch4.mechShopAttack);
+                    minion.value().SetHealth(
+                        minion.value().GetHealth() + batch4.mechShopHealth);
                 }
             });
     }
@@ -107,6 +129,13 @@ void Player::PurchaseMinion(std::size_t idx)
     const bool purchasedPirate =
         tavern.fieldZone[idx].GetRace() == Race::PIRATE;
     purchaseMinionCallback(*this, idx);
+
+    if (hand.GetCount() > 0)
+    {
+        auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
+        const auto attack = season14.OnBuyMinionBatch4();
+        purchased.SetAttack(purchased.GetAttack() + attack);
+    }
 
     remainCoin -= cost;
     remainCoin += season14.OnBuyMinion(purchasedPirate);
@@ -135,6 +164,10 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
         auto minion = std::get<Minion>(card);
         minion.getPlayerCallback = [this]() -> Player& { return *this; };
         minion.SetIndex(getNextCardIndexCallback());
+
+        const auto batch4 = season14.OnPlayMinionBatch4();
+        minion.SetAttack(minion.GetAttack() + batch4.attack);
+        minion.SetHealth(minion.GetHealth() + batch4.health);
 
         if (targetIdx == -1)
         {
@@ -207,6 +240,14 @@ void AppendSupportedNormalMinions(const std::array<Card, N>& cards,
     }
 }
 
+bool HasSupportedTier1Minion()
+{
+    std::vector<Card> candidates;
+    AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates,
+                                 Race::INVALID);
+    return !candidates.empty();
+}
+
 std::vector<Card> SupportedMinionsForRace(Race race)
 {
     std::vector<Card> result;
@@ -258,7 +299,8 @@ bool HasRandomGoldenShopTarget(const Player& player)
 {
     bool found = false;
     player.tavern.fieldZone.ForEach([&found](const MinionData& minion) {
-        if (minion.value().GetPoolIndex() >= 0 &&
+        if (!minion.value().IsDestroyed() &&
+            minion.value().GetPoolIndex() >= 0 &&
             minion.value().CanMakeGolden())
         {
             found = true;
@@ -270,6 +312,14 @@ bool HasRandomGoldenShopTarget(const Player& player)
 bool HasSupportedRaceMinion(Race race)
 {
     return !SupportedMinionsForRace(race).empty();
+}
+
+std::size_t AliveFriendlyMinionCount(const Player& player)
+{
+    std::size_t count = 0;
+    player.recruitField.ForEachAlive(
+        [&count](const MinionData&) { ++count; });
+    return count;
 }
 
 void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
@@ -548,7 +598,8 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             std::vector<Minion*> candidates;
             player.tavern.fieldZone.ForEach(
                 [&candidates](MinionData& minion) {
-                    if (minion.value().GetPoolIndex() >= 0 &&
+                    if (!minion.value().IsDestroyed() &&
+                        minion.value().GetPoolIndex() >= 0 &&
                         minion.value().CanMakeGolden())
                     {
                         candidates.push_back(&minion.value());
@@ -711,7 +762,7 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         return false;
     }
     if (behavior.effect == TavernSpellEffect::RANDOM_MINION_TO_HAND &&
-        !HasSupportedRaceMinion(Race::INVALID))
+        !HasSupportedTier1Minion())
     {
         return false;
     }
@@ -726,6 +777,14 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
     if (behavior.effect == TavernSpellEffect::STEAL_RANDOM_SHOP_MINION &&
         tavern.fieldZone.IsEmpty())
     {
+        return false;
+    }
+    if (behavior.effect == TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS &&
+        AliveFriendlyMinionCount(*this) < 2)
+    {
+        // The spell must leave at least one friendly minion to receive the
+        // sold minion's stats.  Reject an unresolvable target before paying
+        // the spell cost or mutating the board.
         return false;
     }
     const int baseCost = spell.GetCost();

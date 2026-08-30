@@ -27,6 +27,9 @@ Battle::Battle(Player& player1, Player& player2)
 
 void Battle::Initialize()
 {
+    m_player1.season14.BeginCombatBatch4();
+    m_player2.season14.BeginCombatBatch4();
+
     // Determine the player attacks first
     // NOTE: The player with the greater number of minions attacks first.
     // If the number of minions is equal for both players, one of the players
@@ -51,6 +54,16 @@ void Battle::Initialize()
     m_p2NextAttackerIdx = 0;
     m_p1PendingAttacks = 0;
     m_p2PendingAttacks = 0;
+
+    // Dark Gift combat-start multipliers are attached to the copied combat
+    // minions, so they are applied exactly once per combat before any
+    // START_OF_COMBAT task observes stats.
+    m_p1Field.ForEach([](MinionData& minion) {
+        minion.value().ApplyStartCombatStatMultipliers();
+    });
+    m_p2Field.ForEach([](MinionData& minion) {
+        minion.value().ApplyStartCombatStatMultipliers();
+    });
 
     if (m_turn == Turn::PLAYER1)
     {
@@ -465,6 +478,22 @@ void Battle::ProcessDestroy(bool beforeAttack)
                                                   removedMinion);
                 });
             }
+        }
+
+        // Lead the Frostwolves/Stormpikes use the same deterministic Avenge
+        // lifecycle.  Resolve it only after deathrattle and Reborn handling so
+        // a newly reborn friendly minion also receives the permanent bonus.
+        Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+        const auto avenger = owner.season14.OnFriendlyMinionDiedBatch4();
+        if (avenger.avengeTriggered)
+        {
+            owner.recruitField.ForEachAlive(
+                [&avenger](MinionData& aliveMinion) {
+                    aliveMinion.value().SetAttack(
+                        aliveMinion.value().GetAttack() + avenger.attack);
+                    aliveMinion.value().SetHealth(
+                        aliveMinion.value().GetHealth() + avenger.health);
+                });
         }
     }
 

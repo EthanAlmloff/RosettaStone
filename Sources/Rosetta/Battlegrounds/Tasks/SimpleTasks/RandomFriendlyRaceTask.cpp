@@ -14,12 +14,14 @@ using Random = effolkronium::random_thread_local;
 namespace RosettaStone::Battlegrounds::SimpleTasks
 {
 RandomFriendlyRaceTask::RandomFriendlyRaceTask(Race race, int attack,
-                                               int health, int amount)
+                                               int health, int amount,
+                                               bool grantDivineShield)
     : m_race(race),
       m_attack(attack),
       m_health(health),
       m_amount(amount),
-      m_grantReborn(false)
+      m_grantReborn(false),
+      m_grantDivineShield(grantDivineShield)
 {
 }
 
@@ -59,6 +61,10 @@ TaskStatus RandomFriendlyRaceTask::Run(Player& player, Minion& source)
         {
             target.SetAttack(target.GetAttack() + m_attack);
             target.SetHealth(target.GetHealth() + m_health);
+            if (m_grantDivineShield)
+            {
+                target.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+            }
         }
     }
 

@@ -166,6 +166,16 @@ class Minion
     //! \return true when damage from this minion destroys its target.
     bool HasVenomous() const;
 
+    //! Returns whether this minion has Stealth.
+    bool HasStealth() const;
+
+    //! Configures one-shot stat multipliers applied at combat start.
+    void SetStartCombatStatMultipliers(int attackMultiplier,
+                                       int healthMultiplier);
+
+    //! Applies and consumes the combat-start stat multipliers.
+    void ApplyStartCombatStatMultipliers();
+
     //! Returns the number of attacks this minion may make in one combat turn.
     //! \return One, two, or four for normal, Windfury, or Mega Windfury.
     int GetAttackCount() const;
@@ -262,8 +272,12 @@ class Minion
     bool m_hasWindfury = false;
     bool m_hasMegaWindfury = false;
     bool m_hasVenomous = false;
+    bool m_hasStealth = false;
     bool m_isFrozen = false;
     bool m_isDestroyed = false;
+    int m_startCombatAttackMultiplier = 1;
+    int m_startCombatHealthMultiplier = 1;
+    bool m_startCombatStatsApplied = false;
 };
 }  // namespace RosettaStone::Battlegrounds
 

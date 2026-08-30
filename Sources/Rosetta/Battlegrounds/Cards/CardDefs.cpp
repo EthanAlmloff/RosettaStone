@@ -13,6 +13,7 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch6.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch7.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch8.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch9.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 
 namespace RosettaStone::Battlegrounds
@@ -31,6 +32,7 @@ CardDefs::CardDefs()
     ModernMinionBehaviorsBatch6::AddAll(m_data);
     ModernMinionBehaviorsBatch7::AddAll(m_data);
     ModernMinionBehaviorsBatch8::AddAll(m_data);
+    ModernMinionBehaviorsBatch9::AddAll(m_data);
 }
 
 CardDefs::~CardDefs()
