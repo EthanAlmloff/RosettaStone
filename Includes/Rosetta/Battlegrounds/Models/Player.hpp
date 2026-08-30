@@ -56,10 +56,27 @@ class Player
     //! \param handIdx The index of the spell in the player's hand.
     bool CanPlaySpell(std::size_t handIdx) const;
 
+    //! Returns whether a supported Tavern spell can be played on a friendly
+    //! board target. A target of -1 denotes a no-target spell.
+    //! \param handIdx The index of the spell in the player's hand.
+    //! \param targetIdx The friendly board slot, or -1 for no target.
+    bool CanPlaySpell(std::size_t handIdx, int targetIdx) const;
+
     //! Pays for and resolves a supported no-target Tavern spell.
     //! \param handIdx The index of the spell in the player's hand.
     //! \return false when the card, cost, or behavior is unsupported.
     bool PlaySpell(std::size_t handIdx);
+
+    //! Pays for and resolves a supported targeted or no-target Tavern spell.
+    //! \param handIdx The index of the spell in the player's hand.
+    //! \param targetIdx The friendly board slot, or -1 for no target.
+    //! \return false when the card, target, cost, or behavior is unsupported.
+    bool PlaySpell(std::size_t handIdx, int targetIdx);
+
+    //! Applies a fully resolved target-free Season 14 hero-power activation.
+    //! Random recipient selection uses RosettaStone's shared RNG stream.
+    bool ApplySeason14HeroPowerBatch3Activation(
+        const Season14HeroPowerBatch3Activation& activation);
 
     //! Sells a minion to Tavern.
     //! \param idx The index of a list of minions in player's field.
@@ -69,7 +86,9 @@ class Player
     void UpgradeTavern();
 
     //! Refreshes a list of minions in Tavern's field.
-    void RefreshTavern();
+    //! \p freeRefresh is used by a hero power whose activation already paid
+    //! for the refresh (for example Temporal Tavern).
+    void RefreshTavern(bool freeRefresh = false);
 
     //! Freezes a list of minions in Tavern's field.
     void FreezeTavern();

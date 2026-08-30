@@ -85,6 +85,7 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - activations enforce lifecycle")
     CHECK(ResolveSeason14HeroPowerBatch2Activation(58537, state, false,
                                                    result));
     CHECK(result.extraHigherTierMinions == 2);
+    CHECK(state.higherTierRefreshMinions == 2);
 
     CHECK(!ResolveSeason14HeroPowerBatch2Activation(116924, state, false,
                                                     result));
@@ -95,7 +96,7 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - activations enforce lifecycle")
     CHECK(state.nextHeroPowerDiscount);
 }
 
-TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - Arcane Knowledge unlocks on turn three")
+TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - Arcane Knowledge unlocks exactly on turn three")
 {
     Season14HeroPowerBatch2State state{};
     Season14HeroPowerBatch2Result result{};
@@ -110,8 +111,38 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - Arcane Knowledge unlocks on turn
         117426, Season14HeroPowerBatch2Event::BEGIN_TURN, state, result);
     CHECK(state.turnNumber == 3);
     CHECK(result.spellCostDelta == -1);
+    CHECK(state.arcaneKnowledgeUnlocked);
+    CHECK(state.tavernSpellDiscount == 1);
 
     ResolveSeason14HeroPowerBatch2Event(
         117426, Season14HeroPowerBatch2Event::BEGIN_TURN, state, result);
+    CHECK(state.turnNumber == 4);
     CHECK(result.spellCostDelta == 0);
+    CHECK(state.tavernSpellDiscount == 1);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - Arcane Knowledge discount is consumed once on success")
+{
+    Season14HeroPowerBatch2State state{};
+    Season14HeroPowerBatch2Result result{};
+
+    for (int turn = 0; turn < 3; ++turn)
+    {
+        ResolveSeason14HeroPowerBatch2Event(
+            117426, Season14HeroPowerBatch2Event::BEGIN_TURN, state,
+            result);
+    }
+
+    CHECK(state.TavernSpellCost(2) == 1);
+    CHECK(state.TavernSpellCost(0) == 0);
+
+    // A failed or unsupported attempt does not consume the discount.
+    CHECK(!state.ConsumeTavernSpellDiscount(false));
+    CHECK(state.tavernSpellDiscount == 1);
+    CHECK(state.TavernSpellCost(2) == 1);
+
+    CHECK(state.ConsumeTavernSpellDiscount(true));
+    CHECK(state.tavernSpellDiscount == 0);
+    CHECK(state.TavernSpellCost(2) == 2);
+    CHECK(!state.ConsumeTavernSpellDiscount(true));
 }

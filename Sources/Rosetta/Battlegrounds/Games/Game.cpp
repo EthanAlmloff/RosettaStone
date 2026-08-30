@@ -61,6 +61,18 @@ void Game::RestoreRandomState(const std::string& state) const
 
 void Game::Start()
 {
+    // A Game owns its full lobby state. Reset the scalar lobby state before
+    // rebuilding the seeded lobby; Player/zone storage is initialized by the
+    // setup loop below and is intentionally not copy-assigned (HandZone has a
+    // const zone type and is therefore non-assignable).
+    m_playerCount = 0;
+    m_cardIndex = 0;
+    m_playerFightPair.clear();
+    m_gameState.phase = Phase::INVALID;
+    m_gameState.nextPhase = Phase::INVALID;
+    m_gameState.numRemainPlayer = NUM_BATTLEGROUNDS_PLAYERS;
+    m_gameState.ghostPlayerIdx = std::numeric_limits<std::size_t>::max();
+
     if (m_seed.has_value())
     {
         Random::seed(m_seed.value());
@@ -90,7 +102,8 @@ void Game::Start()
     auto selectHeroCallback = [this](Player& player) {
         ++m_playerCount;
 
-        player.hero.health = player.hero.card.GetHealth();
+        player.hero.health = player.season14.heroPowerBatch1.StartingHealth(
+            player.hero.card.GetHealth());
 
         if (m_playerCount >= NUM_BATTLEGROUNDS_PLAYERS)
         {
@@ -301,6 +314,9 @@ void Game::Recruit()
         }
         player.remainCoin = player.totalCoin;
 
+        const auto heroPowerResult = player.season14.BeginRecruitTurn();
+        player.remainCoin += heroPowerResult.goldDelta;
+
         // Decrease the value of coin to upgrade player's Tavern to next tier
         if (player.currentTier < TIER_UPPER_LIMIT)
         {
@@ -350,6 +366,13 @@ void Game::CompleteRecruitPhase()
     {
         if (player.playState == PlayState::PLAYING)
         {
+            if (player.season14.ShouldFreezeRemainingTavern())
+            {
+                player.tavern.fieldZone.ForEach(
+                    [](MinionData& minion) {
+                        minion.value().SetFrozen(true);
+                    });
+            }
             player.season14.Emit(Season14Event::RECRUIT_END);
         }
     }

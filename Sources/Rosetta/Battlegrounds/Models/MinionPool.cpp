@@ -221,8 +221,8 @@ std::size_t MinionPool::GetCount() const
 
 void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern)
 {
-    const std::size_t targetCount =
-        GetNumMinionsCanPurchase(player.currentTier);
+    const std::size_t targetCount = player.season14.TavernOfferCount(
+        GetNumMinionsCanPurchase(player.currentTier));
     const std::size_t currentCount =
         static_cast<std::size_t>(tavern.fieldZone.GetCount());
     if (currentCount >= targetCount)
@@ -233,6 +233,23 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern)
     auto minions = GetMinions(1, player.currentTier, true);
 
     Random::shuffle(minions.begin(), minions.end());
+
+    // Temporal Tavern arms exactly one subsequent fill. Select the requested
+    // higher-tier offers first, then fill the remaining slots normally. The
+    // allowance is consumed here, after the refresh has been accepted, so a
+    // failed/unsupported action cannot leave a stale bonus for a later turn.
+    const auto requestedHigher = player.season14.TakeHigherTierRefresh();
+    if (requestedHigher > 0 && player.currentTier < TIER_UPPER_LIMIT)
+    {
+        auto higherTier = GetMinions(player.currentTier + 1,
+                                     player.currentTier + 1, true);
+        Random::shuffle(higherTier.begin(), higherTier.end());
+        const auto higherCount = std::min<std::size_t>(
+            static_cast<std::size_t>(requestedHigher),
+            std::min(targetCount - currentCount, higherTier.size()));
+        minions.insert(minions.begin(), higherTier.begin(),
+                       higherTier.begin() + static_cast<std::ptrdiff_t>(higherCount));
+    }
 
     std::size_t idx = 0;
     for (auto& minion : minions)

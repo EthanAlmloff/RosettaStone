@@ -71,27 +71,57 @@ TaskStatus SummonTask::Run(Player& player, Minion& source)
 {
     const Card card = Cards::FindCardByID(m_cardID);
 
+    if (m_amount <= 0 || card.id.empty())
+    {
+        return m_amount <= 0 ? TaskStatus::COMPLETE : TaskStatus::STOP;
+    }
+
+    // Compute the source-relative insertion point once.  Inserting to the
+    // left/right can shift the source inside FieldZone, invalidating its old
+    // zone position before a multi-summon task reaches its next iteration.
+    const int sourceSummonPos = GetPosition(source, m_side);
+
     for (int i = 0; i < m_amount; ++i)
     {
         if (player.GetField().IsFull())
         {
             return TaskStatus::STOP;
         }
-    }
 
-    Minion summonMinion{ card };
+        Minion summonMinion{ card };
+        summonMinion.getPlayerCallback = [&player]() -> Player& {
+            return player;
+        };
+        if (player.getNextCardIndexCallback)
+        {
+            summonMinion.SetIndex(player.getNextCardIndexCallback());
+        }
 
-    int summonPos = GetPosition(source, m_side);
-    if (summonPos > player.GetField().GetCount())
-    {
-        summonPos = player.GetField().GetCount();
-    }
+        int summonPos = sourceSummonPos;
+        if (summonPos > player.GetField().GetCount())
+        {
+            summonPos = player.GetField().GetCount();
+        }
+        if (summonPos < 0)
+        {
+            summonPos = player.GetField().GetCount();
+        }
 
-    player.GetField().Add(summonMinion, summonPos);
+        player.GetField().Add(summonMinion, summonPos);
+        const int addedPos = summonPos < player.GetField().GetCount()
+                                 ? summonPos
+                                 : player.GetField().GetCount() - 1;
+        Minion& summoned = player.GetField()[addedPos];
 
-    if (m_addToStack)
-    {
-        player.taskStack.minions.emplace_back(player.GetField()[summonPos]);
+        player.GetField().ForEachAlive([&summoned](MinionData& aliveMinion) {
+            aliveMinion.value().ActivateTrigger(TriggerType::SUMMON,
+                                                summoned);
+        });
+
+        if (m_addToStack)
+        {
+            player.taskStack.minions.emplace_back(summoned);
+        }
     }
 
     return TaskStatus::COMPLETE;
@@ -100,31 +130,6 @@ TaskStatus SummonTask::Run(Player& player, Minion& source)
 TaskStatus SummonTask::Run(Player& player, Minion& source,
                            [[maybe_unused]] Minion& target)
 {
-    const Card card = Cards::FindCardByID(m_cardID);
-
-    for (int i = 0; i < m_amount; ++i)
-    {
-        if (player.GetField().IsFull())
-        {
-            return TaskStatus::STOP;
-        }
-    }
-
-    Minion summonMinion{ card };
-
-    int summonPos = GetPosition(source, m_side);
-    if (summonPos > player.GetField().GetCount())
-    {
-        summonPos = player.GetField().GetCount();
-    }
-
-    player.GetField().Add(summonMinion, summonPos);
-
-    if (m_addToStack)
-    {
-        player.taskStack.minions.emplace_back(player.GetField()[summonPos]);
-    }
-
-    return TaskStatus::COMPLETE;
+    return Run(player, source);
 }
 }  // namespace RosettaStone::Battlegrounds::SimpleTasks

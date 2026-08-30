@@ -83,6 +83,35 @@ Race Card::GetRace() const
     return static_cast<Race>(gameTags.at(GameTag::CARDRACE));
 }
 
+bool Card::HasRace(Race race) const
+{
+    if (race == Race::INVALID)
+    {
+        return false;
+    }
+
+    if (!races.empty())
+    {
+        for (const auto cardRace : races)
+        {
+            if (cardRace == Race::ALL || cardRace == race)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    const auto raceTag = gameTags.find(GameTag::CARDRACE);
+    if (raceTag == gameTags.end())
+    {
+        return false;
+    }
+
+    const auto cardRace = static_cast<Race>(raceTag->second);
+    return cardRace == Race::ALL || cardRace == race;
+}
+
 int Card::GetAttack() const
 {
     if (gameTags.find(GameTag::ATK) == gameTags.end())

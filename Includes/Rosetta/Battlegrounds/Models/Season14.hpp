@@ -3,6 +3,10 @@
 #ifndef ROSETTASTONE_BATTLEGROUNDS_SEASON14_HPP
 #define ROSETTASTONE_BATTLEGROUNDS_SEASON14_HPP
 
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch2.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -63,6 +67,18 @@ class Season14State
     bool heroPowerAvailable = false;
     bool heroPowerUsed = false;
 
+    //! State for the currently implemented modern hero-power families.
+    //! Keeping this with the player-owned Season 14 state makes discounts and
+    //! lifecycle counters available to both the event hooks and Player's
+    //! action-cost checks.
+    Season14HeroPowerBatch1State heroPowerBatch1;
+    Season14HeroPowerBatch2State heroPowerBatch2;
+
+    //! Batch 3 currently contains stateless combat/activation families.  It
+    //! is kept as an explicit state member for schema clarity and future
+    //! counters, while all unsupported families remain fail-closed.
+    std::uint8_t heroPowerBatch3State = 0;
+
     //! Hooks for effects whose entity behavior is implemented elsewhere.
     bool lockboxActive = false;
     bool fishbaitActive = false;
@@ -81,8 +97,66 @@ class Season14State
     //! Configures the hero power without claiming its behavior is supported.
     void SetHeroPower(std::int32_t dbfID, std::int32_t cost, bool available);
 
+    //! Applies deterministic hero-power hooks at the start of recruit.
+    //! The result contains effects paid immediately by Player/Game.
+    Season14HeroPowerBatch2Result BeginRecruitTurn();
+
+    //! Applies a successful minion sale to deferred hero-power state.
+    void OnSellMinion();
+
+    //! Returns immediate bonus gold for a successfully purchased minion.
+    std::int32_t OnBuyMinion(bool purchasedPirate) const;
+
+    //! Applies a successfully played Elemental to hero-power state.
+    Season14HeroPowerBatch2Result OnPlayElemental();
+
+    //! Applies a successful Tavern upgrade and returns its gold/cost effects.
+    Season14HeroPowerBatch2Result OnUpgradeTavern();
+
+    //! Returns the effective cost of buying a minion under passive auras.
+    std::int32_t MinionPurchaseCost(std::int32_t baseCost) const;
+
+    //! Returns the effective cost of refreshing the Tavern.
+    std::int32_t RefreshCost(std::int32_t baseCost) const;
+
+    //! Returns the effective cost of upgrading the Tavern.
+    std::int32_t UpgradeCost(std::int32_t baseCost) const;
+
+    //! Returns the number of Tavern offers after passive hero modifiers.
+    std::size_t TavernOfferCount(std::size_t baseCount) const;
+
+    //! Arms the next Tavern fill with minions from one tier above the player.
+    //! The count is consumed by MinionPool when that fill occurs.
+    void ArmHigherTierRefresh(std::int32_t count);
+
+    //! Returns and clears the one-shot higher-tier refresh allowance.
+    std::int32_t TakeHigherTierRefresh();
+
+    //! Returns whether this hero automatically freezes the remaining Tavern.
+    bool ShouldFreezeRemainingTavern() const;
+
+    //! Returns the effective cost of a Tavern spell before resolution.
+    std::int32_t TavernSpellCost(std::int32_t baseCost) const;
+
+    //! Records a successful Tavern refresh so one-shot effects are consumed.
+    void OnRefreshTavern(bool refreshSucceeded);
+
+    //! Records a successfully resolved Tavern spell.
+    void OnTavernSpellResolved(bool spellResolved);
+
+    //! Resolves a complete target-free Batch-3 activation for this hero.
+    bool ResolveHeroPowerBatch3Activation(
+        std::int32_t currentTier,
+        Season14HeroPowerBatch3Activation& result) const noexcept;
+
+    //! Returns a passive combat-kill bonus owned by this hero, if any.
+    std::int32_t HeroPowerBatch3CombatKillAttackBonus() const noexcept;
+
     //! Returns whether the player can pay and use the power this turn.
     bool CanUseHeroPower(std::int32_t availableGold) const;
+
+    //! Returns the current cost after deterministic hero-power discounts.
+    std::int32_t EffectiveHeroPowerCost() const;
 
     //! Consumes the power for this turn.
     bool UseHeroPower();

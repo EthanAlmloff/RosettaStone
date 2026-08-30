@@ -32,6 +32,19 @@ Minion::Minion(Card card, int poolIdx)
             case GameTag::DIVINE_SHIELD:
                 m_hasDivineShield = true;
                 break;
+            case GameTag::REBORN:
+                m_hasReborn = true;
+                break;
+            case GameTag::WINDFURY:
+                m_hasWindfury = true;
+                break;
+            case GameTag::MEGA_WINDFURY:
+                m_hasMegaWindfury = true;
+                break;
+            case GameTag::POISONOUS:
+            case GameTag::VENOMOUS:
+                m_hasVenomous = true;
+                break;
             default:
                 break;
         }
@@ -86,6 +99,16 @@ void Minion::SetGameTag(GameTag tag, int value)
         case GameTag::DIVINE_SHIELD:
             m_hasDivineShield = value == 1 ? true : false;
             break;
+        case GameTag::WINDFURY:
+            m_hasWindfury = value == 1 ? true : false;
+            break;
+        case GameTag::MEGA_WINDFURY:
+            m_hasMegaWindfury = value == 1 ? true : false;
+            break;
+        case GameTag::POISONOUS:
+        case GameTag::VENOMOUS:
+            m_hasVenomous = value == 1 ? true : false;
+            break;
         default:
             break;
     }
@@ -94,6 +117,11 @@ void Minion::SetGameTag(GameTag tag, int value)
 Race Minion::GetRace() const
 {
     return m_card.GetRace();
+}
+
+bool Minion::HasRace(Race race) const
+{
+    return m_card.HasRace(race);
 }
 
 ZoneType Minion::GetZoneType() const
@@ -131,6 +159,14 @@ int Minion::GetTier() const
     return m_card.GetTier();
 }
 
+bool Minion::IsGolden() const
+{
+    // HearthstoneJSON links a golden entity back to its normal DBF ID.  This
+    // remains stable for generated/pool minions and avoids guessing from
+    // names or card text.
+    return m_card.normalDbfID != 0;
+}
+
 int Minion::GetAttack() const
 {
     return m_attack;
@@ -166,6 +202,43 @@ bool Minion::HasDivineShield() const
     return m_hasDivineShield;
 }
 
+bool Minion::HasReborn() const
+{
+    return m_hasReborn;
+}
+
+void Minion::SetReborn(bool reborn)
+{
+    m_hasReborn = reborn;
+}
+
+bool Minion::HasWindfury() const
+{
+    return m_hasWindfury || m_hasMegaWindfury;
+}
+
+bool Minion::HasVenomous() const
+{
+    return m_hasVenomous;
+}
+
+int Minion::GetAttackCount() const
+{
+    if (m_hasMegaWindfury)
+    {
+        return 4;
+    }
+
+    return m_hasWindfury ? 2 : 1;
+}
+
+void Minion::ReviveWithReborn()
+{
+    m_health = 1;
+    m_isDestroyed = false;
+    m_hasReborn = false;
+}
+
 bool Minion::IsFrozen() const
 {
     return m_isFrozen;
@@ -185,8 +258,11 @@ void Minion::TakeDamage(Minion& source)
     }
 
     m_health -= source.GetAttack();
-    if (m_health <= 0)
+    if (m_health <= 0 ||
+        (source.HasVenomous() && source.GetAttack() > 0))
     {
+        // Venomous applies only after actual damage. Divine Shield returned
+        // above, and a zero-attack minion cannot poison its target.
         m_isDestroyed = true;
     }
 }

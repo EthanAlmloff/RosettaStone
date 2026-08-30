@@ -365,6 +365,41 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         card.gameTags[GameTag::HEALTH] = health;
         card.gameTags[GameTag::COST] = cost;
 
+        // Keep the complete gameplay tribe list.  The primary `race` field
+        // is present for most minions, while the optional `races` array is
+        // required to preserve dual-tribe and ALL/amalgam eligibility.
+        if (cardData.contains("races") && !cardData.at("races").is_null())
+        {
+            if (!cardData.at("races").is_array())
+            {
+                throw std::invalid_argument("card " + cardLabel +
+                                            " field races must be an array");
+            }
+            for (const auto& rawRace : cardData.at("races"))
+            {
+                if (!rawRace.is_string())
+                {
+                    throw std::invalid_argument(
+                        "card " + cardLabel +
+                        " field races entries must be strings");
+                }
+                const Race parsed = ParseEnumString<Race>(
+                    rawRace.get<std::string>(), "races", cardLabel);
+                if (parsed != Race::INVALID &&
+                    std::find(card.races.begin(), card.races.end(), parsed) ==
+                        card.races.end())
+                {
+                    card.races.emplace_back(parsed);
+                }
+            }
+        }
+        if (race != Race::INVALID &&
+            std::find(card.races.begin(), card.races.end(), race) ==
+                card.races.end())
+        {
+            card.races.emplace_back(race);
+        }
+
         // NOTE: The value "isBattlegroundsHero" of Lady Vashj
         //       (TB_BaconShop_HERO_61) is missing.
         if (id == "TB_BaconShop_HERO_61")

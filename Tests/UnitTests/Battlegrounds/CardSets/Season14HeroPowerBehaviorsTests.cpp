@@ -41,6 +41,16 @@ TEST_CASE("[Season14HeroPowerBehaviors] - passive families are explicit")
     REQUIRE(lighting != nullptr);
     CHECK(lighting->kind == Season14HeroPowerKind::TAVERN_SPELL_AURA);
     CHECK(lighting->passive);
+
+    const auto patchedModifiers = Season14HeroPowerBatch1Modifiers(59399);
+    CHECK(patchedModifiers.StartingHealth(40) == 70);
+    CHECK(patchedModifiers.StartingHealth(60) == 90);
+
+    const auto manastormModifiers = Season14HeroPowerBatch1Modifiers(60405);
+    CHECK(manastormModifiers.UpgradeCost(5) == 6);
+
+    // Tavern Lighting buffs spell results; it is not a payment discount.
+    CHECK(Season14HeroPowerBatch1Modifiers(122960).TavernSpellCost(3) == 3);
 }
 
 TEST_CASE("[Season14HeroPowerBehaviors] - no-target active effects are deterministic")

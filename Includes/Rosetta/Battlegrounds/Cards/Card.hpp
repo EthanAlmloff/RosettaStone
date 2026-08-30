@@ -41,6 +41,15 @@ class Card
     //! \return The value of race.
     Race GetRace() const;
 
+    //! Returns whether this card belongs to the requested tribe.
+    //!
+    //! HearthstoneJSON keeps the primary tribe in `race` and can retain
+    //! additional tribes in `races`.  `ALL` is the amalgam tribe and matches
+    //! every concrete tribe for effects that filter by race.
+    //! \param race The tribe to test.
+    //! \return true when the card has the requested tribe.
+    bool HasRace(Race race) const;
+
     //! Returns the value of attack.
     //! \return The value of attack.
     int GetAttack() const;
@@ -66,9 +75,9 @@ class Card
     bool TargetingRequirements(Minion& target) const;
 
     std::string id;
-    int dbfID;
-    int normalDbfID;
-    int premiumDbfID;
+    int dbfID = 0;
+    int normalDbfID = 0;
+    int premiumDbfID = 0;
     int heroPowerDbfID = 0;
     int relatedDbfID = 0;
 
@@ -76,6 +85,10 @@ class Card
     std::vector<int> linkedDbfIDs;
     //! Associated tribes may be multiple values (for example, Trinkets).
     std::vector<std::string> associatedRaces;
+    //! All gameplay tribes from the source `races` field, including the
+    //! primary `race` value when present.  This is separate from
+    //! associatedRaces, which describes pool/feature association metadata.
+    std::vector<Race> races;
     //! The source metadata's Trinket tier marker (LESSER_TRINKET/GREATER_TRINKET).
     std::string trinketType;
     //! String IDs for generated choice/option entities referenced by metadata.

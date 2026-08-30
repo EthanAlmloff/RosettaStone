@@ -50,12 +50,151 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     heroPowerCost = std::max<std::int32_t>(0, cost);
     heroPowerAvailable = available;
     heroPowerUsed = false;
+    heroPowerBatch1 = Season14HeroPowerBatch1Modifiers(dbfID);
+    heroPowerBatch2 = {};
+}
+
+Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
+{
+    ResolveSeason14HeroPowerBatch1Event(
+        heroPowerDbfID, Season14HeroPowerBatch1Event::BEGIN_TURN,
+        heroPowerBatch1);
+
+    Season14HeroPowerBatch2Result result{};
+    ResolveSeason14HeroPowerBatch2Event(
+        heroPowerDbfID, Season14HeroPowerBatch2Event::BEGIN_TURN,
+        heroPowerBatch2, result);
+    return result;
+}
+
+void Season14State::OnSellMinion()
+{
+    Season14HeroPowerBatch2Result result{};
+    ResolveSeason14HeroPowerBatch2Event(
+        heroPowerDbfID, Season14HeroPowerBatch2Event::SELL_MINION,
+        heroPowerBatch2, result);
+}
+
+std::int32_t Season14State::OnBuyMinion(bool purchasedPirate) const
+{
+    return Season14HeroPowerBatch1PurchaseGold(heroPowerDbfID,
+                                               purchasedPirate);
+}
+
+Season14HeroPowerBatch2Result Season14State::OnPlayElemental()
+{
+    Season14HeroPowerBatch2Result result{};
+    ResolveSeason14HeroPowerBatch2Event(
+        heroPowerDbfID, Season14HeroPowerBatch2Event::PLAY_ELEMENTAL,
+        heroPowerBatch2, result);
+    return result;
+}
+
+Season14HeroPowerBatch2Result Season14State::OnUpgradeTavern()
+{
+    Season14HeroPowerBatch2Result result{};
+    ResolveSeason14HeroPowerBatch2Event(
+        heroPowerDbfID, Season14HeroPowerBatch2Event::UPGRADE_TAVERN,
+        heroPowerBatch2, result);
+    return result;
+}
+
+std::int32_t Season14State::MinionPurchaseCost(std::int32_t baseCost) const
+{
+    const auto withBatch1 = heroPowerBatch1.MinionCost(baseCost);
+    const auto batch2 = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
+    return std::max<std::int32_t>(0, withBatch1 + batch2.minionCost);
+}
+
+std::int32_t Season14State::RefreshCost(std::int32_t baseCost) const
+{
+    if (heroPowerBatch1.freeRefreshAvailable)
+    {
+        return 0;
+    }
+    const auto withBatch1 = heroPowerBatch1.RefreshCost(baseCost);
+    const auto batch2 = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
+    return std::max<std::int32_t>(0, withBatch1 + batch2.refreshCost);
+}
+
+std::int32_t Season14State::UpgradeCost(std::int32_t baseCost) const
+{
+    return heroPowerBatch1.UpgradeCost(baseCost);
+}
+
+std::size_t Season14State::TavernOfferCount(std::size_t baseCount) const
+{
+    const auto modifiers = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
+    const auto delta = modifiers.tavernSlotsDelta;
+    if (delta < 0)
+    {
+        const auto reduction = static_cast<std::size_t>(-delta);
+        return reduction >= baseCount ? 0 : baseCount - reduction;
+    }
+    return baseCount + static_cast<std::size_t>(delta);
+}
+
+void Season14State::ArmHigherTierRefresh(std::int32_t count)
+{
+    heroPowerBatch2.higherTierRefreshMinions =
+        std::max<std::int32_t>(0, count);
+}
+
+std::int32_t Season14State::TakeHigherTierRefresh()
+{
+    const auto count = heroPowerBatch2.higherTierRefreshMinions;
+    heroPowerBatch2.higherTierRefreshMinions = 0;
+    return count;
+}
+
+bool Season14State::ShouldFreezeRemainingTavern() const
+{
+    return Season14HeroPowerBatch2Modifiers(heroPowerDbfID)
+        .freezeRemainingShopAtEnd;
+}
+
+std::int32_t Season14State::TavernSpellCost(std::int32_t baseCost) const
+{
+    const auto withBatch1 = heroPowerBatch1.TavernSpellCost(baseCost);
+    return heroPowerBatch2.TavernSpellCost(withBatch1);
+}
+
+void Season14State::OnRefreshTavern(bool refreshSucceeded)
+{
+    ResolveSeason14HeroPowerBatch1Event(
+        heroPowerDbfID, Season14HeroPowerBatch1Event::REFRESH_TAVERN,
+        heroPowerBatch1, refreshSucceeded);
+}
+
+void Season14State::OnTavernSpellResolved(bool spellResolved)
+{
+    heroPowerBatch2.ConsumeTavernSpellDiscount(spellResolved);
+}
+
+bool Season14State::ResolveHeroPowerBatch3Activation(
+    std::int32_t currentTier,
+    Season14HeroPowerBatch3Activation& result) const noexcept
+{
+    return ResolveSeason14HeroPowerBatch3Activation(
+        heroPowerDbfID, currentTier, result);
+}
+
+std::int32_t Season14State::HeroPowerBatch3CombatKillAttackBonus() const noexcept
+{
+    return Season14HeroPowerBatch3CombatKillAttack(
+        heroPowerDbfID);
 }
 
 bool Season14State::CanUseHeroPower(std::int32_t availableGold) const
 {
     return heroPowerAvailable && !heroPowerUsed && heroPowerDbfID != 0 &&
-           availableGold >= heroPowerCost;
+           availableGold >= EffectiveHeroPowerCost();
+}
+
+std::int32_t Season14State::EffectiveHeroPowerCost() const
+{
+    return std::max<std::int32_t>(
+        0, heroPowerCost - (heroPowerBatch2.nextHeroPowerDiscount ? 1 : 0));
 }
 
 bool Season14State::UseHeroPower()
@@ -66,6 +205,10 @@ bool Season14State::UseHeroPower()
     }
 
     heroPowerUsed = true;
+    // The Galaxy's Lens grants a one-use discount for the next hero power.
+    // Consume it at the successful use site so failed/unauthorized attempts
+    // cannot spend the discount and a later turn cannot reuse it indefinitely.
+    heroPowerBatch2.nextHeroPowerDiscount = false;
     return true;
 }
 
@@ -81,7 +224,8 @@ bool Season14State::CanAddDarkGift() const
 
 void Season14State::AddTrinket(Season14PersistentEffect effect)
 {
-    if (CanAddTrinket())
+    if (CanAddTrinket() && effect.dbfID > 0 && effect.remainingUses > 0 &&
+        effect.active)
     {
         trinkets.push_back(effect);
     }
@@ -89,7 +233,8 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
 
 void Season14State::AddDarkGift(Season14PersistentEffect effect)
 {
-    if (CanAddDarkGift())
+    if (CanAddDarkGift() && effect.dbfID > 0 && effect.remainingUses > 0 &&
+        effect.active)
     {
         darkGifts.push_back(effect);
     }
@@ -98,7 +243,8 @@ void Season14State::AddDarkGift(Season14PersistentEffect effect)
 bool Season14State::ConsumeEffect(
     std::vector<Season14PersistentEffect>& effects, std::size_t slot)
 {
-    if (slot >= effects.size() || !effects[slot].active)
+    if (slot >= effects.size() || !effects[slot].active ||
+        effects[slot].remainingUses == 0)
     {
         return false;
     }

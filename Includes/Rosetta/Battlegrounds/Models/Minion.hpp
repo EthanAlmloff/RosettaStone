@@ -71,6 +71,11 @@ class Minion
     //! \return The value of race.
     Race GetRace() const;
 
+    //! Returns whether this minion belongs to the requested tribe.
+    //! \param race The tribe to test.
+    //! \return true when this minion has the requested tribe.
+    bool HasRace(Race race) const;
+
     //! Returns the value of zone type.
     //! \return The value of zone type.
     ZoneType GetZoneType() const;
@@ -99,6 +104,10 @@ class Minion
     //! \return The value of tier.
     int GetTier() const;
 
+    //! Returns whether this is the golden form of a minion.
+    //! \return true when the metadata identifies a premium/golden entity.
+    bool IsGolden() const;
+
     //! Returns the value of attack.
     //! \return The value of attack.
     int GetAttack() const;
@@ -126,6 +135,30 @@ class Minion
     //! Returns the flag that indicates whether it has divine shield.
     //! \return The flag that indicates whether it has divine shield.
     bool HasDivineShield() const;
+
+    //! Returns whether this minion has the Reborn keyword available.
+    //! \return true when the minion can be revived once after dying.
+    bool HasReborn() const;
+
+    //! Clears Reborn after the minion has been revived.
+    //! \param reborn Whether Reborn remains available.
+    void SetReborn(bool reborn);
+
+    //! Returns whether this minion has Windfury.
+    //! \return true when the minion attacks twice in a combat turn.
+    bool HasWindfury() const;
+
+    //! Returns whether this minion has the Battlegrounds Venomous keyword.
+    //! \return true when damage from this minion destroys its target.
+    bool HasVenomous() const;
+
+    //! Returns the number of attacks this minion may make in one combat turn.
+    //! \return One, two, or four for normal, Windfury, or Mega Windfury.
+    int GetAttackCount() const;
+
+    //! Revives this minion according to the Reborn keyword.
+    //! The revived copy has one Health and cannot Reborn again.
+    void ReviveWithReborn();
 
     //! Returns whether this Tavern entity is frozen.
     //! \return true if this entity is frozen, false otherwise.
@@ -211,6 +244,10 @@ class Minion
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
     bool m_hasDivineShield = false;
+    bool m_hasReborn = false;
+    bool m_hasWindfury = false;
+    bool m_hasMegaWindfury = false;
+    bool m_hasVenomous = false;
     bool m_isFrozen = false;
     bool m_isDestroyed = false;
 };

@@ -5,8 +5,11 @@
 // property of any third parties.
 
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
 
 #include <effolkronium/random.hpp>
+
+#include <algorithm>
 
 using Random = effolkronium::random_thread_local;
 
@@ -46,6 +49,8 @@ void Battle::Initialize()
 
     m_p1NextAttackerIdx = 0;
     m_p2NextAttackerIdx = 0;
+    m_p1PendingAttacks = 0;
+    m_p2PendingAttacks = 0;
 
     if (m_turn == Turn::PLAYER1)
     {
@@ -74,48 +79,48 @@ void Battle::Run()
     Initialize();
 
     bool prevAttackSuccess = false;
+    Turn turnStart = Turn::DONE;
 
     while (!IsDone())
     {
-        if (m_turn == Turn::PLAYER1)
+        // A Windfury/Mega-Windfury sequence stays on the same combat turn.
+        // Start-of-turn triggers therefore run once when a side receives the
+        // turn, not once for every repeated attack in that sequence.
+        if (m_turn != turnStart)
         {
-            m_p1Field.ForEachAlive([this](MinionData& owner) {
-                m_p1Field.ForEachAlive([&owner](MinionData& minion) {
-                    {
+            if (m_turn == Turn::PLAYER1)
+            {
+                m_p1Field.ForEachAlive([this](MinionData& owner) {
+                    m_p1Field.ForEachAlive([&owner](MinionData& minion) {
                         owner.value().ActivateTrigger(TriggerType::TURN_START,
                                                       minion.value());
-                    };
+                    });
                 });
-            });
 
-            m_p2Field.ForEachAlive([this](MinionData& owner) {
-                m_p2Field.ForEachAlive([&owner](MinionData& minion) {
-                    {
+                m_p2Field.ForEachAlive([this](MinionData& owner) {
+                    m_p2Field.ForEachAlive([&owner](MinionData& minion) {
                         owner.value().ActivateTrigger(TriggerType::TURN_START,
                                                       minion.value());
-                    };
+                    });
                 });
-            });
-        }
-        else
-        {
-            m_p2Field.ForEachAlive([this](MinionData& owner) {
-                m_p2Field.ForEachAlive([&owner](MinionData& minion) {
-                    {
+            }
+            else
+            {
+                m_p2Field.ForEachAlive([this](MinionData& owner) {
+                    m_p2Field.ForEachAlive([&owner](MinionData& minion) {
                         owner.value().ActivateTrigger(TriggerType::TURN_START,
                                                       minion.value());
-                    };
+                    });
                 });
-            });
 
-            m_p1Field.ForEachAlive([this](MinionData& owner) {
-                m_p1Field.ForEachAlive([&owner](MinionData& minion) {
-                    {
+                m_p1Field.ForEachAlive([this](MinionData& owner) {
+                    m_p1Field.ForEachAlive([&owner](MinionData& minion) {
                         owner.value().ActivateTrigger(TriggerType::TURN_START,
                                                       minion.value());
-                    };
+                    });
                 });
-            });
+            }
+            turnStart = m_turn;
         }
 
         const bool curAttackSuccess = Attack();
@@ -153,11 +158,101 @@ bool Battle::Attack()
 
     Minion& attacker = (m_turn == Turn::PLAYER1) ? m_p1Field[attackerIdx]
                                                  : m_p2Field[attackerIdx];
+
+    int& pendingAttacks = (m_turn == Turn::PLAYER1)
+                              ? m_p1PendingAttacks
+                              : m_p2PendingAttacks;
+    if (pendingAttacks == 0)
+    {
+        // Store the current attack as well as any repeats.  A zero value is
+        // reserved for "no Windfury sequence is in progress"; this keeps the
+        // final attack of a two-hit sequence from starting a new sequence.
+        pendingAttacks = attacker.GetAttackCount();
+    }
+    const bool shouldRepeat = pendingAttacks > 1;
+    --pendingAttacks;
+
+    // Keep a stable fallback for hand-built tests whose minions do not have
+    // an assigned entity index.  Normal game minions use GetIndex().
+    const int attackerEntityIndex = attacker.GetIndex();
+    const int attackerZonePosition = attacker.GetZonePosition();
+    const std::string attackerCardID(attacker.GetCardID());
+    const bool attackerHadReborn = attacker.HasReborn();
+
     Minion& target = GetProperTarget(attacker);
     target.TakeDamage(attacker);
     attacker.TakeDamage(target);
+    const bool targetWasDestroyed = target.IsDestroyed();
 
     ProcessDestroy(false);
+
+    // A Reborn copy has already spent its attack.  Do not mistake it for the
+    // original Windfury attacker when a minion dies in combat or a death
+    // trigger removes it before ProcessDestroy completes.
+    bool attackerSurvived = false;
+    int attackerPositionAfterCleanup = -1;
+    FieldZone& attackerField = (m_turn == Turn::PLAYER1) ? m_p1Field
+                                                         : m_p2Field;
+    attackerField.ForEachAlive([&](MinionData& minionData) {
+        const Minion& candidate = minionData.value();
+        const bool sameEntity = attackerEntityIndex >= 0
+                                    ? candidate.GetIndex() == attackerEntityIndex
+                                    : (candidate.GetZonePosition() ==
+                                           attackerZonePosition &&
+                                       candidate.GetCardID() == attackerCardID);
+        if (sameEntity && (!attackerHadReborn || candidate.HasReborn()))
+        {
+            attackerSurvived = true;
+            attackerPositionAfterCleanup = candidate.GetZonePosition();
+        }
+    });
+
+    // Glory of Combat is a player-owned passive.  Apply it only after the
+    // combat exchange has confirmed that this attacker's damage destroyed an
+    // enemy and that the same minion survived cleanup.  Looking the attacker
+    // up by stable identity avoids touching a reference invalidated by zone
+    // compaction or deathrattle processing.
+    if (targetWasDestroyed && attackerSurvived)
+    {
+        const auto bonus = (m_turn == Turn::PLAYER1)
+                               ? m_player1.season14
+                                     .HeroPowerBatch3CombatKillAttackBonus()
+                               : m_player2.season14
+                                     .HeroPowerBatch3CombatKillAttackBonus();
+        if (bonus > 0)
+        {
+            attackerField.ForEachAlive([&](MinionData& minionData) {
+                Minion& candidate = minionData.value();
+                const bool sameEntity = attackerEntityIndex >= 0
+                                            ? candidate.GetIndex() ==
+                                                  attackerEntityIndex
+                                            : (candidate.GetZonePosition() ==
+                                                   attackerZonePosition &&
+                                               candidate.GetCardID() ==
+                                                   attackerCardID);
+                if (sameEntity)
+                {
+                    candidate.SetAttack(candidate.GetAttack() + bonus);
+                }
+            });
+        }
+    }
+
+    if (shouldRepeat && attackerSurvived)
+    {
+        if (m_turn == Turn::PLAYER1)
+        {
+            m_p1NextAttackerIdx = attackerPositionAfterCleanup;
+        }
+        else
+        {
+            m_p2NextAttackerIdx = attackerPositionAfterCleanup;
+        }
+
+        return true;
+    }
+
+    pendingAttacks = 0;
 
     m_turn = (m_turn == Turn::PLAYER1) ? Turn::PLAYER2 : Turn::PLAYER1;
     return true;
@@ -166,8 +261,22 @@ bool Battle::Attack()
 int Battle::FindAttacker()
 {
     FieldZone& fieldZone = (m_turn == Turn::PLAYER1) ? m_p1Field : m_p2Field;
+    if (fieldZone.IsEmpty())
+    {
+        return -1;
+    }
+
     int nextAttackerIdx =
         (m_turn == Turn::PLAYER1) ? m_p1NextAttackerIdx : m_p2NextAttackerIdx;
+
+    // Deathrattles and summons can change the field while an attack is being
+    // resolved.  Keep the cursor inside the compacted zone before indexing;
+    // this also protects hand-built battles that remove a minion directly.
+    nextAttackerIdx %= fieldZone.GetCount();
+    if (nextAttackerIdx < 0)
+    {
+        nextAttackerIdx += fieldZone.GetCount();
+    }
 
     for (int i = 0; i < fieldZone.GetCount(); ++i)
     {
@@ -332,6 +441,31 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 PowerType::DEATHRATTLE,
                 std::get<0>(deadMinion) == 1 ? m_player1 : m_player2);
         }
+
+        if (removedMinion.HasReborn())
+        {
+            FieldZone& ownerField = std::get<0>(deadMinion) == 1
+                                        ? m_p1Field
+                                        : m_p2Field;
+            if (!ownerField.IsFull())
+            {
+                removedMinion.ReviveWithReborn();
+                int summonPosition = removedMinion.GetLastFieldPos();
+                if (summonPosition > ownerField.GetCount())
+                {
+                    summonPosition = ownerField.GetCount();
+                }
+                ownerField.Add(removedMinion, summonPosition);
+
+                // Reborn is a summon and therefore participates in existing
+                // summon-trigger chains, while retaining the normal
+                // deathrattle-before-Reborn ordering above.
+                ownerField.ForEachAlive([&removedMinion](MinionData& alive) {
+                    alive.value().ActivateTrigger(TriggerType::SUMMON,
+                                                  removedMinion);
+                });
+            }
+        }
     }
 
     if (!beforeAttack)
@@ -351,13 +485,13 @@ void Battle::ProcessDestroy(bool beforeAttack)
         }
 
         // Check the boundaries of field zone
-        if (m_p1NextAttackerIdx == m_p1Field.GetCount())
+        if (m_p1NextAttackerIdx >= m_p1Field.GetCount())
         {
-            m_p1NextAttackerIdx = 0;
+            m_p1NextAttackerIdx %= std::max(1, m_p1Field.GetCount());
         }
-        if (m_p2NextAttackerIdx == m_p2Field.GetCount())
+        if (m_p2NextAttackerIdx >= m_p2Field.GetCount())
         {
-            m_p2NextAttackerIdx = 0;
+            m_p2NextAttackerIdx %= std::max(1, m_p2Field.GetCount());
         }
     }
 }

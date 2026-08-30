@@ -97,7 +97,33 @@ struct Season14HeroPowerBatch2State
     std::int32_t elementalPlays = 0;
     std::int32_t upgradeCostReduction = 0;
     std::int32_t tavernSpellDiscount = 0;
+    //! One-shot count armed by Temporal Tavern for the next shop fill.
+    std::int32_t higherTierRefreshMinions = 0;
+    bool arcaneKnowledgeUnlocked = false;
     bool nextHeroPowerDiscount = false;
+
+    //! Returns the effective cost of a Tavern spell before it resolves.
+    constexpr std::int32_t TavernSpellCost(std::int32_t baseCost) const noexcept
+    {
+        return baseCost < tavernSpellDiscount
+                   ? 0
+                   : baseCost - tavernSpellDiscount;
+    }
+
+    //! Consumes one granted Tavern-spell discount after a successful spell.
+    //!
+    //! The caller must pass false for failed, unaffordable, or unsupported
+    //! attempts.  Those attempts must not consume a one-shot discount.
+    constexpr bool ConsumeTavernSpellDiscount(bool spellResolved) noexcept
+    {
+        if (!spellResolved || tavernSpellDiscount <= 0)
+        {
+            return false;
+        }
+
+        --tavernSpellDiscount;
+        return true;
+    }
 };
 
 //! Events that can advance a batch-2 lifecycle counter.
@@ -165,6 +191,16 @@ constexpr void ResolveSeason14HeroPowerBatch2Event(
     Season14HeroPowerBatch2Result& result) noexcept
 {
     result = {};
+
+    // Recruit begins are one-based.  Advance the lifecycle before resolving
+    // start-of-turn effects so Arcane Knowledge unlocks on the third begin,
+    // not the fourth.
+    if (event == Season14HeroPowerBatch2Event::BEGIN_TURN)
+    {
+        ++state.turnNumber;
+        state.bloodboundUsesThisTurn = 0;
+    }
+
     switch (dbfID)
     {
         case 57559: // Smart Savings
@@ -198,19 +234,15 @@ constexpr void ResolveSeason14HeroPowerBatch2Event(
             break;
         case 117426: // Arcane Knowledge
             if (event == Season14HeroPowerBatch2Event::BEGIN_TURN &&
-                state.turnNumber >= 3)
+                state.turnNumber == 3 && !state.arcaneKnowledgeUnlocked)
             {
+                state.arcaneKnowledgeUnlocked = true;
                 state.tavernSpellDiscount = 1;
                 result.spellCostDelta = -1;
             }
             break;
         default:
             break;
-    }
-    if (event == Season14HeroPowerBatch2Event::BEGIN_TURN)
-    {
-        ++state.turnNumber;
-        state.bloodboundUsesThisTurn = 0;
     }
 }
 
@@ -234,6 +266,7 @@ constexpr bool ResolveSeason14HeroPowerBatch2Activation(
     }
     if (dbfID == 58537) // Temporal Tavern: refresh and two higher-tier minions.
     {
+        state.higherTierRefreshMinions = 2;
         result.extraHigherTierMinions = 2;
         return true;
     }

@@ -99,6 +99,11 @@ class Battle
     int m_p1NextAttackerIdx = 0;
     int m_p2NextAttackerIdx = 0;
 
+    // Number of additional attacks owed by the current Windfury attacker.
+    // Combat alternates players, so this state belongs to each side.
+    int m_p1PendingAttacks = 0;
+    int m_p2PendingAttacks = 0;
+
     Turn m_turn = Turn::DONE;
     BattleResult m_result = BattleResult::DRAW;
 };
