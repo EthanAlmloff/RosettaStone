@@ -11,7 +11,24 @@
 
 namespace RosettaStone::Battlegrounds
 {
-//!
+//! The gameplay origin of damage dealt to a Battlegrounds hero.
+//! Keeping this on the event (rather than inferring it from the current phase)
+//! prevents recruit self-damage from being confused with combat damage.
+enum class HeroDamageSource
+{
+    RECRUIT_SELF,
+    COMBAT_OPPONENT,
+};
+
+struct HeroDamageEvent
+{
+    int requested = 0;
+    int absorbedByArmor = 0;
+    int healthLost = 0;
+    HeroDamageSource source = HeroDamageSource::RECRUIT_SELF;
+};
+
+//! 
 //! \brief Hero class.
 //!
 //! A hero is a character in the Warcraft universe representing the player.
@@ -26,7 +43,9 @@ class Hero
     //! Takes damage to the hero.
     //! \param player The owner of the hero.
     //! \param amount The amount of damage.
-    void TakeDamage(Player& player, int amount);
+    HeroDamageEvent TakeDamage(
+        Player& player, int amount,
+        HeroDamageSource source = HeroDamageSource::RECRUIT_SELF);
 
     Card card;
     int health = 0;

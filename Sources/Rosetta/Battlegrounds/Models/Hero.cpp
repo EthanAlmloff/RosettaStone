@@ -17,15 +17,27 @@ void Hero::Initialize(const Card& heroCard)
     health = heroCard.gameTags.at(GameTag::HEALTH);
 }
 
-void Hero::TakeDamage(Player& player, int amount)
+HeroDamageEvent Hero::TakeDamage(Player& player, int amount,
+                                 HeroDamageSource source)
 {
-    const int absorbed = std::min(player.armor, std::max(0, amount));
+    HeroDamageEvent event;
+    event.requested = std::max(0, amount);
+    event.source = source;
+    const int absorbed = std::min(player.armor, event.requested);
     player.armor -= absorbed;
-    amount -= absorbed;
-    health -= amount;
+    event.absorbedByArmor = absorbed;
+    event.healthLost = event.requested - absorbed;
+    health -= event.healthLost;
+    // A hero-damage trigger means actual Health loss.  In particular, an
+    // armor-only hit must not wake Tichondrius-like effects.
+    if (event.healthLost > 0)
+    {
+        player.DispatchHeroDamage(event);
+    }
     if (health <= 0)
     {
         player.ProcessDefeat();
     }
+    return event;
 }
 }  // namespace RosettaStone::Battlegrounds

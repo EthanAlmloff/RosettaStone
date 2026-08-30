@@ -25,6 +25,5 @@ void ModernMinionBehaviorsBatch30::AddAll(std::map<std::string, CardDef>& cards)
   AddEnchant(cards, "BG28_306e", 1, 1); AddDeathAll(cards, "BG28_306", "BG28_306e");
   AddEnchant(cards, "BG28_306Ge", 2, 2); AddDeathAll(cards, "BG28_306_G", "BG28_306Ge");
   AddDeathSummon(cards, "BGS_014", "BG_BRM_006t", 1); AddDeathSummon(cards, "TB_BaconUps_113", "TB_BaconUps_030t", 1);
-  AddDeathCard(cards, "BG36_854", "BG36_624", 1); AddDeathCard(cards, "BG36_854_G", "BG36_624", 2);
 }
 }

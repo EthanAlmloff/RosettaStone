@@ -135,6 +135,11 @@ class Player
     //! Processes the tasks related to defeat.
     void ProcessDefeat();
 
+    //! Dispatches a successfully resolved hero-damage event to the active
+    //! minions in the same zone as the damage.  Armor-only damage never
+    //! reaches this lifecycle.
+    void DispatchHeroDamage(const HeroDamageEvent& event);
+
     PlayState playState = PlayState::INVALID;
     std::size_t idx = 0;
     std::size_t rank = 1;

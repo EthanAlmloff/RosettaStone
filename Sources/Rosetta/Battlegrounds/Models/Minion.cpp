@@ -10,6 +10,7 @@
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 
 #include <utility>
+#include <type_traits>
 #include <vector>
 
 namespace RosettaStone::Battlegrounds
@@ -622,8 +623,9 @@ void Minion::TakeDamage(Minion& source)
         return;
     }
 
-    m_health -= source.GetAttack();
-    if (m_health <= 0 || (source.HasVenomous() && source.GetAttack() > 0))
+    const int damage = source.GetAttack();
+    m_health -= damage;
+    if (m_health <= 0 || (source.HasVenomous() && damage > 0))
     {
         // Venomous applies only after actual damage. Divine Shield returned
         // above, and a zero-attack minion cannot poison its target.
@@ -631,7 +633,8 @@ void Minion::TakeDamage(Minion& source)
     }
     const bool limitedFrenzy = GetCardID() == "BG20_204" || GetCardID() == "BG20_204_G";
     const int frenzyLimit = GetCardID() == "BG20_204_G" ? 2 : 1;
-    if (!m_isDestroyed && (!limitedFrenzy || m_frenzyUses < frenzyLimit) && getPlayerCallback)
+    if (damage > 0 && !m_isDestroyed &&
+        (!limitedFrenzy || m_frenzyUses < frenzyLimit) && getPlayerCallback)
     {
         ++m_frenzyUses;
         ActivateTrigger(TriggerType::TAKE_DAMAGE, *this);
@@ -835,6 +838,20 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
     }
 }
 
+void Minion::ActivateHeroDamageTrigger()
+{
+    auto& trigger = m_card.power.GetTrigger();
+    if (!trigger.has_value() ||
+        trigger.value().GetTriggerType() != TriggerType::HERO_DAMAGE)
+    {
+        return;
+    }
+
+    // The observer is both owner and SELF event source.  This keeps a
+    // hero-damage trigger from firing once for every sibling on the board.
+    trigger.value().Run(*this, *this);
+}
+
 void Minion::ResetFrenzyUses()
 {
     m_frenzyUses = 0;
@@ -852,8 +869,40 @@ void Minion::ActivateRally([[maybe_unused]] Player& player, Minion& source,
     for (auto& task : m_card.power.GetRallyTask())
     {
         std::visit(
-            [this, &player, &target](auto& rallyTask) {
-                rallyTask.Run(player, *this, target);
+            [this, &player, &source, &target](auto& rallyTask) {
+                // Most Rally tasks use the observer (the minion carrying the
+                // Rally text) as their source so "other minions" semantics
+                // remain relative to that observer.  Roaring Recruiter's
+                // attacking-minion task is different: its source and target
+                // are the attacker declared by Battle::Attack, not the
+                // defender and not the observing recruiter.
+                if constexpr (std::is_same_v<
+                                  std::decay_t<decltype(rallyTask)>,
+                                  SimpleTasks::AttackingMinionBuffTask>)
+                {
+                    const bool isAttacker =
+                        &source == this ||
+                        (source.GetIndex() >= 0 &&
+                         source.GetIndex() == this->GetIndex());
+                    if (!isAttacker)
+                    {
+                        rallyTask.Run(player, source, source);
+                    }
+                }
+                else if constexpr (std::is_same_v<
+                                       std::decay_t<decltype(rallyTask)>,
+                                       SimpleTasks::RallyRaceBuffTask>)
+                {
+                    // Race-gated attack triggers inspect the attacker, not
+                    // the observing minion.  Passing *this here made
+                    // Cage Gnawer fire for every attack simply because the
+                    // observer itself is a Beast.
+                    rallyTask.Run(player, source, target);
+                }
+                else
+                {
+                    rallyTask.Run(player, *this, target);
+                }
             },
             task);
     }

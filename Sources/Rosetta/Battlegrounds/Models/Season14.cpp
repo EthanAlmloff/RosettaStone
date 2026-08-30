@@ -15,12 +15,16 @@ void Season14State::BeginDecision(
         pendingDecision = Season14Decision::NONE;
         choiceOfferings.clear();
         pendingOfferings.clear();
+        pendingSourceEntityID = 0;
+        pendingSourceCardDbfID = 0;
         chooseOne = {};
         return;
     }
 
     pendingDecision = decision;
     pendingOfferings = std::move(offerings);
+    pendingSourceEntityID = 0;
+    pendingSourceCardDbfID = 0;
     chooseOne = {};
     if (decision == Season14Decision::CHOICE ||
         decision == Season14Decision::DISCOVER)
@@ -40,7 +44,18 @@ void Season14State::BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t t
     pendingDecision = Season14Decision::CHOOSE_ONE;
     pendingOfferings = std::move(offerings);
     choiceOfferings = pendingOfferings;
+    pendingSourceEntityID = 0;
+    pendingSourceCardDbfID = 0;
     chooseOne = { true, sourceEntityID, targetMask, sourceCardDbfID };
+}
+
+void Season14State::BeginOfferingDecision(
+    Season14Decision decision, std::uint64_t sourceEntityID,
+    std::int32_t sourceCardDbfID, std::vector<Season14Offering> offerings)
+{
+    BeginDecision(decision, std::move(offerings));
+    pendingSourceEntityID = sourceEntityID;
+    pendingSourceCardDbfID = sourceCardDbfID;
 }
 
 bool Season14State::SelectDecision(std::size_t offeringIndex)
@@ -53,6 +68,8 @@ bool Season14State::SelectDecision(std::size_t offeringIndex)
 
     choiceOfferings.clear();
     pendingOfferings.clear();
+    pendingSourceEntityID = 0;
+    pendingSourceCardDbfID = 0;
     pendingDecision = Season14Decision::NONE;
     chooseOne = {};
     return true;
@@ -257,6 +274,54 @@ std::pair<std::int32_t, std::int32_t> Season14State::BloodGemStats() const noexc
     return { 1 + bloodGemAttackBonus, 1 + bloodGemHealthBonus };
 }
 
+void Season14State::AddTavernSpellHealthBonus(std::int32_t health) noexcept
+{
+    tavernSpellHealthBonus = std::max<std::int32_t>(
+        0, tavernSpellHealthBonus + health);
+}
+
+std::int32_t Season14State::TakeGrowingSummonAttack(
+    std::int32_t entityIndex, std::int32_t initialAttack,
+    std::int32_t increment)
+{
+    for (auto& bonus : growingSummonBonuses)
+    {
+        if (bonus.entityIndex == entityIndex)
+        {
+            const auto result = bonus.nextAttack;
+            bonus.nextAttack += bonus.increment;
+            return result;
+        }
+    }
+    growingSummonBonuses.push_back(
+        {entityIndex, initialAttack + increment, increment});
+    return initialAttack;
+}
+
+std::pair<std::int32_t, std::int32_t> Season14State::BloodGemStatsFor(
+    Race race) const noexcept
+{
+    auto [attack, health] = BloodGemStats();
+    const auto [raceAttack, raceHealth] = BloodGemRaceStatsFor(race);
+    return { attack + raceAttack, health + raceHealth };
+}
+
+std::pair<std::int32_t, std::int32_t> Season14State::BloodGemRaceStatsFor(
+    Race race) const noexcept
+{
+    std::int32_t attack = 0;
+    std::int32_t health = 0;
+    for (const auto& bonus : bloodGemRaceBonuses)
+    {
+        if (bonus.race == race || bonus.race == Race::ALL)
+        {
+            attack += bonus.attack;
+            health += bonus.health;
+        }
+    }
+    return { attack, health };
+}
+
 void Season14State::AddBloodGemBonus(std::int32_t attack,
                                      std::int32_t health) noexcept
 {
@@ -264,6 +329,32 @@ void Season14State::AddBloodGemBonus(std::int32_t attack,
         0, bloodGemAttackBonus + attack);
     bloodGemHealthBonus = std::max<std::int32_t>(
         0, bloodGemHealthBonus + health);
+}
+
+void Season14State::AddBloodGemRaceBonus(Race race, std::int32_t attack,
+                                         std::int32_t health)
+{
+    // Race-scoped bonuses are persistent state, not a general-purpose stat
+    // mutation API.  Reject malformed metadata and preserve the same
+    // non-negative invariant used by the global Blood Gem modifiers.
+    if (race == Race::INVALID || (attack == 0 && health == 0))
+        return;
+    auto it = std::find_if(
+        bloodGemRaceBonuses.begin(), bloodGemRaceBonuses.end(),
+        [race](const Season14RaceShopStats& bonus) {
+            return bonus.race == race;
+        });
+    if (it == bloodGemRaceBonuses.end())
+    {
+        bloodGemRaceBonuses.push_back(
+            { race, std::max<std::int32_t>(0, attack),
+              std::max<std::int32_t>(0, health) });
+    }
+    else
+    {
+        it->attack = std::max<std::int32_t>(0, it->attack + attack);
+        it->health = std::max<std::int32_t>(0, it->health + health);
+    }
 }
 
 void Season14State::OnRefreshTavern(bool refreshSucceeded)

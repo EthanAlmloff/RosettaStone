@@ -20,11 +20,64 @@ namespace RosettaStone::Battlegrounds
 namespace
 {
 using Random = effolkronium::random_thread_local;
+
+// Blue Whelp modifies stat-bearing Tavern spells.  It must not turn a
+// keyword-only, economy, transform, or consume-the-Tavern spell into a
+// hidden stat buff merely because TavernSpellBehavior has a health field.
+bool TavernSpellReceivesHealthBonus(TavernSpellEffect effect)
+{
+    switch (effect)
+    {
+        case TavernSpellEffect::BLOOD_GEM:
+        case TavernSpellEffect::ALL_STATS:
+        case TavernSpellEffect::ALL_STATS_AND_GOLDEN:
+        case TavernSpellEffect::LEFTMOST_STATS:
+        case TavernSpellEffect::ALL_AND_RACE:
+        case TavernSpellEffect::ALL_RACE_AND_DIVINE_SHIELD:
+        case TavernSpellEffect::RANDOM_STATS:
+        case TavernSpellEffect::MENAGERIE_STATS:
+        case TavernSpellEffect::ONE_PER_RACE_STATS:
+        case TavernSpellEffect::SHOP_STATS:
+        case TavernSpellEffect::TARGET_STATS:
+        case TavernSpellEffect::TARGET_AND_RACE:
+        case TavernSpellEffect::TARGET_STATS_REPEAT:
+        case TavernSpellEffect::TARGET_STATS_AND_TAUNT:
+        case TavernSpellEffect::TARGET_STATS_AND_WINDFURY:
+        case TavernSpellEffect::TARGET_STATS_AND_REBORN:
+        case TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT:
+        case TavernSpellEffect::TARGET_SHARED_RACE_STATS:
+        case TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT:
+        case TavernSpellEffect::SHOP_STATS_PERSISTENT:
+        case TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH:
+            return true;
+        default:
+            return false;
+    }
+}
 }
 
 FieldZone& Player::GetField()
 {
     return isInCombat ? battleField : recruitField;
+}
+
+void Player::DispatchHeroDamage(const HeroDamageEvent& event)
+{
+    // Tichondrius-style recruit effects react to damage paid by the player
+    // during the recruit phase.  Combat damage is resolved against a copied
+    // battle field and must not create a non-persistent buff (or fire the
+    // recruit trigger after combat has already ended).
+    if (event.healthLost <= 0 ||
+        event.source != HeroDamageSource::RECRUIT_SELF)
+    {
+        return;
+    }
+
+    // Recruit self-damage is authoritative on recruitField.  Do not dispatch
+    // into hand/Tavern, and do not use a combat copy or the opponent's field.
+    recruitField.ForEachAlive([](MinionData& data) {
+        data.value().ActivateHeroDamageTrigger();
+    });
 }
 
 void Player::ApplyFreshMinionModifiers(Minion& minion) const
@@ -483,6 +536,20 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
         return false;
     }
 
+    if (season14.pendingSourceEntityID != 0)
+    {
+        bool sourceStillPresent = false;
+        recruitField.ForEachAlive([&](const MinionData& data) {
+            const auto& source = data.value();
+            if (static_cast<std::uint64_t>(source.GetIndex()) ==
+                    season14.pendingSourceEntityID &&
+                (season14.pendingSourceCardDbfID == 0 ||
+                 source.GetDbfID() == season14.pendingSourceCardDbfID))
+                sourceStillPresent = true;
+        });
+        if (!sourceStillPresent) return false;
+    }
+
     const auto offering = season14.pendingOfferings[offeringIdx];
     const auto card = Cards::FindCardByDbfID(offering.dbfID);
     if (card.dbfID == 0 ||
@@ -717,11 +784,23 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             {
                 return;
             }
-            const auto [attack, health] = player.season14.BloodGemStats();
             Minion& target =
                 player.recruitField[static_cast<std::size_t>(targetIdx)];
-            int scaledAttack = attack;
-            int scaledHealth = health;
+            auto [scaledAttack, scaledHealth] =
+                player.season14.BloodGemStats();
+            // A Blood Gem aura is satisfied by every concrete type the
+            // target has; Card::HasRace also makes ALL minions match every
+            // concrete Battlegrounds race.  This preserves multitype and
+            // ALL semantics instead of consulting only GetRace().
+            for (const Race race : RACES_IN_BATTLEGROUNDS)
+            {
+                if (!target.HasRace(race))
+                    continue;
+                const auto [raceAttack, raceHealth] =
+                    player.season14.BloodGemRaceStatsFor(race);
+                scaledAttack += raceAttack;
+                scaledHealth += raceHealth;
+            }
             if (target.GetBloodGemsThisTurn() == 0)
             {
                 if (target.GetCardID() == "BG20_103")
@@ -1432,7 +1511,14 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     const Spell& spell = std::get<Spell>(card);
     const int cost = season14.TavernSpellCost(spell.GetCost());
     const bool temporarySpell = spell.IsTemporary();
-    const TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
+    TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
+    // Blue Whelp's Rally is player-owned and cumulative.  Apply it at
+    // resolution so spells already in hand, refreshed spells, and generated
+    // copies all receive the same bonus exactly once.
+    if (TavernSpellReceivesHealthBonus(effect.effect))
+    {
+        effect.health += season14.tavernSpellHealthBonus;
+    }
     hand.Remove(card);
     if (effect.effect == TavernSpellEffect::SPELL_COSTS_HEALTH)
     {

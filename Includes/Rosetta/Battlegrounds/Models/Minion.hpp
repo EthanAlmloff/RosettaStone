@@ -276,6 +276,10 @@ class Minion
     //! \param source The source of trigger.
     void ActivateTrigger(TriggerType type, Minion& source);
 
+    //! Activates this instance's hero-damage trigger.  The source is the
+    //! observing minion itself so SELF filtering remains exact.
+    void ActivateHeroDamageTrigger();
+
     //! Activates the task.
     //! \param type The type of power.
     //! \param player The owner of the minion.

@@ -9,6 +9,14 @@ struct DeclarativeBehaviorRow { std::string_view id, trigger, selector, conditio
 struct DeclarativeEnchantmentRow { std::string_view id, owner, source, duration; int attack, health; unsigned keywordBits; };
 inline constexpr unsigned DeclarativeBehaviorSchema = 1;
 inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
+  {"BGS_123","battlecry","random_elemental","pool_minion","random_card_to_hand",1,1,0,0,0,0,false},
+  {"TB_BaconUps_162","battlecry","random_elemental","pool_minion","random_card_to_hand",2,2,0,0,0,0,false},
+  {"BG29_300","self_damaged","hand_minion","always","random_hand_minion_buff",2,1,1,0,0,0,false},
+  {"BG29_300_G","self_damaged","hand_minion","always","random_hand_minion_buff",4,2,2,0,0,0,false},
+  {"BG26_523","after_hero_damage","friendly_race","always","hero_damage_race_buff",3,1,3,0,0,0,false},
+  {"BG26_523_G","after_hero_damage","friendly_race","always","hero_damage_race_buff",6,2,6,0,0,0,false},
+  {"BG34_320","rally","one_of_each_type","always","one_per_type_rally_buff",15,1,15,0,0,0,false},
+  {"BG34_320_G","rally","one_of_each_type","always","one_per_type_rally_buff",15,2,15,0,0,0,false},
   {"BG25_001","static","self","always","static",0,1,0,0,0,0,false},
   {"BG25_001_G","static","self","always","static",0,1,0,0,0,0,false},
   {"BG26_175","static","self","always","static",0,1,0,0,0,0,false},
@@ -74,6 +82,10 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG32_846_G","after_play_minion","friendly_race","played_elemental","after_play_race_buff",4,2,4,0,0,0,false},
   {"BG36_211","rally","friendly_race","friendly_beast_attack","conditional_rally_race_buff",2,1,1,0,0,0,false},
   {"BG36_211_G","rally","friendly_race","friendly_beast_attack","conditional_rally_race_buff",4,2,2,0,0,0,false},
+  {"BG36_351","rally","blood_gem_aura","always","blood_gem_race_bonus",2,1,2,0,0,0,false},
+  {"BG36_351_G","rally","blood_gem_aura","always","blood_gem_race_bonus",4,1,4,0,0,0,false},
+  {"BG29_816","rally","attacking_minion","another_friendly_dragon","rally_attacking_minion_buff",3,1,1,0,0,0,false},
+  {"BG29_816_G","rally","attacking_minion","another_friendly_dragon","rally_attacking_minion_buff",6,2,2,0,0,0,false},
   {"BG26_810","spend_gold","friendly_race","each_5_gold","spend_gold_race_buff",2,1,0,0,0,0,false},
   {"BG26_810_G","spend_gold","friendly_race","each_5_gold","spend_gold_race_buff",4,2,0,0,0,0,false},
   {"BG25_011","battlecry","friendly_race_wherever","always","persistent_race_buff",1,1,0,0,0,0,false},
@@ -92,8 +104,28 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG36_762_G","after_cast_spell","tavern_minions","target_is_self","cast_spell_buff",4,2,4,0,0,0,false},
   {"BG33_893","after_play_minion","friendly_race","played_tier_at_most_3","after_play_tier_race_buff",3,1,3,0,0,0,false},
   {"BG33_893_G","after_play_minion","friendly_race","played_tier_at_most_3","after_play_tier_race_buff",6,2,6,0,0,0,false},
+  {"BG33_924","rally","tavern_spell_aura","always","rally_tavern_spell_health_bonus",0,1,1,0,0,0,false},
+  {"BG33_924_G","rally","tavern_spell_aura","always","rally_tavern_spell_health_bonus",0,2,2,0,0,0,false},
+  {"BG35_602","after_summon","summoned_race","always","summon_growing_attack",0,1,0,0,0,0,false},
+  {"BG35_602_G","after_summon","summoned_race","always","summon_growing_attack",0,1,0,0,0,0,false},
+  {"BG26_802","after_summon","summoned_race","in_combat","summon_race_stat_multiplier",0,1,0,2,0,0,false},
+  {"BG26_802_G","after_summon","summoned_race","in_combat","summon_race_stat_multiplier",0,1,0,3,0,0,false},
+  {"BGS_020","battlecry","friendly_race","another_friendly_murloc","offer_minions",0,1,0,0,0,0,false},
+  {"BG28_300","deathrattle","self","always","deathrattle_summon",2,1,0,0,0,0,false},
+  {"BG28_300_G","deathrattle","self","always","deathrattle_summon",4,2,0,0,0,0,false},
+  {"BG29_611","deathrattle","self","always","deathrattle_summon",1,1,0,0,0,0,false},
+  {"BG29_611_G","deathrattle","self","always","deathrattle_summon",1,1,0,0,0,0,false},
+  {"BG31_803","deathrattle","self","always","deathrattle_summon",1,1,0,0,0,0,false},
+  {"BG31_803_G","deathrattle","self","always","deathrattle_summon",2,2,0,0,0,0,false},
+  {"BG34_682","deathrattle","self","always","add_card",1,1,0,0,0,0,false},
+  {"BG34_682_G","deathrattle","self","always","add_card",2,2,0,0,0,0,false},
+  {"BG35_143","battlecry_and_deathrattle","self","always","add_card",1,1,0,0,0,0,false},
+  {"BG35_143_G","battlecry_and_deathrattle","self","always","add_card",2,2,0,0,0,0,false},
+  {"BG36_854","deathrattle","self","always","add_card",1,1,0,0,0,0,false},
+  {"BG36_854_G","deathrattle","self","always","add_card",2,2,0,0,0,0,false},
 };
 inline constexpr DeclarativeEnchantmentRow DeclarativeEnchantmentRows[] = {
+  {"BG26_523e","BG26_523","BG26_523","permanent",3,3,0},
   {"BG36_514e","BG36_514","BG36_514","permanent",0,0,1},
   {"BG31_843e","BG31_843","BG31_843","permanent",4,4,0},
   {"BG22_HERO_200_Buddy_e","BG22_HERO_200_Buddy","BG22_HERO_200_Buddy","permanent",3,3,0},
@@ -101,6 +133,7 @@ inline constexpr DeclarativeEnchantmentRow DeclarativeEnchantmentRows[] = {
   {"BG26_810e","BG26_810","BG26_810","permanent",2,0,0},
   {"BG33_893e","BG33_893","BG33_893","permanent",3,3,0},
   {"BG25_011e2","BG25_011","BG25_011","this_game",1,0,0},
+  {"BG34_320e","BG34_320","BG34_320","permanent",15,15,0},
 };
 class GeneratedBehaviorMappings { public: static void AddAll(std::map<std::string, CardDef>&); };
 }

@@ -75,6 +75,11 @@ class Season14State
     Season14Decision pendingDecision = Season14Decision::NONE;
     std::vector<Season14Offering> choiceOfferings;
     std::vector<Season14Offering> pendingOfferings;
+    //! Identity of the effect that created the public offering. These fields
+    //! make a pending modal replayable and prevent callers from treating an
+    //! offering as an anonymous global random result.
+    std::uint64_t pendingSourceEntityID = 0;
+    std::int32_t pendingSourceCardDbfID = 0;
     Season14ChooseOneState chooseOne;
     std::vector<Season14PersistentEffect> trinkets;
     std::vector<Season14PersistentEffect> darkGifts;
@@ -126,9 +131,14 @@ class Season14State
     std::vector<Season14RaceShopStats> persistentRaceStats;
     std::int32_t refreshRandomShopAttack = 0;
     std::int32_t refreshRandomShopHealth = 0;
+    //! Cumulative health added by future Tavern spells this game.
+    std::int32_t tavernSpellHealthBonus = 0;
+    struct GrowingSummonBonus { std::int32_t entityIndex; std::int32_t nextAttack; std::int32_t increment; };
+    std::vector<GrowingSummonBonus> growingSummonBonuses;
     //! Additive attack/health applied by each subsequently played Blood Gem.
     std::int32_t bloodGemAttackBonus = 0;
     std::int32_t bloodGemHealthBonus = 0;
+    std::vector<Season14RaceShopStats> bloodGemRaceBonuses;
     std::int32_t goldSpentThisTurn = 0;
     std::array<std::uint64_t, static_cast<std::size_t>(
                                   Season14Event::COUNT)>
@@ -137,6 +147,10 @@ class Season14State
     //! Replaces the current public modal offering and enters its decision.
     void BeginDecision(Season14Decision decision,
                        std::vector<Season14Offering> offerings);
+    void BeginOfferingDecision(Season14Decision decision,
+                               std::uint64_t sourceEntityID,
+                               std::int32_t sourceCardDbfID,
+                               std::vector<Season14Offering> offerings);
 
     //! Selects one public offering and clears the pending decision.
     //! \return false when no matching pending offering exists.
@@ -217,9 +231,21 @@ class Season14State
     //! Returns the resolved stats of one Blood Gem, including persistent
     //! hero/effect scaling.
     std::pair<std::int32_t, std::int32_t> BloodGemStats() const noexcept;
+    std::pair<std::int32_t, std::int32_t> BloodGemStatsFor(Race race) const noexcept;
+
+    //! Returns only the cumulative race-scoped Blood Gem bonus.  Callers
+    //! holding a multi-type/ALL minion may query each matching type.
+    std::pair<std::int32_t, std::int32_t> BloodGemRaceStatsFor(
+        Race race) const noexcept;
 
     //! Adds persistent Blood Gem scaling for future generated/played gems.
     void AddBloodGemBonus(std::int32_t attack, std::int32_t health) noexcept;
+    void AddTavernSpellHealthBonus(std::int32_t health) noexcept;
+    std::int32_t TakeGrowingSummonAttack(std::int32_t entityIndex,
+                                          std::int32_t initialAttack,
+                                          std::int32_t increment);
+    void AddBloodGemRaceBonus(Race race, std::int32_t attack,
+                              std::int32_t health);
 
     //! Records a successful Tavern refresh so one-shot effects are consumed.
     void OnRefreshTavern(bool refreshSucceeded);

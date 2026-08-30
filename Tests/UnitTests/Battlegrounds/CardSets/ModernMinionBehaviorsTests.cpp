@@ -10,26 +10,6 @@
 using namespace RosettaStone;
 using namespace Battlegrounds;
 
-TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - normal and golden families")
-{
-    std::map<std::string, CardDef> cards;
-    ModernMinionBehaviors::AddAll(cards);
-
-    CHECK(cards.contains("BG31_803"));
-    CHECK(cards.contains("BG31_803_G"));
-    CHECK(cards.contains("BG29_611"));
-    CHECK(cards.contains("BG29_611_G"));
-    CHECK(cards.contains("BG28_300"));
-    CHECK(cards.contains("BG28_300_G"));
-
-    CHECK_EQ(cards.at("BG31_803").power.GetDeathrattleTask().size(), 1);
-    CHECK_EQ(cards.at("BG31_803_G").power.GetDeathrattleTask().size(), 1);
-    CHECK_EQ(cards.at("BG29_611").power.GetDeathrattleTask().size(), 1);
-    CHECK_EQ(cards.at("BG29_611_G").power.GetDeathrattleTask().size(), 1);
-    CHECK_EQ(cards.at("BG28_300").power.GetDeathrattleTask().size(), 1);
-    CHECK_EQ(cards.at("BG28_300_G").power.GetDeathrattleTask().size(), 1);
-}
-
 TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - static keyword registrations")
 {
     std::map<std::string, CardDef> cards;

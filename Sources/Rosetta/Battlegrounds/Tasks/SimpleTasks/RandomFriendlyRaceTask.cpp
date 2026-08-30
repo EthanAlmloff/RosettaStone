@@ -43,7 +43,8 @@ TaskStatus RandomFriendlyRaceTask::Run(Player& player, Minion& source)
     player.GetField().ForEachAlive(
         [&candidates, &source, this](MinionData& minionData) {
             Minion& candidate = minionData.value();
-            if (&candidate != &source && candidate.HasRace(m_race))
+            if (&candidate != &source &&
+                (m_race == Race::ALL || candidate.HasRace(m_race)))
             {
                 candidates.emplace_back(&candidate);
             }

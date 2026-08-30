@@ -67,6 +67,7 @@ enum class TriggerType
     BUY_MINION,  //!< The effect triggers after a minion is bought.
     SPEND_GOLD,  //!< The effect triggers after each 5 Gold spent.
     AFTER_CAST_SPELL, //!< The effect triggers after a targeted Tavern spell resolves.
+    HERO_DAMAGE, //!< The effect triggers after this player's hero loses Health.
 };
 
 //! \brief An enumerator for identifying trigger source.
