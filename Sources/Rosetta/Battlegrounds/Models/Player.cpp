@@ -16,6 +16,11 @@
 
 namespace RosettaStone::Battlegrounds
 {
+namespace
+{
+using Random = effolkronium::random_thread_local;
+}
+
 FieldZone& Player::GetField()
 {
     return isInCombat ? battleField : recruitField;
@@ -58,7 +63,8 @@ void Player::PrepareTavern()
     });
     prepareTavernMinionsCallback(*this);
     if (season14.persistentShopAttack != 0 ||
-        season14.persistentShopHealth != 0)
+        season14.persistentShopHealth != 0 ||
+        !season14.persistentShopRaceStats.empty())
     {
         tavern.fieldZone.ForEach(
             [this, &existingPoolIndices](MinionData& minion) {
@@ -71,6 +77,16 @@ void Player::PrepareTavern()
                                          season14.persistentShopAttack);
                 minion.value().SetHealth(minion.value().GetHealth() +
                                          season14.persistentShopHealth);
+                for (const auto& raceBonus : season14.persistentShopRaceStats)
+                {
+                    if (minion.value().HasRace(raceBonus.race))
+                    {
+                        minion.value().SetAttack(
+                            minion.value().GetAttack() + raceBonus.attack);
+                        minion.value().SetHealth(
+                            minion.value().GetHealth() + raceBonus.health);
+                    }
+                }
             });
     }
 }
@@ -168,13 +184,92 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
 
 namespace
 {
-using Random = effolkronium::random_thread_local;
-
 bool ValidFriendlyBoardTarget(const Player& player, int targetIdx)
 {
     return targetIdx >= 0 && targetIdx < player.recruitField.GetCount() &&
            !player.recruitField[static_cast<std::size_t>(targetIdx)]
                 .IsDestroyed();
+}
+
+template <std::size_t N>
+void AppendSupportedNormalMinions(const std::array<Card, N>& cards,
+                                  std::vector<Card>& result, Race race)
+{
+    for (const auto& card : cards)
+    {
+        if (card.id.empty() || !card.hasBehavior ||
+            card.normalDbfID != 0 || card.GetCardType() != CardType::MINION ||
+            (race != Race::INVALID && !card.HasRace(race)))
+        {
+            continue;
+        }
+        result.push_back(card);
+    }
+}
+
+std::vector<Card> SupportedMinionsForRace(Race race)
+{
+    std::vector<Card> result;
+    AppendSupportedNormalMinions(Cards::GetTier1Minions(), result, race);
+    AppendSupportedNormalMinions(Cards::GetTier2Minions(), result, race);
+    AppendSupportedNormalMinions(Cards::GetTier3Minions(), result, race);
+    AppendSupportedNormalMinions(Cards::GetTier4Minions(), result, race);
+    AppendSupportedNormalMinions(Cards::GetTier5Minions(), result, race);
+    AppendSupportedNormalMinions(Cards::GetTier6Minions(), result, race);
+    AppendSupportedNormalMinions(Cards::GetTier7Minions(), result, race);
+    return result;
+}
+
+bool AddRandomMinionToHand(Player& player, std::vector<Card> candidates)
+{
+    if (candidates.empty() || player.hand.IsFull())
+    {
+        return false;
+    }
+    Random::shuffle(candidates.begin(), candidates.end());
+    player.hand.Add(CardData{ Minion(candidates.front()) });
+    return true;
+}
+
+Race MostCommonFriendlyRace(const Player& player)
+{
+    Race result = Race::INVALID;
+    int highest = 0;
+    for (const Race race : RACES_IN_BATTLEGROUNDS)
+    {
+        int count = 0;
+        player.recruitField.ForEachAlive(
+            [race, &count](const MinionData& minion) {
+                if (minion.value().HasRace(race))
+                {
+                    ++count;
+                }
+            });
+        if (count > highest)
+        {
+            highest = count;
+            result = race;
+        }
+    }
+    return result;
+}
+
+bool HasRandomGoldenShopTarget(const Player& player)
+{
+    bool found = false;
+    player.tavern.fieldZone.ForEach([&found](const MinionData& minion) {
+        if (minion.value().GetPoolIndex() >= 0 &&
+            minion.value().CanMakeGolden())
+        {
+            found = true;
+        }
+    });
+    return found;
+}
+
+bool HasSupportedRaceMinion(Race race)
+{
+    return !SupportedMinionsForRace(race).empty();
 }
 
 void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
@@ -399,6 +494,140 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             minion.SetTaunt(!alreadyTaunted);
             return;
         }
+        case TavernSpellEffect::TARGET_SHARED_RACE_STATS:
+        {
+            const Minion& target =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            player.recruitField.ForEachAlive(
+                [&target, &effect, &addStats](MinionData& aliveMinion) {
+                    for (const Race race : RACES_IN_BATTLEGROUNDS)
+                    {
+                        if (target.HasRace(race) &&
+                            aliveMinion.value().HasRace(race))
+                        {
+                            addStats(aliveMinion);
+                            break;
+                        }
+                    }
+                });
+            return;
+        }
+        case TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT:
+        {
+            const Minion& target =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            for (const Race race : RACES_IN_BATTLEGROUNDS)
+            {
+                if (!target.HasRace(race))
+                {
+                    continue;
+                }
+                player.tavern.fieldZone.ForEach(
+                    [&effect, race](MinionData& minion) {
+                        if (minion.value().HasRace(race))
+                        {
+                            minion.value().SetAttack(
+                                minion.value().GetAttack() + effect.attack);
+                            minion.value().SetHealth(
+                                minion.value().GetHealth() + effect.health);
+                        }
+                    });
+                player.season14.AddPersistentShopRaceStats(
+                    race, effect.attack, effect.health);
+            }
+            return;
+        }
+        case TavernSpellEffect::TARGET_GOLDEN:
+        {
+            static_cast<void>(player.recruitField[
+                static_cast<std::size_t>(targetIdx)].MakeGolden());
+            return;
+        }
+        case TavernSpellEffect::RANDOM_SHOP_GOLDEN:
+        {
+            std::vector<Minion*> candidates;
+            player.tavern.fieldZone.ForEach(
+                [&candidates](MinionData& minion) {
+                    if (minion.value().GetPoolIndex() >= 0 &&
+                        minion.value().CanMakeGolden())
+                    {
+                        candidates.push_back(&minion.value());
+                    }
+                });
+            Random::shuffle(candidates.begin(), candidates.end());
+            for (Minion* candidate : candidates)
+            {
+                if (candidate->MakeGolden())
+                {
+                    break;
+                }
+            }
+            return;
+        }
+        case TavernSpellEffect::RANDOM_MINION_TO_HAND:
+            static_cast<void>(AddRandomMinionToHand(
+                player, [&] {
+                    std::vector<Card> result;
+                    AppendSupportedNormalMinions(
+                        Cards::GetTier1Minions(), result, Race::INVALID);
+                    return result;
+                }()));
+            return;
+        case TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND:
+        {
+            const Race race = MostCommonFriendlyRace(player);
+            static_cast<void>(AddRandomMinionToHand(
+                player, SupportedMinionsForRace(race)));
+            return;
+        }
+        case TavernSpellEffect::STEAL_RANDOM_SHOP_MINION:
+        {
+            std::vector<int> candidates;
+            player.tavern.fieldZone.ForEach(
+                [&candidates](const MinionData& minion) {
+                    candidates.push_back(minion.value().GetZonePosition());
+                });
+            Random::shuffle(candidates.begin(), candidates.end());
+            if (!candidates.empty() && !player.hand.IsFull())
+            {
+                Minion& source = player.tavern.fieldZone[
+                    static_cast<std::size_t>(candidates.front())];
+                Minion stolen = player.tavern.fieldZone.Remove(source);
+                player.hand.Add(CardData{ std::move(stolen) });
+            }
+            return;
+        }
+        case TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH:
+            player.season14.ArmRefreshRandomShopStats(effect.attack,
+                                                       effect.health);
+            return;
+        case TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS:
+        {
+            const Minion& target =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            const int soldAttack = target.GetAttack();
+            const int soldHealth = target.GetHealth();
+            Minion sold = player.recruitField.Remove(
+                player.recruitField[static_cast<std::size_t>(targetIdx)]);
+            player.returnMinionCallback(sold.GetPoolIndex());
+            player.remainCoin += 1;
+            player.season14.OnSellMinion();
+
+            std::vector<Minion*> candidates;
+            player.recruitField.ForEachAlive(
+                [&candidates](MinionData& minion) {
+                    candidates.push_back(&minion.value());
+                });
+            Random::shuffle(candidates.begin(), candidates.end());
+            if (!candidates.empty())
+            {
+                candidates.front()->SetAttack(candidates.front()->GetAttack() +
+                                              soldAttack);
+                candidates.front()->SetHealth(candidates.front()->GetHealth() +
+                                              soldHealth);
+            }
+            return;
+        }
         case TavernSpellEffect::SET_PLAYER_ARMOR:
             player.armor = effect.value;
             return;
@@ -452,6 +681,50 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         return false;
     }
     if (targetIdx >= 0 && !ValidFriendlyBoardTarget(*this, targetIdx))
+    {
+        return false;
+    }
+    if (targetIdx >= 0)
+    {
+        const Minion& target = recruitField[static_cast<std::size_t>(targetIdx)];
+        if (!TavernSpellTargetIsLegal(behavior.effect, target.GetTier(),
+                                      target.IsGolden()))
+        {
+            return false;
+        }
+        if (behavior.effect == TavernSpellEffect::TARGET_GOLDEN &&
+            !target.CanMakeGolden())
+        {
+            return false;
+        }
+    }
+    if (behavior.effect == TavernSpellEffect::RANDOM_SHOP_GOLDEN &&
+        !HasRandomGoldenShopTarget(*this))
+    {
+        return false;
+    }
+    if ((behavior.effect == TavernSpellEffect::RANDOM_MINION_TO_HAND ||
+         behavior.effect == TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND ||
+         behavior.effect == TavernSpellEffect::STEAL_RANDOM_SHOP_MINION) &&
+        hand.IsFull())
+    {
+        return false;
+    }
+    if (behavior.effect == TavernSpellEffect::RANDOM_MINION_TO_HAND &&
+        !HasSupportedRaceMinion(Race::INVALID))
+    {
+        return false;
+    }
+    if (behavior.effect == TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND)
+    {
+        const Race race = MostCommonFriendlyRace(*this);
+        if (race == Race::INVALID || !HasSupportedRaceMinion(race))
+        {
+            return false;
+        }
+    }
+    if (behavior.effect == TavernSpellEffect::STEAL_RANDOM_SHOP_MINION &&
+        tavern.fieldZone.IsEmpty())
     {
         return false;
     }
@@ -580,6 +853,27 @@ void Player::RefreshTavern(bool freeRefresh)
     }
 
     PrepareTavern();
+    const auto [randomAttack, randomHealth] =
+        season14.RefreshRandomShopStats();
+    if (randomAttack != 0 || randomHealth != 0)
+    {
+        std::vector<Minion*> candidates;
+        tavern.fieldZone.ForEach(
+            [&candidates](MinionData& minion) {
+                if (!minion.value().IsDestroyed())
+                {
+                    candidates.push_back(&minion.value());
+                }
+            });
+        Random::shuffle(candidates.begin(), candidates.end());
+        if (!candidates.empty())
+        {
+            candidates.front()->SetAttack(candidates.front()->GetAttack() +
+                                          randomAttack);
+            candidates.front()->SetHealth(candidates.front()->GetHealth() +
+                                          randomHealth);
+        }
+    }
     season14.OnRefreshTavern(true);
 }
 

@@ -321,6 +321,22 @@ TEST_CASE("[Game] - Per-card freeze survives normal end turn")
     CHECK_EQ(player.tavern.fieldZone.GetCount(), 3);
 }
 
+TEST_CASE("[Game] - Recruit phase selects recruit field")
+{
+    Game game(43);
+    game.Start();
+    for (auto& player : game.GetGameState().players)
+    {
+        player.SelectHero(0);
+    }
+
+    for (auto& player : game.GetGameState().players)
+    {
+        CHECK_FALSE(player.isInCombat);
+        CHECK_EQ(&player.GetField(), &player.recruitField);
+    }
+}
+
 TEST_CASE("[Game] - Ghost")
 {
     Game game;

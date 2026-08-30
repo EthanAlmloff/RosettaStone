@@ -4,24 +4,19 @@
 
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch7.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 
 #include <array>
 #include <map>
 #include <string>
+#include <variant>
 
 using namespace RosettaStone;
 using namespace Battlegrounds;
 
 TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 7 inventory table")
 {
-    constexpr std::array ids{
-        "BG25_009", "BG25_009_G", "BG25_008", "BG25_008_G",
-        "BG20_HERO_301_Buddy", "BG20_HERO_301_Buddy_G", "BG24_004",
-        "BG24_004_G", "BG27_513", "BG27_513_G", "BG35_150t",
-        "BG35_150t_G", "TB_BaconShop_HERO_40_Buddy",
-        "TB_BaconShop_HERO_40_Buddy_G", "TB_BaconShop_HERO_68_Buddy",
-        "TB_BaconShop_HERO_68_Buddy_G", "TB_BaconUps_156",
-        "BG36_621", "BG36_621_G" };
+    constexpr std::array ids{ "BG25_009", "BG25_009_G" };
 
     std::map<std::string, CardDef> cards;
     ModernMinionBehaviorsBatch7::AddAll(cards);
@@ -37,36 +32,42 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 7 inventory table")
 
 TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 7 summon scaling")
 {
+    struct ExpectedSummon
+    {
+        const char* id;
+        const char* tokenID;
+        int amount;
+    };
+
+    constexpr std::array expected{
+        ExpectedSummon{ "BG25_009", "BG25_008", 1 },
+        ExpectedSummon{ "BG25_009_G", "BG25_008_G", 1 },
+    };
+
     std::map<std::string, CardDef> cards;
     ModernMinionBehaviorsBatch7::AddAll(cards);
 
-    REQUIRE(cards.contains("BG25_009"));
-    REQUIRE(cards.contains("BG25_009_G"));
-    CHECK_EQ(cards.at("BG25_009").power.GetDeathrattleTask().size(), 1);
-    CHECK_EQ(cards.at("BG25_009_G").power.GetDeathrattleTask().size(), 1);
-    CHECK(cards.at("BG25_009").power.GetBattlecryTask().empty());
-    CHECK(cards.at("BG25_009_G").power.GetBattlecryTask().empty());
-
-    // The generated target is the normal/golden Eternal Knight respectively;
-    // checking the task's variant directly would couple this test to the
-    // internal TaskType layout, so the source table remains the authority for
-    // the exact pair and the focused test asserts both branches are present.
-    CHECK(cards.contains("BG25_008"));
-    CHECK(cards.contains("BG25_008_G"));
+    for (const auto& row : expected)
+    {
+        CAPTURE(row.id);
+        REQUIRE(cards.contains(row.id));
+        const auto& deathrattles = cards.at(row.id).power.GetDeathrattleTask();
+        REQUIRE_EQ(deathrattles.size(), 1);
+        const auto* summon = std::get_if<SimpleTasks::SummonTask>(&deathrattles.front());
+        REQUIRE(summon != nullptr);
+        CHECK_EQ(summon->m_cardID, row.tokenID);
+        CHECK_EQ(summon->m_amount, row.amount);
+        CHECK(cards.at(row.id).power.GetBattlecryTask().empty());
+    }
 }
 
-TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 7 static companions")
+TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 7 has no metadata-only registrations")
 {
     std::map<std::string, CardDef> cards;
     ModernMinionBehaviorsBatch7::AddAll(cards);
-
-    for (const auto* id : { "BG20_HERO_301_Buddy", "BG20_HERO_301_Buddy_G",
-                            "BG24_004", "BG24_004_G", "BG27_513",
-                            "BG27_513_G", "BG35_150t", "BG35_150t_G",
-                            "BG36_621", "BG36_621_G" })
-    {
-        REQUIRE(cards.contains(id));
-        CHECK(cards.at(id).power.GetBattlecryTask().empty());
-        CHECK(cards.at(id).power.GetDeathrattleTask().empty());
-    }
+    // The exact excluded IDs and their missing mechanics are maintained in
+    // the parent project's experimental metadata-only catalog.  Avoid
+    // repeating those IDs here: coverage tooling treats literals in focused
+    // tests as evidence of a behavior test.
+    CHECK_EQ(cards.size(), 2);
 }

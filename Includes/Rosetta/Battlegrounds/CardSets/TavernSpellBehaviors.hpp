@@ -41,6 +41,15 @@ enum class TavernSpellEffect
     FREE_REFRESHES,
     SHOP_STATS_PERSISTENT,
     SPELL_COSTS_HEALTH,
+    TARGET_SHARED_RACE_STATS,
+    TARGET_RACE_SHOP_STATS_PERSISTENT,
+    TARGET_GOLDEN,
+    RANDOM_SHOP_GOLDEN,
+    RANDOM_MINION_TO_HAND,
+    RANDOM_COMMON_RACE_MINION_TO_HAND,
+    STEAL_RANDOM_SHOP_MINION,
+    RANDOM_SHOP_STATS_ON_REFRESH,
+    SELL_TARGET_GIVE_RANDOM_STATS,
 };
 
 struct TavernSpellBehavior
@@ -213,6 +222,48 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 1, 0, 0, TavernSpellEffect::SPELL_COSTS_HEALTH };
     }
 
+    // Patch 36.4 generated/tribal batch.  These entries are deliberately
+    // limited to effects that can be resolved from public player state and
+    // the existing structured TavernSpell target argument.
+    if (id == "BG28_845") // Natural Blessing: share a type with a minion.
+    {
+        return { 0, 3, 3, TavernSpellEffect::TARGET_SHARED_RACE_STATS };
+    }
+    if (id == "BG35_912") // Eonar's Favor: same type in Tavern this game.
+    {
+        return { 0, 3, 3,
+                 TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT };
+    }
+    if (id == "EBG_Spell_017") // Eyes of the Earth Mother: make <= T4 Golden.
+    {
+        return { 0, 0, 0, TavernSpellEffect::TARGET_GOLDEN };
+    }
+    if (id == "BG28_830") // Golden Touch: random Tavern minion Golden.
+    {
+        return { 0, 0, 0, TavernSpellEffect::RANDOM_SHOP_GOLDEN };
+    }
+    if (id == "BG28_504") // Recruit a Trainee: random Tier 1 minion.
+    {
+        return { 0, 0, 0, TavernSpellEffect::RANDOM_MINION_TO_HAND };
+    }
+    if (id == "BG33_814") // Friendly Bounty: random most-common-type minion.
+    {
+        return { 0, 0, 0,
+                 TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND };
+    }
+    if (id == "BG28_512") // Enchanted Lasso: steal a random Tavern minion.
+    {
+        return { 0, 0, 0, TavernSpellEffect::STEAL_RANDOM_SHOP_MINION };
+    }
+    if (id == "BG34_444") // Easterly Winds: future refreshes buff one minion.
+    {
+        return { 0, 8, 8, TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH };
+    }
+    if (id == "EBG_Spell_032") // Channel the Devourer: sell and transfer.
+    {
+        return { 0, 0, 0, TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS };
+    }
+
     return {};
 }
 
@@ -225,7 +276,25 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::TARGET_STATS_REPEAT ||
            effect == TavernSpellEffect::TARGET_STATS_AND_TAUNT ||
            effect == TavernSpellEffect::TARGET_DIVINE_SHIELD ||
-           effect == TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT;
+           effect == TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT ||
+           effect == TavernSpellEffect::TARGET_SHARED_RACE_STATS ||
+           effect == TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT ||
+           effect == TavernSpellEffect::TARGET_GOLDEN ||
+           effect == TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS;
+}
+
+//! Returns whether a target satisfies additional spell-specific constraints.
+//! Generic friendly-minion legality is checked by Player; this helper keeps
+//! the low-level Tier 4 cap for Eyes of the Earth Mother declarative and
+//! replayable from the same spell table.
+inline bool TavernSpellTargetIsLegal(TavernSpellEffect effect, int tier,
+                                     bool golden) noexcept
+{
+    if (effect == TavernSpellEffect::TARGET_GOLDEN)
+    {
+        return !golden && tier >= 1 && tier <= 4;
+    }
+    return true;
 }
 }  // namespace RosettaStone::Battlegrounds
 

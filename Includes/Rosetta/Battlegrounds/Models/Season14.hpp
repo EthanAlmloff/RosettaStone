@@ -6,10 +6,12 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
+#include <Rosetta/Common/Enums/CardEnums.hpp>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 namespace RosettaStone::Battlegrounds
@@ -48,6 +50,16 @@ struct Season14PersistentEffect
     std::int32_t dbfID = 0;
     std::uint8_t remainingUses = 0;
     bool active = true;
+};
+
+//! A persistent Tavern stat bonus scoped to one or more concrete tribes.
+//! The vector is intentionally player-owned so the effect survives Tavern
+//! refreshes without exposing hidden pool state to the bridge.
+struct Season14RaceShopStats
+{
+    Race race = Race::INVALID;
+    std::int32_t attack = 0;
+    std::int32_t health = 0;
 };
 
 inline constexpr std::size_t SEASON14_TRINKET_SLOTS = 2;
@@ -90,6 +102,9 @@ class Season14State
     std::int32_t freeRefreshes = 0;
     std::int32_t persistentShopAttack = 0;
     std::int32_t persistentShopHealth = 0;
+    std::vector<Season14RaceShopStats> persistentShopRaceStats;
+    std::int32_t refreshRandomShopAttack = 0;
+    std::int32_t refreshRandomShopHealth = 0;
     std::array<std::uint64_t, static_cast<std::size_t>(
                                   Season14Event::COUNT)>
         eventCounts{};
@@ -176,6 +191,19 @@ class Season14State
     //! Adds a persistent stat bonus to newly generated Tavern minions.
     void AddPersistentShopStats(std::int32_t attack,
                                 std::int32_t health) noexcept;
+
+    //! Adds a persistent Tavern stat bonus scoped to a concrete tribe.
+    void AddPersistentShopRaceStats(Race race, std::int32_t attack,
+                                    std::int32_t health);
+
+    //! Arms a persistent trigger that buffs one random fresh Tavern minion
+    //! after each successful refresh.
+    void ArmRefreshRandomShopStats(std::int32_t attack,
+                                   std::int32_t health) noexcept;
+
+    //! Returns the armed random-refresh bonus, or zeroes when none is armed.
+    std::pair<std::int32_t, std::int32_t>
+    RefreshRandomShopStats() const noexcept;
 
     //! Resolves a complete target-free Batch-3 activation for this hero.
     bool ResolveHeroPowerBatch3Activation(

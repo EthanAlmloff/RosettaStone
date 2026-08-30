@@ -9,11 +9,19 @@
 
 #include <Rosetta/Battlegrounds/Actions/Generic.hpp>
 #include <Rosetta/Battlegrounds/CardSets/BattlegroundsCardsGen.hpp>
+#include <Rosetta/Battlegrounds/CardSets/DarkGiftBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch3.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch4.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch5.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch6.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch7.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch8.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch2.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/Card.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDef.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
@@ -45,8 +53,11 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CountTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DamageHeroTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DamageTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FriendlyRaceEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GetGameTagTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/IncludeTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomFriendlyRaceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ReduceTavernCostTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberEndTask.hpp>

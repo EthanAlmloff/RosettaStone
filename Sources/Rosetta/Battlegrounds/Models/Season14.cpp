@@ -221,6 +221,41 @@ void Season14State::AddPersistentShopStats(std::int32_t attack,
     persistentShopHealth += health;
 }
 
+void Season14State::AddPersistentShopRaceStats(Race race,
+                                               std::int32_t attack,
+                                               std::int32_t health)
+{
+    if (race == Race::INVALID || (attack == 0 && health == 0))
+    {
+        return;
+    }
+
+    for (auto& existing : persistentShopRaceStats)
+    {
+        if (existing.race == race)
+        {
+            existing.attack += attack;
+            existing.health += health;
+            return;
+        }
+    }
+
+    persistentShopRaceStats.push_back({ race, attack, health });
+}
+
+void Season14State::ArmRefreshRandomShopStats(std::int32_t attack,
+                                              std::int32_t health) noexcept
+{
+    refreshRandomShopAttack += attack;
+    refreshRandomShopHealth += health;
+}
+
+std::pair<std::int32_t, std::int32_t>
+Season14State::RefreshRandomShopStats() const noexcept
+{
+    return { refreshRandomShopAttack, refreshRandomShopHealth };
+}
+
 bool Season14State::ResolveHeroPowerBatch3Activation(
     std::int32_t currentTier,
     Season14HeroPowerBatch3Activation& result) const noexcept

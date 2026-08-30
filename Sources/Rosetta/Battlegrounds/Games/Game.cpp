@@ -298,11 +298,14 @@ void Game::Recruit()
             continue;
         }
 
+        // Recruit actions and recruit-phase task selectors operate on the
+        // recruit field.  Combat sets this flag true; clear it here before
+        // any turn-start effects or Tavern work so GetField() cannot route
+        // recruit summons/effects into the copied battle field.
+        player.isInCombat = false;
+
         player.season14.Emit(Season14Event::RECRUIT_START);
         player.season14.heroPowerUsed = false;
-
-        // Set the flag
-        player.isInCombat = true;
 
         // Assign the index of the player to fight next.
         player.playerIdxNextFight = FindPlayerNextFight(player.idx);

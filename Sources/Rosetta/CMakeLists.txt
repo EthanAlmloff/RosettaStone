@@ -13,10 +13,10 @@ include_directories(
 file(GLOB header_dir
     ${root_dir}/Includes/Rosetta)
 
-file(GLOB_RECURSE headers
+file(GLOB_RECURSE headers CONFIGURE_DEPENDS
     ${header_dir}/*.hpp)
 
-file(GLOB_RECURSE sources
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
 # Custom-build event

@@ -178,3 +178,49 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - simple keyword/economy batch
         CHECK(behavior.gold == item.gold);
     }
 }
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - generated and tribal batch")
+{
+    struct Expected
+    {
+        const char* id;
+        TavernSpellEffect effect;
+        bool target;
+    };
+
+    constexpr std::array expected{
+        Expected{ "BG28_845", TavernSpellEffect::TARGET_SHARED_RACE_STATS,
+                  true },
+        Expected{ "BG35_912",
+                  TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT,
+                  true },
+        Expected{ "EBG_Spell_017", TavernSpellEffect::TARGET_GOLDEN, true },
+        Expected{ "BG28_830", TavernSpellEffect::RANDOM_SHOP_GOLDEN, false },
+        Expected{ "BG28_504", TavernSpellEffect::RANDOM_MINION_TO_HAND,
+                  false },
+        Expected{ "BG33_814",
+                  TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND,
+                  false },
+        Expected{ "BG28_512", TavernSpellEffect::STEAL_RANDOM_SHOP_MINION,
+                  false },
+        Expected{ "BG34_444",
+                  TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH, false },
+        Expected{ "EBG_Spell_032",
+                  TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS, true },
+    };
+
+    for (const auto& item : expected)
+    {
+        const auto behavior = FindTavernSpellBehavior(item.id);
+        CHECK(behavior.effect == item.effect);
+        CHECK(TavernSpellRequiresTarget(behavior.effect) == item.target);
+        CHECK(behavior.gold == 0);
+    }
+
+    CHECK(TavernSpellTargetIsLegal(TavernSpellEffect::TARGET_GOLDEN, 4,
+                                   false));
+    CHECK(!TavernSpellTargetIsLegal(TavernSpellEffect::TARGET_GOLDEN, 5,
+                                    false));
+    CHECK(!TavernSpellTargetIsLegal(TavernSpellEffect::TARGET_GOLDEN, 4,
+                                    true));
+}

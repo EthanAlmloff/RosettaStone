@@ -5,6 +5,7 @@
 // property of any third parties.
 
 #include <Rosetta/Battlegrounds/Enchants/Power.hpp>
+#include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 
@@ -172,6 +173,76 @@ bool Minion::IsGolden() const
     // remains stable for generated/pool minions and avoids guessing from
     // names or card text.
     return m_card.normalDbfID != 0;
+}
+
+bool Minion::MakeGolden()
+{
+    if (!CanMakeGolden())
+    {
+        return false;
+    }
+
+    Card premium = Cards::FindCardByDbfID(m_card.premiumDbfID);
+
+    // The premium entity supplies the golden card identity/keywords while
+    // the live instance keeps its current stats and zone/index state.  This
+    // mirrors the in-game conversion of a buffed Tavern minion and avoids
+    // turning this spell into a metadata-only flag.
+    const int currentAttack = m_attack;
+    const int currentHealth = m_health;
+    m_card = std::move(premium);
+    m_card.Initialize();
+    m_attack = currentAttack;
+    m_health = currentHealth;
+
+    m_hasDeathrattle = false;
+    m_hasTaunt = false;
+    m_hasDivineShield = false;
+    m_hasReborn = false;
+    m_hasWindfury = false;
+    m_hasMegaWindfury = false;
+    m_hasVenomous = false;
+    for (const auto& tag : m_card.gameTags)
+    {
+        switch (tag.first)
+        {
+            case GameTag::DEATHRATTLE:
+                m_hasDeathrattle = true;
+                break;
+            case GameTag::TAUNT:
+                m_hasTaunt = true;
+                break;
+            case GameTag::DIVINE_SHIELD:
+                m_hasDivineShield = true;
+                break;
+            case GameTag::REBORN:
+                m_hasReborn = true;
+                break;
+            case GameTag::WINDFURY:
+                m_hasWindfury = true;
+                break;
+            case GameTag::MEGA_WINDFURY:
+                m_hasMegaWindfury = true;
+                break;
+            case GameTag::POISONOUS:
+            case GameTag::VENOMOUS:
+                m_hasVenomous = true;
+                break;
+            default:
+                break;
+        }
+    }
+    return true;
+}
+
+bool Minion::CanMakeGolden() const
+{
+    if (IsGolden() || m_card.premiumDbfID == 0)
+    {
+        return false;
+    }
+
+    return !Cards::FindCardByDbfID(m_card.premiumDbfID).id.empty();
 }
 
 int Minion::GetAttack() const

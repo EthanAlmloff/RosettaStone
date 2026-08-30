@@ -113,6 +113,15 @@ class Minion
     //! \return true when the metadata identifies a premium/golden entity.
     bool IsGolden() const;
 
+    //! Converts this instance to its premium entity while preserving its
+    //! current mutable stats and zone identity.
+    //! \return false when no linked premium entity is available.
+    bool MakeGolden();
+
+    //! Returns whether this instance can be converted to a supported premium
+    //! entity without mutating it.
+    bool CanMakeGolden() const;
+
     //! Returns the value of attack.
     //! \return The value of attack.
     int GetAttack() const;
