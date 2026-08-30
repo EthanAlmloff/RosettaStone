@@ -50,6 +50,9 @@ class Player
     //! passive hero powers do not depend on the minion first appearing in the
     //! Tavern.
     void ApplyFreshMinionModifiers(Minion& minion) const;
+    void ApplyPersistentRaceStats(Race race, int attack, int health);
+    void ApplySpellRaceBuff(Race race, int attack, int health, bool includeHand);
+    void ApplySpellSpecialBuff(int mode, int attack, int health);
 
     //! Purchases a minion from Tavern's field.
     //! \param idx The index of a list of minions in Tavern's field.
@@ -116,6 +119,7 @@ class Player
     //! \p freeRefresh is used by a hero power whose activation already paid
     //! for the refresh (for example Temporal Tavern).
     void RefreshTavern(bool freeRefresh = false);
+    void RecordGoldSpent(std::int32_t amount);
 
     //! Freezes a list of minions in Tavern's field.
     void FreezeTavern();

@@ -156,14 +156,6 @@ void ModernMinionBehaviorsBatch8::AddAll(
     AddDeflectOBot(cards, "TB_BaconUps_123", "BGS_071e", 2);
     AddStatEnchantment(cards, "BGS_071e", 2, 0);
 
-    // Refreshing Anomaly: the next refresh (two for golden) is free.
-    Power refreshPower;
-    refreshPower.AddBattlecryTask(FreeRefreshTask{ 1 });
-    cards.emplace("BGS_116", CardDef{ refreshPower });
-    refreshPower.ClearData();
-    refreshPower.AddBattlecryTask(FreeRefreshTask{ 2 });
-    cards.emplace("TB_BaconUps_167", CardDef{ std::move(refreshPower) });
-
     // Molten Rock: after playing an Elemental, gain +1 Health (+2 Health for
     // the linked golden copy).  The source is the owner of the trigger.
     AddMoltenRock(cards, "BGS_127", "BGS_127e");

@@ -1,6 +1,7 @@
 #include "doctest_proxy.hpp"
 
 #include <Rosetta/Battlegrounds/CardSets/ActivateBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 
 #include <map>
 
@@ -10,6 +11,7 @@ TEST_CASE("[Battlegrounds : Activate] - simple target families are registered")
 {
     std::map<std::string, CardDef> cards;
     ActivateBehaviors::AddAll(cards);
+    GeneratedBehaviorMappings::AddAll(cards);
 
     REQUIRE_EQ(cards.size(), 8);
     CHECK(cards.contains("BG36_345"));

@@ -17,12 +17,10 @@ void ModernMinionBehaviorsBatch16::AddAll(
     trigger.SetTriggerSource(TriggerSource::SELF);
     trigger.SetTasks(std::vector<TaskType>{ SimpleTasks::GainGoldTask{ 1 } });
     normal.AddTrigger(std::move(trigger));
-    cards.emplace("BG26_147", CardDef{ normal });
     Power golden;
     Trigger goldenTrigger{ TriggerType::TURN_START };
     goldenTrigger.SetTriggerSource(TriggerSource::SELF);
     goldenTrigger.SetTasks(std::vector<TaskType>{ SimpleTasks::GainGoldTask{ 2 } });
     golden.AddTrigger(std::move(goldenTrigger));
-    cards.emplace("BG26_147_G", CardDef{ std::move(golden) });
 }
 }

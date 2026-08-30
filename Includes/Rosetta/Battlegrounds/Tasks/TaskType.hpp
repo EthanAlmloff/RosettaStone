@@ -20,6 +20,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/IncludeTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeftmostFriendlyRaceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FriendlyRaceEnchantmentTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/HandRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GainGoldTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
@@ -28,6 +29,9 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomFriendlyRaceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberEndTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberStartTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/PersistentRaceBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastSpellBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackingMinionBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RebornAttackTask.hpp>
@@ -44,6 +48,7 @@ using TaskType =
                  SimpleTasks::CountTask, SimpleTasks::CounterBuffTask, SimpleTasks::DamageHeroTask,
                  SimpleTasks::DamageTask, SimpleTasks::GetGameTagTask,
                  SimpleTasks::FriendlyRaceEnchantmentTask,
+                 SimpleTasks::HandRaceBuffTask,
                  SimpleTasks::FreeRefreshTask,
                  SimpleTasks::GainGoldTask,
                  SimpleTasks::GenerateBloodGemsTask,
@@ -55,7 +60,8 @@ using TaskType =
                  SimpleTasks::RepeatNumberStartTask,
                  SimpleTasks::SetGameTagTask, SimpleTasks::SummonTask,
                  SimpleTasks::RallyBuffTask, SimpleTasks::RallyRaceBuffTask,
-                 SimpleTasks::RebornAttackTask>;
+                 SimpleTasks::RebornAttackTask,
+                 SimpleTasks::PersistentRaceBuffTask, SimpleTasks::CastSpellBuffTask, SimpleTasks::AttackingMinionBuffTask>;
 }  // namespace RosettaStone::Battlegrounds
 
 #endif  // ROSETTASTONE_BATTLEGROUNDS_TASK_TYPE_HPP

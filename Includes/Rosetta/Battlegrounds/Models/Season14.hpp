@@ -123,11 +123,13 @@ class Season14State
     std::int32_t trinketMaxGoldDelta = 0;
     std::int32_t trinketImmediateGold = 0;
     std::vector<Season14RaceShopStats> persistentShopRaceStats;
+    std::vector<Season14RaceShopStats> persistentRaceStats;
     std::int32_t refreshRandomShopAttack = 0;
     std::int32_t refreshRandomShopHealth = 0;
     //! Additive attack/health applied by each subsequently played Blood Gem.
     std::int32_t bloodGemAttackBonus = 0;
     std::int32_t bloodGemHealthBonus = 0;
+    std::int32_t goldSpentThisTurn = 0;
     std::array<std::uint64_t, static_cast<std::size_t>(
                                   Season14Event::COUNT)>
         eventCounts{};
@@ -233,6 +235,7 @@ class Season14State
         if (battlecry) ++battlecriesTriggered;
     }
     void RecordBattlecry() noexcept { ++battlecriesTriggered; }
+    int RecordGoldSpent(std::int32_t amount) noexcept;
 
     //! Returns and clears deferred next-turn gold.
     std::int32_t TakeNextTurnGold() noexcept;
@@ -271,6 +274,8 @@ class Season14State
     //! Adds a persistent Tavern stat bonus scoped to a concrete tribe.
     void AddPersistentShopRaceStats(Race race, std::int32_t attack,
                                     std::int32_t health);
+    void AddPersistentRaceStats(Race race, std::int32_t attack,
+                                std::int32_t health);
 
     //! Arms a persistent trigger that buffs one random fresh Tavern minion
     //! after each successful refresh.

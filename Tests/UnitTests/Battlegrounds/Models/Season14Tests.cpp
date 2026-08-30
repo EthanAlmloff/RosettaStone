@@ -197,3 +197,29 @@ TEST_CASE("[Season14] - simple Tavern spell economy state is deterministic")
     CHECK(state.persistentShopAttack == 2);
     CHECK(state.persistentShopHealth == 2);
 }
+
+TEST_CASE("[Season14] - spend-gold thresholds roll over and reset per recruit turn")
+{
+    Season14State state;
+    CHECK(state.RecordGoldSpent(4) == 0);
+    CHECK(state.RecordGoldSpent(1) == 1);
+    CHECK(state.RecordGoldSpent(9) == 2);
+    CHECK(state.RecordGoldSpent(1) == 0);
+    CHECK(state.RecordGoldSpent(5) == 1);
+    state.BeginRecruitTurn();
+    CHECK(state.RecordGoldSpent(4) == 0);
+    CHECK(state.RecordGoldSpent(1) == 1);
+}
+
+TEST_CASE("[Season14] - persistent race bonuses stack and remain state-owned")
+{
+    Season14State state;
+    state.AddPersistentRaceStats(Race::UNDEAD, 1, 0);
+    state.AddPersistentRaceStats(Race::UNDEAD, 2, 1);
+    REQUIRE(state.persistentRaceStats.size() == 1);
+    CHECK(state.persistentRaceStats.front().race == Race::UNDEAD);
+    CHECK(state.persistentRaceStats.front().attack == 3);
+    CHECK(state.persistentRaceStats.front().health == 1);
+    state.BeginRecruitTurn();
+    CHECK(state.persistentRaceStats.front().attack == 3);
+}

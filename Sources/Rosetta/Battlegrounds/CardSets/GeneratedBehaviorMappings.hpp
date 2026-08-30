@@ -80,18 +80,6 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG25_011_G","battlecry","friendly_race_wherever","always","persistent_race_buff",2,2,0,0,0,0,false},
   {"BG32_841","battlecry","friendly_race_wherever","always","persistent_race_buff",2,1,0,0,0,0,false},
   {"BG32_841_G","battlecry","friendly_race_wherever","always","persistent_race_buff",4,2,0,0,0,0,false},
-  {"BG26_137","after_play_minion","hand_race","played_murloc","hand_race_buff",6,1,6,0,0,0,false},
-  {"BG26_137_G","after_play_minion","hand_race","played_murloc","hand_race_buff",12,2,12,0,0,0,false},
-  {"BG36_622","after_cast_spell","all_friendly_minions","target_is_naga","cast_spell_buff",2,1,3,0,0,0,false},
-  {"BG36_622_G","after_cast_spell","all_friendly_minions","target_is_naga","cast_spell_buff",4,2,6,0,0,0,false},
-  {"BG36_704","after_cast_spell","friendly_race_in_hand_and_board","target_is_murloc","cast_spell_buff",3,1,3,0,0,0,false},
-  {"BG36_704_G","after_cast_spell","friendly_race_in_hand_and_board","target_is_murloc","cast_spell_buff",6,2,6,0,0,0,false},
-  {"BG36_703","after_cast_spell","leftmost_hand_minion","target_is_self","cast_spell_buff",8,1,8,0,0,0,false},
-  {"BG36_703_G","after_cast_spell","leftmost_hand_minion","target_is_self","cast_spell_buff",16,2,16,0,0,0,false},
-  {"BG36_762","after_cast_spell","tavern_minions","target_is_self","cast_spell_buff",2,1,2,0,0,0,false},
-  {"BG36_762_G","after_cast_spell","tavern_minions","target_is_self","cast_spell_buff",4,2,4,0,0,0,false},
-  {"BG33_893","after_play_minion","friendly_race","played_tier_at_most_3","after_play_tier_race_buff",3,1,3,0,0,0,false},
-  {"BG33_893_G","after_play_minion","friendly_race","played_tier_at_most_3","after_play_tier_race_buff",6,2,6,0,0,0,false},
 };
 inline constexpr DeclarativeEnchantmentRow DeclarativeEnchantmentRows[] = {
   {"BG36_514e","BG36_514","BG36_514","permanent",0,0,1},
@@ -99,7 +87,6 @@ inline constexpr DeclarativeEnchantmentRow DeclarativeEnchantmentRows[] = {
   {"BG22_HERO_200_Buddy_e","BG22_HERO_200_Buddy","BG22_HERO_200_Buddy","permanent",3,3,0},
   {"BG32_846e","BG32_846","BG32_846","permanent",4,4,0},
   {"BG26_810e","BG26_810","BG26_810","permanent",2,0,0},
-  {"BG33_893e","BG33_893","BG33_893","permanent",3,3,0},
   {"BG25_011e2","BG25_011","BG25_011","this_game",1,0,0},
 };
 class GeneratedBehaviorMappings { public: static void AddAll(std::map<std::string, CardDef>&); };

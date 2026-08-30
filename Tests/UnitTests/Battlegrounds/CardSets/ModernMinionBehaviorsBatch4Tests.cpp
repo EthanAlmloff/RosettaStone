@@ -21,17 +21,12 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 4 registrations")
     ModernMinionBehaviorsBatch4::AddAll(cards);
 
     for (const auto* id : { "BG25_001", "BG25_001_G", "TB_BaconUps_099",
-                            "TB_BaconUps_159", "TB_BaconUps_251",
-                            "BG25_010t", "BG25_010_Gt" })
+                            "TB_BaconUps_159", "TB_BaconUps_251" })
     {
         REQUIRE(cards.contains(id));
         CHECK(cards.at(id).power.GetBattlecryTask().empty());
     }
 
-    REQUIRE(cards.contains("BG25_010"));
-    REQUIRE(cards.contains("BG25_010_G"));
-    CHECK_EQ(cards.at("BG25_010").power.GetDeathrattleTask().size(), 1);
-    CHECK_EQ(cards.at("BG25_010_G").power.GetDeathrattleTask().size(), 1);
 }
 
 TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 4 metadata flags")

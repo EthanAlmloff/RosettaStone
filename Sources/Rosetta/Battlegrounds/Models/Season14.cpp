@@ -72,6 +72,7 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
 
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
 {
+    goldSpentThisTurn = 0;
     ResolveSeason14HeroPowerBatch1Event(
         heroPowerDbfID, Season14HeroPowerBatch1Event::BEGIN_TURN,
         heroPowerBatch1);
@@ -82,6 +83,14 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
         heroPowerBatch2, result);
     BeginRecruitTurnBatch4();
     return result;
+}
+
+int Season14State::RecordGoldSpent(std::int32_t amount) noexcept
+{
+    if (amount <= 0) return 0;
+    const auto before = goldSpentThisTurn / 5;
+    goldSpentThisTurn += amount;
+    return goldSpentThisTurn / 5 - before;
 }
 
 void Season14State::BeginRecruitTurnBatch4()
@@ -377,6 +386,22 @@ void Season14State::AddPersistentShopRaceStats(Race race,
     }
 
     persistentShopRaceStats.push_back({ race, attack, health });
+}
+
+void Season14State::AddPersistentRaceStats(Race race, std::int32_t attack,
+                                            std::int32_t health)
+{
+    if (race == Race::INVALID || (attack == 0 && health == 0)) return;
+    for (auto& existing : persistentRaceStats)
+    {
+        if (existing.race == race)
+        {
+            existing.attack += attack;
+            existing.health += health;
+            return;
+        }
+    }
+    persistentRaceStats.push_back({ race, attack, health });
 }
 
 void Season14State::ArmRefreshRandomShopStats(std::int32_t attack,

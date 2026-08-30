@@ -14,6 +14,9 @@ TaskStatus RallyRaceBuffTask::Run(Player& player, Minion&) {
   return TaskStatus::COMPLETE;
 }
 TaskStatus RallyRaceBuffTask::Run(Player& player, Minion& source, Minion&) {
+  if (m_triggerRace != Race::INVALID && !source.HasRace(m_triggerRace)) {
+    return TaskStatus::COMPLETE;
+  }
   return Run(player, source);
 }
 }

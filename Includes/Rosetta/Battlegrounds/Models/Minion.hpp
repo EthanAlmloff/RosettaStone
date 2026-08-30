@@ -11,6 +11,7 @@
 #include <Rosetta/Common/Enums/TaskEnums.hpp>
 
 #include <initializer_list>
+#include <array>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -154,6 +155,7 @@ class Minion
     //! between Tavern, hand, and board must not stack the same aura.
     void ApplyFutureLobsterStats(int attack, int health);
     void ApplyFutureBallerStats(int attack, int health);
+    void ApplyPersistentRaceStats(Race race, int attack, int health);
 
     //! Applies one Blood Gem's resolved stats and records the permanent
     //! instance count used by observation/diagnostics.
@@ -330,6 +332,8 @@ class Minion
     int m_futureLobsterHealth = 0;
     int m_futureBallerAttack = 0;
     int m_futureBallerHealth = 0;
+    std::array<int, 40> m_persistentRaceAttack{};
+    std::array<int, 40> m_persistentRaceHealth{};
     int m_buyTriggerUses = 0;
     int m_bloodGemCount = 0;
     int m_bloodGemCountThisTurn = 0;

@@ -78,10 +78,6 @@ void ModernMinionBehaviorsBatch25::AddAll(std::map<std::string, CardDef>& cards)
     AddEnchant(cards, "BG33_701e", 2, 2); AddOtherMinionsBoth(cards, "BG33_701", "BG33_701e");
     AddEnchant(cards, "BG33_701Ge", 4, 4); AddOtherMinionsBoth(cards, "BG33_701_G", "BG33_701Ge");
     {
-        Power normal; normal.AddBattlecryTask(SimpleTasks::AddCardTask{ "BG27_002t", 2 });
-        cards.emplace("BG27_002", CardDef{ std::move(normal) });
-        Power golden; golden.AddBattlecryTask(SimpleTasks::AddCardTask{ "BG27_002t", 4 });
-        cards.emplace("BG27_002_G", CardDef{ std::move(golden) });
     }
     {
         Power normal; normal.AddBattlecryTask(SimpleTasks::SetGameTagTask{ EntityType::TARGET, GameTag::TAUNT, 1 });

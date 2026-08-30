@@ -65,6 +65,8 @@ enum class TriggerType
     REBORN,      //!< The effect triggers after a friendly minion Reborns.
     SELL_MINION, //!< The effect triggers after a minion is sold.
     BUY_MINION,  //!< The effect triggers after a minion is bought.
+    SPEND_GOLD,  //!< The effect triggers after each 5 Gold spent.
+    AFTER_CAST_SPELL, //!< The effect triggers after a targeted Tavern spell resolves.
 };
 
 //! \brief An enumerator for identifying trigger source.

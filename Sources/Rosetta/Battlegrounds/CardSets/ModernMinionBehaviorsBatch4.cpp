@@ -37,24 +37,15 @@ void ModernMinionBehaviorsBatch4::AddAll(
     // BG25_001 Risen Rider is only Taunt + Reborn in the pinned 36.4 data.
     // Both rarities are explicit because generated golden entities are
     // independently checked by the behavior coverage tooling.
-    AddStatic(cards, "BG25_001");
-    AddStatic(cards, "BG25_001_G");
 
     // The previous static batches registered the normal records. These are
     // their pinned golden records and share exactly the same metadata-backed
     // keyword behavior.
-    AddStatic(cards, "TB_BaconUps_099");  // Annoy-o-Module
-    AddStatic(cards, "TB_BaconUps_159");  // Crackling Cyclone
-    AddStatic(cards, "TB_BaconUps_251");  // Deadly Spore
 
     // ---------------------------------------------------------------------
     // Fixed deathrattle-summon family.
     // ---------------------------------------------------------------------
     // BG25_010 Handless Forsaken summons Helping Hand. The golden form uses
     // the explicitly linked golden token and doubles the summon count.
-    AddDeathrattleSummon(cards, "BG25_010", "BG25_010t", 1);
-    AddDeathrattleSummon(cards, "BG25_010_G", "BG25_010_Gt", 2);
-    AddStatic(cards, "BG25_010t");
-    AddStatic(cards, "BG25_010_Gt");
 }
 }  // namespace RosettaStone::Battlegrounds

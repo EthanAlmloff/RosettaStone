@@ -3,6 +3,7 @@
 #include "doctest_proxy.hpp"
 
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch8.hpp>
+#include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FriendlyRaceEnchantmentTask.hpp>
@@ -27,6 +28,7 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 8 inventory table")
 
     std::map<std::string, CardDef> cards;
     ModernMinionBehaviorsBatch8::AddAll(cards);
+    GeneratedBehaviorMappings::AddAll(cards);
 
     for (const auto* id : ids)
     {

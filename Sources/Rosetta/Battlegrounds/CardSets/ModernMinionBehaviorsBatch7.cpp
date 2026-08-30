@@ -29,8 +29,6 @@ void ModernMinionBehaviorsBatch7::AddAll(
     // Eternal Summoner (Patch 36.4): Reborn. Deathrattle: Summon 1 Eternal
     // Knight. The golden form summons a Golden Eternal Knight. Reborn is a
     // metadata keyword; only the deterministic deathrattle belongs here.
-    AddDeathrattleSummon(cards, "BG25_009", "BG25_008", 1);
-    AddDeathrattleSummon(cards, "BG25_009_G", "BG25_008_G", 1);
 
     // The remaining Batch 7 inventory is deliberately not registered here.
     // Those entities have non-static text (Auras, Devour/sell triggers, or

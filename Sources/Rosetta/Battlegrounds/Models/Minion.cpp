@@ -238,6 +238,8 @@ bool Minion::MakeGolden()
     const int futureLobsterHealth = m_futureLobsterHealth;
     const int futureBallerAttack = m_futureBallerAttack;
     const int futureBallerHealth = m_futureBallerHealth;
+    const auto persistentRaceAttack = m_persistentRaceAttack;
+    const auto persistentRaceHealth = m_persistentRaceHealth;
     const int bloodGemCount = m_bloodGemCount;
     const int bloodGemCountThisTurn = m_bloodGemCountThisTurn;
     // The premium card supplies the new identity and its static keywords,
@@ -274,6 +276,8 @@ bool Minion::MakeGolden()
     m_futureLobsterHealth = futureLobsterHealth;
     m_futureBallerAttack = futureBallerAttack;
     m_futureBallerHealth = futureBallerHealth;
+    m_persistentRaceAttack = persistentRaceAttack;
+    m_persistentRaceHealth = persistentRaceHealth;
     m_bloodGemCount = bloodGemCount;
     m_bloodGemCountThisTurn = bloodGemCountThisTurn;
 
@@ -409,6 +413,22 @@ void Minion::ApplyFutureBallerStats(int attack, int health)
     {
         m_health += health - m_futureBallerHealth;
         m_futureBallerHealth = health;
+    }
+}
+
+void Minion::ApplyPersistentRaceStats(Race race, int attack, int health)
+{
+    const auto index = static_cast<std::size_t>(race);
+    if (index >= m_persistentRaceAttack.size() || !HasRace(race)) return;
+    if (attack > m_persistentRaceAttack[index])
+    {
+        m_attack += attack - m_persistentRaceAttack[index];
+        m_persistentRaceAttack[index] = attack;
+    }
+    if (health > m_persistentRaceHealth[index])
+    {
+        m_health += health - m_persistentRaceHealth[index];
+        m_persistentRaceHealth[index] = health;
     }
 }
 
@@ -753,7 +773,7 @@ void Minion::ActivateTrigger(TriggerType type, Minion& source)
         return;
     }
 
-    if (type == TriggerType::BUY_MINION)
+    if (type == TriggerType::BUY_MINION || type == TriggerType::AFTER_CAST_SPELL)
         trigger.value().Run(*this, source, source);
     else
         trigger.value().Run(*this, source);
@@ -928,6 +948,7 @@ bool Minion::Activate(Player& player, int targetIdx)
     }
     const auto definition = *m_card.power.GetActivate();
     player.remainCoin -= definition.cost;
+    player.RecordGoldSpent(definition.cost);
     if (definition.effect == ActivateEffect::BUFF_TARGET)
     {
         auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];

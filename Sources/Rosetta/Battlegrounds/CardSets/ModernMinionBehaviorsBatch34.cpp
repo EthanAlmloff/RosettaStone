@@ -7,10 +7,8 @@
 #include <vector>
 namespace RosettaStone::Battlegrounds {
 void ModernMinionBehaviorsBatch34::AddAll(std::map<std::string, CardDef>& cards) {
-    auto enchant = [](std::map<std::string, CardDef>& cards, const char* id, int attack, int health) {
-        Power p; p.AddEnchant(Enchant{std::vector<Effect>{Effects::AttackN(attack), Effects::HealthN(health)}});
-        cards.emplace(id, CardDef{std::move(p)});
-    };
+    Power goldenEnchant; goldenEnchant.AddEnchant(Enchant{std::vector<Effect>{Effects::AttackN(6), Effects::HealthN(6)}});
+    cards.emplace("BG22_HERO_200_Buddy_Ge", CardDef{std::move(goldenEnchant)});
     auto add = [](std::map<std::string, CardDef>& cards, const char* id, const char* e) {
         Power p; Trigger t{TriggerType::AFTER_PLAY_MINION};
         t.SetTriggerSource(TriggerSource::MINIONS_EXCEPT_SELF);
@@ -18,8 +16,6 @@ void ModernMinionBehaviorsBatch34::AddAll(std::map<std::string, CardDef>& cards)
         t.SetTasks({SimpleTasks::AddEnchantmentTask{e, EntityType::SOURCE}});
         p.AddTrigger(std::move(t)); cards.emplace(id, CardDef{std::move(p)});
     };
-    enchant(cards, "BG22_HERO_200_Buddy_e", 3, 3);
-    enchant(cards, "BG22_HERO_200_Buddy_Ge", 6, 6);
     add(cards, "BG22_HERO_200_Buddy", "BG22_HERO_200_Buddy_e");
     add(cards, "BG22_HERO_200_Buddy_G", "BG22_HERO_200_Buddy_Ge");
 }

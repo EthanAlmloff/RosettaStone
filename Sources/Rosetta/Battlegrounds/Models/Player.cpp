@@ -29,6 +29,8 @@ FieldZone& Player::GetField()
 
 void Player::ApplyFreshMinionModifiers(Minion& minion) const
 {
+    for (const auto& bonus : season14.persistentRaceStats)
+        minion.ApplyPersistentRaceStats(bonus.race, bonus.attack, bonus.health);
     const auto batch4 = season14.HeroPowerBatch4PassiveModifiers();
     if (batch4.globalMinionAttack != 0)
     {
@@ -52,6 +54,45 @@ void Player::ApplyFreshMinionModifiers(Minion& minion) const
     {
         const auto [attack, health] = season14.FutureBallerStats();
         minion.ApplyFutureBallerStats(attack, health);
+    }
+}
+
+void Player::ApplyPersistentRaceStats(Race race, int attack, int health)
+{
+    season14.AddPersistentRaceStats(race, attack, health);
+    auto apply = [race, attack, health](Minion& minion) {
+        minion.ApplyPersistentRaceStats(race, attack, health);
+    };
+    recruitField.ForEachAlive([&](MinionData& d) { apply(d.value()); });
+    tavern.fieldZone.ForEachAlive([&](MinionData& d) { apply(d.value()); });
+    hand.ForEach([&](std::optional<CardData>& d) {
+        if (d.has_value() && std::holds_alternative<Minion>(d.value()))
+            apply(std::get<Minion>(d.value()));
+    });
+}
+
+void Player::ApplySpellRaceBuff(Race race, int attack, int health, bool includeHand)
+{
+    auto apply = [race, attack, health](Minion& minion) {
+        if (race == Race::INVALID || minion.HasRace(race)) {
+            minion.SetAttack(minion.GetAttack() + attack);
+            minion.SetHealth(minion.GetHealth() + health);
+        }
+    };
+    recruitField.ForEachAlive([&](MinionData& d) { apply(d.value()); });
+    if (includeHand) hand.ForEach([&](std::optional<CardData>& d) {
+        if (d.has_value() && std::holds_alternative<Minion>(d.value())) apply(std::get<Minion>(d.value()));
+    });
+}
+
+void Player::ApplySpellSpecialBuff(int mode, int attack, int health)
+{
+    if (mode == 1) {
+        for (int i = 0; i < hand.GetCount(); ++i)
+            if (std::holds_alternative<Minion>(hand[i])) { auto& m = std::get<Minion>(hand[i]); m.SetAttack(m.GetAttack()+attack); m.SetHealth(m.GetHealth()+health); break; }
+    } else if (mode == 2) {
+        season14.AddPersistentShopStats(attack, health);
+        tavern.fieldZone.ForEachAlive([&](MinionData& d) { d.value().SetAttack(d.value().GetAttack()+attack); d.value().SetHealth(d.value().GetHealth()+health); });
     }
 }
 
@@ -245,6 +286,7 @@ void Player::PurchaseMinion(std::size_t idx)
     // entity is already in hand, and remains the event source for every
     // friendly board trigger below.
     remainCoin -= cost;
+    RecordGoldSpent(cost);
     if (hand.GetCount() > handCountBeforePurchase)
     {
         auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
@@ -394,6 +436,13 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
         recruitField.ForEachAlive([&minion](MinionData& aliveMinion) {
             aliveMinion.value().ActivateTrigger(TriggerType::AFTER_PLAY_MINION,
                                                 minion);
+        });
+        hand.ForEach([&minion](std::optional<CardData>& data) {
+            if (data.has_value() && std::holds_alternative<Minion>(data.value()))
+            {
+                auto& observer = std::get<Minion>(data.value());
+                observer.ActivateTrigger(TriggerType::AFTER_PLAY_MINION, minion);
+            }
         });
 
         // Prophet of the Boar triggers after a Quilboar is played (including
@@ -1382,6 +1431,7 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     CardData& card = hand[static_cast<int>(handIdx)];
     const Spell& spell = std::get<Spell>(card);
     const int cost = season14.TavernSpellCost(spell.GetCost());
+    const bool temporarySpell = spell.IsTemporary();
     const TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
     hand.Remove(card);
     if (effect.effect == TavernSpellEffect::SPELL_COSTS_HEALTH)
@@ -1393,10 +1443,17 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     else
     {
         remainCoin -= cost;
+        RecordGoldSpent(cost);
     }
     remainCoin += effect.gold;
     season14.Emit(Season14Event::SPELL_CAST);
-    ApplySpellBoardEffect(*this, effect, targetIdx, spell.IsTemporary());
+    ApplySpellBoardEffect(*this, effect, targetIdx, temporarySpell);
+    if (targetIdx >= 0 && targetIdx < recruitField.GetCount()) {
+        auto& target = recruitField[static_cast<std::size_t>(targetIdx)];
+        recruitField.ForEachAlive([&target](MinionData& data) {
+            data.value().ActivateTrigger(TriggerType::AFTER_CAST_SPELL, target);
+        });
+    }
     // Arcane Knowledge and other one-shot Tavern-spell discounts are
     // consumed only after a supported spell has actually resolved.  The
     // legality check above ensures unaffordable/unsupported attempts leave
@@ -1497,6 +1554,7 @@ void Player::UpgradeTavern()
     }
 
     remainCoin -= cost;
+    RecordGoldSpent(cost);
     upgradeTavernCallback(*this);
     const auto result = season14.OnUpgradeTavern();
     remainCoin += result.goldDelta;
@@ -1515,6 +1573,7 @@ void Player::RefreshTavern(bool freeRefresh)
 
     clearTavernMinionsCallback(*this);
     remainCoin -= cost;
+    RecordGoldSpent(cost);
 
     if (allowanceRefresh)
     {
@@ -1544,6 +1603,18 @@ void Player::RefreshTavern(bool freeRefresh)
         }
     }
     season14.OnRefreshTavern(true);
+}
+
+void Player::RecordGoldSpent(std::int32_t amount)
+{
+    const int thresholds = season14.RecordGoldSpent(amount);
+    for (int i = 0; i < thresholds; ++i)
+    {
+        recruitField.ForEachAlive([this](MinionData& data) {
+            auto& minion = data.value();
+            minion.ActivateTrigger(TriggerType::SPEND_GOLD, minion);
+        });
+    }
 }
 
 void Player::FreezeTavern()

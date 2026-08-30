@@ -1,8 +1,9 @@
 #include "doctest_proxy.hpp"
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch34.hpp>
+#include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 using namespace RosettaStone::Battlegrounds;
 TEST_CASE("[Batch34] - Sub Scrubber post-play Mech trigger") {
-    std::map<std::string, CardDef> cards; ModernMinionBehaviorsBatch34::AddAll(cards);
+    std::map<std::string, CardDef> cards; ModernMinionBehaviorsBatch34::AddAll(cards); GeneratedBehaviorMappings::AddAll(cards);
     for (const auto* id : {"BG22_HERO_200_Buddy", "BG22_HERO_200_Buddy_G"}) {
         REQUIRE(cards.contains(id));
         REQUIRE(cards.at(id).power.GetTrigger().has_value());
