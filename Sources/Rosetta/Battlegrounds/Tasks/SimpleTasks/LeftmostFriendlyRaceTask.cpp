@@ -16,7 +16,8 @@ LeftmostFriendlyRaceTask::LeftmostFriendlyRaceTask(
 {
 }
 
-TaskStatus LeftmostFriendlyRaceTask::Run(Player& player, Minion& source)
+TaskStatus LeftmostFriendlyRaceTask::Run(
+    Player& player, [[maybe_unused]] Minion& source)
 {
     int remaining = m_amount;
     player.GetField().ForEachAlive(

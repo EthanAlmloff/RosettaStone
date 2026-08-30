@@ -3,6 +3,8 @@
 #include "doctest_proxy.hpp"
 
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch4.hpp>
+#include <Rosetta/Battlegrounds/Cards/Card.hpp>
+#include <Rosetta/Battlegrounds/Models/Player.hpp>
 
 #include <array>
 #include <tuple>
@@ -17,12 +19,18 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch4] - registry is exact")
         "TB_BaconShop_HP_049", "BG22_HERO_002p", "BG22_HERO_003p"};
     constexpr std::array<std::int32_t, 8> expected = {
         71455, 57949, 61406, 61917, 62035, 60285, 80244, 80248};
+    constexpr std::array<std::int32_t, 8> expectedCosts = {
+        1, 0, 0, 0, 0, 0, 0, 0};
+    constexpr std::array<bool, 8> expectedPassive = {
+        false, true, true, true, true, false, true, true};
     REQUIRE(SEASON14_HERO_POWER_BEHAVIORS_BATCH4.size() == expected.size());
     for (std::size_t i = 0; i < expected.size(); ++i)
     {
         const auto& entry = SEASON14_HERO_POWER_BEHAVIORS_BATCH4[i];
         CHECK(entry.id == expectedIds[i]);
         CHECK(entry.dbfID == expected[i]);
+        CHECK(entry.cost == expectedCosts[i]);
+        CHECK(entry.passive == expectedPassive[i]);
         REQUIRE(FindSeason14HeroPowerBehaviorBatch4(entry.id) != nullptr);
         REQUIRE(FindSeason14HeroPowerBehaviorBatch4(entry.dbfID) != nullptr);
         CHECK(FindSeason14HeroPowerBehaviorBatch4(entry.id)->dbfID ==
@@ -103,4 +111,22 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch4] - Graveyard Shift is atomic data")
     CHECK(result.goldDelta == 2);
     CHECK(result.healthDelta == -4);
     CHECK(!ResolveSeason14HeroPowerBatch4Activation(60286, state, result));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch4] - ALL Will Burn applies once per instance")
+{
+    Card card;
+    card.id = "synthetic_bg_minion";
+    card.dbfID = 900001;
+    card.gameTags[GameTag::ATK] = 4;
+    card.gameTags[GameTag::HEALTH] = 4;
+    Minion minion(card);
+
+    Player player;
+    player.season14.SetHeroPower(61406, 0, true);
+    player.ApplyFreshMinionModifiers(minion);
+    player.ApplyFreshMinionModifiers(minion);
+
+    CHECK(minion.GetAttack() == 7);
+    CHECK(minion.GetGlobalMinionAttack() == 3);
 }

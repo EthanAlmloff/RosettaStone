@@ -26,6 +26,15 @@ FieldZone& Player::GetField()
     return isInCombat ? battleField : recruitField;
 }
 
+void Player::ApplyFreshMinionModifiers(Minion& minion) const
+{
+    const auto batch4 = season14.HeroPowerBatch4PassiveModifiers();
+    if (batch4.globalMinionAttack != 0)
+    {
+        minion.ApplyGlobalMinionAttack(batch4.globalMinionAttack);
+    }
+}
+
 void Player::SelectHero(std::size_t idx)
 {
     const auto heroCard = Cards::FindCardByDbfID(heroChoices.at(idx));
@@ -34,16 +43,18 @@ void Player::SelectHero(std::size_t idx)
     // Hero powers are metadata-only cards in RosettaStone.  Install their
     // cost and lifecycle state on the owning player at selection time; the
     // bridge still decides whether a target-dependent power is exposed.
+    const auto* batch4 =
+        FindSeason14HeroPowerBehaviorBatch4(hero.card.heroPowerDbfID);
     const auto* batch1 =
         FindSeason14HeroPowerBehavior(hero.card.heroPowerDbfID);
     const auto* batch2 =
         FindSeason14HeroPowerBehaviorBatch2(hero.card.heroPowerDbfID);
     const auto* batch3 =
         FindSeason14HeroPowerBehaviorBatch3(hero.card.heroPowerDbfID);
-    const auto* batch4 =
-        FindSeason14HeroPowerBehaviorBatch4(hero.card.heroPowerDbfID);
     const int heroPowerCost = batch1 != nullptr
-                                  ? batch1->cost
+                                  ? (batch4 != nullptr
+                                         ? batch4->cost
+                                         : batch1->cost)
                                   : (batch2 != nullptr
                                          ? batch2->cost
                                          : (batch3 != nullptr
@@ -53,6 +64,23 @@ void Player::SelectHero(std::size_t idx)
                                                        : 0)));
     season14.SetHeroPower(hero.card.heroPowerDbfID, heroPowerCost,
                           hero.card.heroPowerDbfID != 0);
+
+    // Tests and bridge callers may pre-seed a player's hand/board before
+    // selecting a hero.  Install an aura on those existing instances too;
+    // the per-instance operation is idempotent and therefore safe for the
+    // normal empty-at-selection path.
+    tavern.fieldZone.ForEach([this](MinionData& data) {
+        ApplyFreshMinionModifiers(data.value());
+    });
+    recruitField.ForEach([this](MinionData& data) {
+        ApplyFreshMinionModifiers(data.value());
+    });
+    hand.ForEach([this](std::optional<CardData>& data) {
+        if (std::holds_alternative<Minion>(data.value()))
+        {
+            ApplyFreshMinionModifiers(std::get<Minion>(data.value()));
+        }
+    });
 
     selectHeroCallback(*this);
 }
@@ -95,12 +123,7 @@ void Player::PrepareTavern()
                             minion.value().GetHealth() + raceBonus.health);
                     }
                 }
-                if (batch4.globalMinionAttack != 0)
-                {
-                    minion.value().SetAttack(
-                        minion.value().GetAttack() +
-                        batch4.globalMinionAttack);
-                }
+                ApplyFreshMinionModifiers(minion.value());
                 if (batch4.mechShopAttack != 0 &&
                     minion.value().HasRace(Race::MECHANICAL))
                 {
@@ -133,6 +156,7 @@ void Player::PurchaseMinion(std::size_t idx)
     if (hand.GetCount() > 0)
     {
         auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
+        ApplyFreshMinionModifiers(purchased);
         const auto attack = season14.OnBuyMinionBatch4();
         purchased.SetAttack(purchased.GetAttack() + attack);
     }
@@ -162,6 +186,7 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
         CardData card = hand.Remove(hand[handIdx]);
 
         auto minion = std::get<Minion>(card);
+        ApplyFreshMinionModifiers(minion);
         minion.getPlayerCallback = [this]() -> Player& { return *this; };
         minion.SetIndex(getNextCardIndexCallback());
 
@@ -268,7 +293,9 @@ bool AddRandomMinionToHand(Player& player, std::vector<Card> candidates)
         return false;
     }
     Random::shuffle(candidates.begin(), candidates.end());
-    player.hand.Add(CardData{ Minion(candidates.front()) });
+    Minion minion(candidates.front());
+    player.ApplyFreshMinionModifiers(minion);
+    player.hand.Add(CardData{ std::move(minion) });
     return true;
 }
 

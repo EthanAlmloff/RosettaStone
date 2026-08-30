@@ -89,8 +89,13 @@ void AddBoomInABox(std::map<std::string, CardDef>& cards, const char* id,
     Power power;
     for (int i = 0; i < repetitions; ++i)
     {
+        // DamageTask's MINIONS_NOSOURCE selector is friendly-only; pair it
+        // with ENEMY_MINIONS so the semantic "all other minions" effect does
+        // not accidentally omit the opposing combat field.
         power.AddStartCombatTask(
             DamageTask{ EntityType::MINIONS_NOSOURCE, 3 });
+        power.AddStartCombatTask(
+            DamageTask{ EntityType::ENEMY_MINIONS, 3 });
     }
     cards.emplace(id, CardDef{ std::move(power) });
 }

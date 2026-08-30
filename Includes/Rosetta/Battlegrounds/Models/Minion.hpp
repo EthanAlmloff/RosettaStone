@@ -130,6 +130,14 @@ class Minion
     //! \param val The value of attack to set.
     void SetAttack(int val);
 
+    //! Applies the player's ALL Will Burn! attack aura to this instance.
+    //! The operation is idempotent so a card can cross Tavern, hand, board,
+    //! and combat boundaries without receiving the aura twice.
+    void ApplyGlobalMinionAttack(int attack);
+
+    //! Returns the ALL Will Burn! attack already applied to this instance.
+    int GetGlobalMinionAttack() const;
+
     //! Returns the value of health.
     //! \return The value of health.
     int GetHealth() const;
@@ -244,6 +252,10 @@ class Minion
     //! \param target The target.
     void ActivateTask(PowerType type, Player& player, Minion& target);
 
+    //! Resolves this minion's Rally effect after a friendly attack is
+    //! declared. The target is the selected opposing minion.
+    void ActivateRally(Player& player, Minion& source, Minion& target);
+
     Trigger activatedTrigger;
 
     std::function<Player&()> getPlayerCallback;
@@ -264,6 +276,7 @@ class Minion
 
     int m_attack = 0;
     int m_health = 0;
+    int m_globalMinionAttack = 0;
 
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;

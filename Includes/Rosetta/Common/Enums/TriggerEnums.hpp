@@ -61,6 +61,7 @@ enum class TriggerType
     MANA_CRYSTAL,   //!< The effect will be triggered when a player gains mana
                     //!< crystal.
     MULTI_TRIGGER,  //!< The effect for multi trigger.
+    RALLY,       //!< The effect triggers when a friendly minion attacks.
 };
 
 //! \brief An enumerator for identifying trigger source.

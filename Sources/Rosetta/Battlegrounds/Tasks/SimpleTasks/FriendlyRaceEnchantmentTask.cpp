@@ -22,8 +22,12 @@ TaskStatus FriendlyRaceEnchantmentTask::Run(
     player.GetField().ForEachAlive(
         [this, &enchantmentCard, &source](MinionData& data) {
         Minion& minion = data.value();
-        if (minion.HasRace(m_race) &&
-            (!m_excludeSource || &minion != &source))
+        const bool isSource = &minion == &source ||
+                              (source.GetPoolIndex() >= 0 &&
+                               minion.GetPoolIndex() == source.GetPoolIndex()) ||
+                              (source.GetIndex() >= 0 &&
+                               minion.GetIndex() == source.GetIndex());
+        if (minion.HasRace(m_race) && (!m_excludeSource || !isSource))
         {
             Generic::AddEnchantment(enchantmentCard, minion);
         }

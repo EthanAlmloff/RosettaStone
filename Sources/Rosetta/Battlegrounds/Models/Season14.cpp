@@ -1,4 +1,6 @@
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
+#include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 
 #include <algorithm>
 #include <utility>
@@ -172,6 +174,7 @@ std::size_t Season14State::TavernOfferCount(std::size_t baseCount) const
 {
     const auto modifiers = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
     const auto delta = modifiers.tavernSlotsDelta +
+                       trinketExtraShopSlots +
                        HeroPowerBatch4PassiveModifiers().tavernSlotsDelta;
     if (delta < 0)
     {
@@ -232,6 +235,10 @@ void Season14State::OnRefreshTavern(bool refreshSucceeded)
     ResolveSeason14HeroPowerBatch1Event(
         heroPowerDbfID, Season14HeroPowerBatch1Event::REFRESH_TAVERN,
         heroPowerBatch1, refreshSucceeded);
+    if (refreshSucceeded && trinketHigherTierRefreshes > 0)
+    {
+        ArmHigherTierRefresh(trinketHigherTierRefreshes);
+    }
 }
 
 void Season14State::OnTavernSpellResolved(bool spellResolved)
@@ -251,10 +258,18 @@ std::int32_t Season14State::TakeNextTurnGold() noexcept
     return result;
 }
 
+std::int32_t Season14State::TakeImmediateGold() noexcept
+{
+    const auto result = trinketImmediateGold;
+    trinketImmediateGold = 0;
+    return result;
+}
+
 std::int32_t Season14State::EffectiveMaxGold(
     std::int32_t baseCap) const noexcept
 {
-    return std::max<std::int32_t>(0, baseCap + maxGoldDelta);
+    return std::max<std::int32_t>(0, baseCap + maxGoldDelta +
+                                      trinketMaxGoldDelta);
 }
 
 void Season14State::IncreaseMaxGold(std::int32_t amount) noexcept
@@ -381,6 +396,33 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
         effect.active)
     {
         trinkets.push_back(effect);
+        const auto card = Cards::FindCardByDbfID(effect.dbfID);
+        const auto behavior = FindTrinketBehavior(card.id);
+        switch (behavior.effect)
+        {
+            case TrinketEffect::SHOP_STATS:
+                AddPersistentShopStats(behavior.attack, behavior.health);
+                break;
+            case TrinketEffect::EXTRA_SHOP_SLOT:
+                trinketExtraShopSlots += behavior.value;
+                break;
+            case TrinketEffect::HIGHER_TIER_REFRESH:
+                ++trinketHigherTierRefreshes;
+                break;
+            case TrinketEffect::MAX_GOLD:
+                trinketMaxGoldDelta += behavior.value;
+                break;
+            case TrinketEffect::GOLD_AND_MAX_GOLD:
+                trinketImmediateGold += behavior.value;
+                trinketMaxGoldDelta += behavior.value;
+                break;
+            case TrinketEffect::SHOP_STATS_AND_EXTRA_SLOT:
+                AddPersistentShopStats(behavior.attack, behavior.health);
+                trinketExtraShopSlots += behavior.value;
+                break;
+            case TrinketEffect::NONE:
+                break;
+        }
     }
 }
 

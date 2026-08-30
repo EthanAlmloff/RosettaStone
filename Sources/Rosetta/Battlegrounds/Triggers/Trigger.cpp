@@ -88,6 +88,27 @@ void Trigger::Validate(Minion& owner, Minion& source)
     m_isValidated = true;
 }
 
+void Trigger::Run(Minion& owner, Minion& source, Minion& target)
+{
+    Validate(owner, source);
+
+    if (!m_isValidated)
+    {
+        return;
+    }
+
+    for (auto& task : m_tasks)
+    {
+        std::visit(
+            [&owner, &target](auto& _task) {
+                _task.Run(owner.getPlayerCallback(), owner, target);
+            },
+            task);
+    }
+
+    m_isValidated = false;
+}
+
 void Trigger::Run(Minion& owner, Minion& source)
 {
     Validate(owner, source);

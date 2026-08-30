@@ -4,17 +4,115 @@
 // personal capacity and are not conveying any rights to any intellectual
 // property of any third parties.
 
-#include <Rosetta/Battlegrounds/Models/Battle.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
+#include <Rosetta/Battlegrounds/Models/Battle.hpp>
 
 #include <effolkronium/random.hpp>
 
 #include <algorithm>
+#include <stdexcept>
 
 using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds
 {
+namespace
+{
+bool HasAttackableTarget(const FieldZone& field)
+{
+    bool found = false;
+    field.ForEachAlive([&found](const MinionData& minion) {
+        if (!minion.value().HasStealth())
+        {
+            found = true;
+        }
+    });
+    return found;
+}
+
+void ConsumeRebornInRecruitField(Player& owner,
+                                 const Minion& consumedCombatMinion)
+{
+    const int entityIndex = consumedCombatMinion.GetIndex();
+    const int zonePosition = consumedCombatMinion.GetZonePosition();
+    const std::string cardID(consumedCombatMinion.GetCardID());
+
+    owner.recruitField.ForEachAlive(
+        [entityIndex, zonePosition, &cardID](MinionData& minion) {
+            Minion& source = minion.value();
+            const bool sameEntity =
+                entityIndex >= 0 ? source.GetIndex() == entityIndex
+                                 : (source.GetZonePosition() == zonePosition &&
+                                    source.GetCardID() == cardID);
+            if (sameEntity && source.HasReborn())
+            {
+                // Combat operates on a copy of recruitField.  Persist the
+                // one-shot keyword consumption back to the source instance,
+                // but only when that source really owned Reborn; a combat
+                // task may grant Reborn to the temporary copy alone.
+                source.SetReborn(false);
+            }
+        });
+}
+
+bool SameMinionInstance(const Minion& combatMinion,
+                        const Minion& recruitMinion)
+{
+    // Normal game entities receive a stable index when they are bought,
+    // played, or summoned.  Pool indices are a useful fallback for direct
+    // deterministic fixtures; the final fallback keeps hand-built fixtures
+    // usable without confusing a different card with the source.
+    if (combatMinion.GetIndex() >= 0 && recruitMinion.GetIndex() >= 0)
+    {
+        return combatMinion.GetIndex() == recruitMinion.GetIndex();
+    }
+    if (combatMinion.GetPoolIndex() >= 0 &&
+        recruitMinion.GetPoolIndex() >= 0)
+    {
+        return combatMinion.GetPoolIndex() == recruitMinion.GetPoolIndex();
+    }
+    return combatMinion.GetCardID() == recruitMinion.GetCardID() &&
+           combatMinion.GetZonePosition() == recruitMinion.GetZonePosition();
+}
+
+void ApplyPermanentAvengeBonus(Player& owner, FieldZone& combatField,
+                              int attack, int health)
+{
+    if (attack == 0 && health == 0)
+    {
+        return;
+    }
+
+    std::vector<Minion> combatSources;
+    combatSources.reserve(MAX_FIELD_SIZE);
+    combatField.ForEachAlive([&combatSources, attack, health](MinionData& data) {
+        Minion& combatMinion = data.value();
+        combatSources.push_back(combatMinion);
+        // The bonus is permanent and also affects the current combat copy.
+        combatMinion.SetAttack(combatMinion.GetAttack() + attack);
+        combatMinion.SetHealth(combatMinion.GetHealth() + health);
+    });
+
+    // Combat uses copied entities.  Commit only the Avenge delta to matching
+    // recruit-phase entities; combat damage and temporary effects are not
+    // persistent and must not be copied wholesale.
+    owner.recruitField.ForEachAlive(
+        [&combatSources, attack, health](MinionData& data) {
+            Minion& recruitMinion = data.value();
+            const auto source = std::find_if(
+                combatSources.begin(), combatSources.end(),
+                [&recruitMinion](const Minion& combatMinion) {
+                    return SameMinionInstance(combatMinion, recruitMinion);
+                });
+            if (source != combatSources.end())
+            {
+                recruitMinion.SetAttack(recruitMinion.GetAttack() + attack);
+                recruitMinion.SetHealth(recruitMinion.GetHealth() + health);
+            }
+        });
+}
+}  // namespace
+
 Battle::Battle(Player& player1, Player& player2)
     : m_player1(player1),
       m_player2(player2),
@@ -172,9 +270,27 @@ bool Battle::Attack()
     Minion& attacker = (m_turn == Turn::PLAYER1) ? m_p1Field[attackerIdx]
                                                  : m_p2Field[attackerIdx];
 
-    int& pendingAttacks = (m_turn == Turn::PLAYER1)
-                              ? m_p1PendingAttacks
-                              : m_p2PendingAttacks;
+    const FieldZone& defendingField =
+        (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
+    if (!HasAttackableTarget(defendingField))
+    {
+        // Stealthed minions cannot be selected by a Battlegrounds attack. If
+        // every opposing minion is hidden, this side simply has no legal
+        // attack target until stealth is removed.
+        if (m_turn == Turn::PLAYER1)
+        {
+            m_p1PendingAttacks = 0;
+        }
+        else
+        {
+            m_p2PendingAttacks = 0;
+        }
+        m_turn = (m_turn == Turn::PLAYER1) ? Turn::PLAYER2 : Turn::PLAYER1;
+        return false;
+    }
+
+    int& pendingAttacks =
+        (m_turn == Turn::PLAYER1) ? m_p1PendingAttacks : m_p2PendingAttacks;
     if (pendingAttacks == 0)
     {
         // Store the current attack as well as any repeats.  A zero value is
@@ -193,6 +309,17 @@ bool Battle::Attack()
     const bool attackerHadReborn = attacker.HasReborn();
 
     Minion& target = GetProperTarget(attacker);
+    FieldZone& attackerField =
+        (m_turn == Turn::PLAYER1) ? m_p1Field : m_p2Field;
+
+    // Rally resolves at attack declaration, after the legal target is known
+    // but before combat damage. Snapshot no references here: Rally tasks may
+    // mutate either field and are responsible for their own stable lookups.
+    attackerField.ForEachAlive([&](MinionData& minionData) {
+        minionData.value().ActivateRally(
+            (m_turn == Turn::PLAYER1) ? m_player1 : m_player2, attacker,
+            target);
+    });
     target.TakeDamage(attacker);
     attacker.TakeDamage(target);
     const bool targetWasDestroyed = target.IsDestroyed();
@@ -204,15 +331,13 @@ bool Battle::Attack()
     // trigger removes it before ProcessDestroy completes.
     bool attackerSurvived = false;
     int attackerPositionAfterCleanup = -1;
-    FieldZone& attackerField = (m_turn == Turn::PLAYER1) ? m_p1Field
-                                                         : m_p2Field;
     attackerField.ForEachAlive([&](MinionData& minionData) {
         const Minion& candidate = minionData.value();
-        const bool sameEntity = attackerEntityIndex >= 0
-                                    ? candidate.GetIndex() == attackerEntityIndex
-                                    : (candidate.GetZonePosition() ==
-                                           attackerZonePosition &&
-                                       candidate.GetCardID() == attackerCardID);
+        const bool sameEntity =
+            attackerEntityIndex >= 0
+                ? candidate.GetIndex() == attackerEntityIndex
+                : (candidate.GetZonePosition() == attackerZonePosition &&
+                   candidate.GetCardID() == attackerCardID);
         if (sameEntity && (!attackerHadReborn || candidate.HasReborn()))
         {
             attackerSurvived = true;
@@ -227,22 +352,20 @@ bool Battle::Attack()
     // compaction or deathrattle processing.
     if (targetWasDestroyed && attackerSurvived)
     {
-        const auto bonus = (m_turn == Turn::PLAYER1)
-                               ? m_player1.season14
-                                     .HeroPowerBatch3CombatKillAttackBonus()
-                               : m_player2.season14
-                                     .HeroPowerBatch3CombatKillAttackBonus();
+        const auto bonus =
+            (m_turn == Turn::PLAYER1)
+                ? m_player1.season14.HeroPowerBatch3CombatKillAttackBonus()
+                : m_player2.season14.HeroPowerBatch3CombatKillAttackBonus();
         if (bonus > 0)
         {
             attackerField.ForEachAlive([&](MinionData& minionData) {
                 Minion& candidate = minionData.value();
-                const bool sameEntity = attackerEntityIndex >= 0
-                                            ? candidate.GetIndex() ==
-                                                  attackerEntityIndex
-                                            : (candidate.GetZonePosition() ==
-                                                   attackerZonePosition &&
-                                               candidate.GetCardID() ==
-                                                   attackerCardID);
+                const bool sameEntity =
+                    attackerEntityIndex >= 0
+                        ? candidate.GetIndex() == attackerEntityIndex
+                        : (candidate.GetZonePosition() ==
+                               attackerZonePosition &&
+                           candidate.GetCardID() == attackerCardID);
                 if (sameEntity)
                 {
                     candidate.SetAttack(candidate.GetAttack() + bonus);
@@ -312,17 +435,25 @@ Minion& Battle::GetProperTarget([[maybe_unused]] Minion& attacker)
 {
     auto& minions = (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
 
+    std::vector<std::size_t> attackableMinions;
     std::vector<std::size_t> tauntMinions;
+    attackableMinions.reserve(MAX_FIELD_SIZE);
     tauntMinions.reserve(MAX_FIELD_SIZE);
 
-    std::size_t minionIdx = 0;
-    minions.ForEach([&tauntMinions, &minionIdx](const MinionData& minion) {
-        if (minion.value().HasTaunt())
+    minions.ForEachAlive([&attackableMinions,
+                          &tauntMinions](const MinionData& minion) {
+        const Minion& target = minion.value();
+        if (target.HasStealth())
         {
-            tauntMinions.emplace_back(minionIdx);
+            return;
         }
 
-        ++minionIdx;
+        const auto index = static_cast<std::size_t>(target.GetZonePosition());
+        attackableMinions.emplace_back(index);
+        if (target.HasTaunt())
+        {
+            tauntMinions.emplace_back(index);
+        }
     });
 
     if (!tauntMinions.empty())
@@ -331,8 +462,13 @@ Minion& Battle::GetProperTarget([[maybe_unused]] Minion& attacker)
         return minions[tauntMinions[idx]];
     }
 
-    const auto idx = Random::get<int>(0, minions.GetCount() - 1);
-    return minions[idx];
+    if (attackableMinions.empty())
+    {
+        throw std::logic_error("No non-stealthed Battlegrounds target");
+    }
+
+    const auto idx = Random::get<std::size_t>(0, attackableMinions.size() - 1);
+    return minions[attackableMinions[idx]];
 }
 
 void Battle::ProcessDestroy(bool beforeAttack)
@@ -457,9 +593,15 @@ void Battle::ProcessDestroy(bool beforeAttack)
 
         if (removedMinion.HasReborn())
         {
-            FieldZone& ownerField = std::get<0>(deadMinion) == 1
-                                        ? m_p1Field
-                                        : m_p2Field;
+            FieldZone& ownerField =
+                std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
+            Player& owner =
+                std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+
+            // Reborn is a one-shot property of the recruit-phase entity, not
+            // just of this combat copy.  Consume it even when the board is
+            // full and no revived copy can be summoned.
+            ConsumeRebornInRecruitField(owner, removedMinion);
             if (!ownerField.IsFull())
             {
                 removedMinion.ReviveWithReborn();
@@ -487,13 +629,10 @@ void Battle::ProcessDestroy(bool beforeAttack)
         const auto avenger = owner.season14.OnFriendlyMinionDiedBatch4();
         if (avenger.avengeTriggered)
         {
-            owner.recruitField.ForEachAlive(
-                [&avenger](MinionData& aliveMinion) {
-                    aliveMinion.value().SetAttack(
-                        aliveMinion.value().GetAttack() + avenger.attack);
-                    aliveMinion.value().SetHealth(
-                        aliveMinion.value().GetHealth() + avenger.health);
-                });
+            ApplyPermanentAvengeBonus(
+                owner,
+                std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field,
+                avenger.attack, avenger.health);
         }
     }
 

@@ -41,6 +41,12 @@ class Player
     //! Prepare a list of minions in Tavern for purchase.
     void PrepareTavern();
 
+    //! Applies passive modifiers that belong to a newly created minion
+    //! instance.  This is intentionally callable by pool and summon paths so
+    //! passive hero powers do not depend on the minion first appearing in the
+    //! Tavern.
+    void ApplyFreshMinionModifiers(Minion& minion) const;
+
     //! Purchases a minion from Tavern's field.
     //! \param idx The index of a list of minions in Tavern's field.
     void PurchaseMinion(std::size_t idx);

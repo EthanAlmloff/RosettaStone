@@ -39,6 +39,10 @@ class Power
     //! \return A list of deathrattle tasks.
     std::vector<TaskType>& GetDeathrattleTask();
 
+    //! Returns Rally tasks, resolved when this minion's friendly attacker
+    //! declares an attack.
+    std::vector<TaskType>& GetRallyTask();
+
     //! Returns enchant.
     //! \return A reference to enchant.
     std::optional<Enchant>& GetEnchant();
@@ -59,6 +63,9 @@ class Power
     //! \param task A deathrattle task to add.
     void AddDeathrattleTask(TaskType&& task);
 
+    //! Adds a Rally task.
+    void AddRallyTask(TaskType&& task);
+
     //! Adds enchant.
     //! \param enchant An enchant to add.
     void AddEnchant(Enchant&& enchant);
@@ -71,6 +78,7 @@ class Power
     std::vector<TaskType> m_battlecryTask;
     std::vector<TaskType> m_startCombatTask;
     std::vector<TaskType> m_deathrattleTask;
+    std::vector<TaskType> m_rallyTask;
     std::optional<Enchant> m_enchant;
     std::optional<Trigger> m_trigger;
 };

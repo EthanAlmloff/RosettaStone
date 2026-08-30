@@ -62,6 +62,16 @@ TEST_CASE("[Season14] - Persistent effects and event hooks")
     CHECK(!Season14State::IsValidBoardTarget(1, 1));
 }
 
+TEST_CASE("[Season14] - Bob's Tip Jar grants immediate gold and raises cap")
+{
+    Season14State state;
+    state.AddTrinket({112988, 1, true}); // BG30_MagicItem_996
+
+    CHECK(state.TakeImmediateGold() == 4);
+    CHECK(state.TakeImmediateGold() == 0);
+    CHECK(state.EffectiveMaxGold(10) == 14);
+}
+
 TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")
 {
     Season14State state;

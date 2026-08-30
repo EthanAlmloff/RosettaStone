@@ -318,6 +318,7 @@ void Game::Recruit()
         }
         player.remainCoin = player.totalCoin +
                             player.season14.TakeNextTurnGold();
+        player.remainCoin += player.season14.TakeImmediateGold();
 
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.remainCoin += heroPowerResult.goldDelta;

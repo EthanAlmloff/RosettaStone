@@ -104,6 +104,10 @@ class Season14State
     std::int32_t freeRefreshes = 0;
     std::int32_t persistentShopAttack = 0;
     std::int32_t persistentShopHealth = 0;
+    std::int32_t trinketExtraShopSlots = 0;
+    std::int32_t trinketHigherTierRefreshes = 0;
+    std::int32_t trinketMaxGoldDelta = 0;
+    std::int32_t trinketImmediateGold = 0;
     std::vector<Season14RaceShopStats> persistentShopRaceStats;
     std::int32_t refreshRandomShopAttack = 0;
     std::int32_t refreshRandomShopHealth = 0;
@@ -201,6 +205,9 @@ class Season14State
 
     //! Returns and clears deferred next-turn gold.
     std::int32_t TakeNextTurnGold() noexcept;
+
+    //! Returns and clears gold granted when a Trinket was selected.
+    std::int32_t TakeImmediateGold() noexcept;
 
     //! Returns the configured maximum gold cap.
     std::int32_t EffectiveMaxGold(std::int32_t baseCap) const noexcept;

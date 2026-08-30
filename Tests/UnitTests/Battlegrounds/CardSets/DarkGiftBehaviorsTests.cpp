@@ -7,8 +7,8 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
 
-#include <map>
 #include <array>
+#include <map>
 #include <string>
 
 using namespace RosettaStone;
@@ -16,8 +16,7 @@ using namespace Battlegrounds;
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - verified Patch 36.4 batch")
 {
-    const auto fortitude =
-        FindDarkGiftBehavior("BG36_MidGameEffect_000t73");
+    const auto fortitude = FindDarkGiftBehavior("BG36_MidGameEffect_000t73");
     CHECK(fortitude.effect == DarkGiftEffect::TARGET_STATS);
     CHECK(fortitude.attack == 5);
     CHECK(fortitude.health == 5);
@@ -48,10 +47,10 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
         int healthMultiplier;
     };
     constexpr std::array expected{
-        Expected{ "BG36_MidGameEffect_000t14", DarkGiftEffect::TARGET_GOLDEN,
-                  1, 1 },
-        Expected{ "BG36_MidGameEffect_000t12", DarkGiftEffect::TARGET_REBORN,
-                  1, 1 },
+        Expected{ "BG36_MidGameEffect_000t14", DarkGiftEffect::TARGET_GOLDEN, 1,
+                  1 },
+        Expected{ "BG36_MidGameEffect_000t12", DarkGiftEffect::TARGET_REBORN, 1,
+                  1 },
         Expected{ "BG36_MidGameEffect_000t79", DarkGiftEffect::TARGET_STEALTH,
                   1, 1 },
         Expected{ "BG36_MidGameEffect_000t7",
@@ -77,8 +76,8 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
     Minion golden(base);
     CHECK(DarkGiftTargetIsLegal(
         golden, FindDarkGiftBehavior("BG36_MidGameEffect_000t14")));
-    REQUIRE(ApplyDarkGift(
-        golden, FindDarkGiftBehavior("BG36_MidGameEffect_000t14")));
+    REQUIRE(ApplyDarkGift(golden,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t14")));
     CHECK(golden.IsGolden());
     CHECK_FALSE(DarkGiftTargetIsLegal(
         golden, FindDarkGiftBehavior("BG36_MidGameEffect_000t14")));
@@ -86,8 +85,8 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
     Minion reborn(base);
     CHECK(DarkGiftTargetIsLegal(
         reborn, FindDarkGiftBehavior("BG36_MidGameEffect_000t12")));
-    REQUIRE(ApplyDarkGift(
-        reborn, FindDarkGiftBehavior("BG36_MidGameEffect_000t12")));
+    REQUIRE(ApplyDarkGift(reborn,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t12")));
     CHECK(reborn.HasReborn());
     CHECK_FALSE(DarkGiftTargetIsLegal(
         reborn, FindDarkGiftBehavior("BG36_MidGameEffect_000t12")));
@@ -95,15 +94,15 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
     Minion stealth(base);
     CHECK(DarkGiftTargetIsLegal(
         stealth, FindDarkGiftBehavior("BG36_MidGameEffect_000t79")));
-    REQUIRE(ApplyDarkGift(
-        stealth, FindDarkGiftBehavior("BG36_MidGameEffect_000t79")));
+    REQUIRE(ApplyDarkGift(stealth,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t79")));
     CHECK(stealth.HasStealth());
     CHECK_FALSE(DarkGiftTargetIsLegal(
         stealth, FindDarkGiftBehavior("BG36_MidGameEffect_000t79")));
 
     Minion combat(base);
-    REQUIRE(ApplyDarkGift(
-        combat, FindDarkGiftBehavior("BG36_MidGameEffect_000t81")));
+    REQUIRE(ApplyDarkGift(combat,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t81")));
     combat.ApplyStartCombatStatMultipliers();
     CHECK(combat.GetAttack() == base.GetAttack() * 3);
     CHECK(combat.GetHealth() == base.GetHealth() * 3);
@@ -134,24 +133,25 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
     CHECK(cards.contains("BG36_MidGameEffect_000t81"));
 }
 
-TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - target application is reusable")
+TEST_CASE(
+    "[Battlegrounds : DarkGiftBehaviors] - target application is reusable")
 {
     const Card base = Cards::FindCardByID("BGS_039");
     REQUIRE_FALSE(base.id.empty());
     Minion minion(base);
 
-    CHECK(ApplyDarkGift(
-        minion, FindDarkGiftBehavior("BG36_MidGameEffect_000t73")));
+    CHECK(ApplyDarkGift(minion,
+                        FindDarkGiftBehavior("BG36_MidGameEffect_000t73")));
     CHECK(minion.GetAttack() == base.GetAttack() + 5);
     CHECK(minion.GetHealth() == base.GetHealth() + 5);
 
-    CHECK(ApplyDarkGift(
-        minion, FindDarkGiftBehavior("BG36_MidGameEffect_000t13")));
+    CHECK(ApplyDarkGift(minion,
+                        FindDarkGiftBehavior("BG36_MidGameEffect_000t13")));
     CHECK(minion.HasDivineShield());
     CHECK(minion.HasWindfury());
 
-    CHECK(ApplyDarkGift(
-        minion, FindDarkGiftBehavior("BG36_MidGameEffect_000t69")));
+    CHECK(ApplyDarkGift(minion,
+                        FindDarkGiftBehavior("BG36_MidGameEffect_000t69")));
     CHECK(minion.HasVenomous());
 
     Minion destroyed(base);
@@ -168,12 +168,60 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - target application is reusable"
     CHECK_FALSE(ApplyDarkGift(minion, spent));
 }
 
-TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - acquisition and one-use lifecycle")
+TEST_CASE(
+    "[Battlegrounds : DarkGiftBehaviors] - Gilding preserves instance state")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion minion(base);
+
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t73")));
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t13")));
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t69")));
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t12")));
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t79")));
+
+    const int attack = minion.GetAttack();
+    const int health = minion.GetHealth();
+    REQUIRE(minion.MakeGolden());
+    CHECK(minion.IsGolden());
+    CHECK(minion.GetAttack() == attack);
+    CHECK(minion.GetHealth() == health);
+    CHECK(minion.HasDivineShield());
+    CHECK(minion.HasWindfury());
+    CHECK(minion.HasVenomous());
+    CHECK(minion.HasReborn());
+    CHECK(minion.HasStealth());
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - start combat gifts compose")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion minion(base);
+
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t7")));
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t71")));
+    minion.ApplyStartCombatStatMultipliers();
+
+    CHECK(minion.GetAttack() == base.GetAttack() * 2);
+    CHECK(minion.GetHealth() == base.GetHealth() * 2);
+}
+
+TEST_CASE(
+    "[Battlegrounds : DarkGiftBehaviors] - acquisition and one-use lifecycle")
 {
     Season14State state;
     state.BeginDecision(
         Season14Decision::DARK_GIFT_SELECTION,
-        { Season14Offering{ 133421, 1 } }); // BG36_MidGameEffect_000t73.
+        { Season14Offering{ 133421, 1 } });  // BG36_MidGameEffect_000t73.
 
     REQUIRE(state.SelectDecision(0));
     const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t73");

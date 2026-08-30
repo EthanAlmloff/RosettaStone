@@ -6,6 +6,8 @@
 
 #include <Rosetta/Battlegrounds/Enchants/Power.hpp>
 
+#include <utility>
+
 namespace RosettaStone::Battlegrounds
 {
 void Power::ClearData()
@@ -13,6 +15,7 @@ void Power::ClearData()
     m_battlecryTask.clear();
     m_startCombatTask.clear();
     m_deathrattleTask.clear();
+    m_rallyTask.clear();
     m_enchant.reset();
     m_trigger.reset();
 }
@@ -30,6 +33,11 @@ std::vector<TaskType>& Power::GetStartCombatTask()
 std::vector<TaskType>& Power::GetDeathrattleTask()
 {
     return m_deathrattleTask;
+}
+
+std::vector<TaskType>& Power::GetRallyTask()
+{
+    return m_rallyTask;
 }
 
 std::optional<Enchant>& Power::GetEnchant()
@@ -55,6 +63,11 @@ void Power::AddStartCombatTask(TaskType&& task)
 void Power::AddDeathrattleTask(TaskType&& task)
 {
     m_deathrattleTask.emplace_back(task);
+}
+
+void Power::AddRallyTask(TaskType&& task)
+{
+    m_rallyTask.emplace_back(std::move(task));
 }
 
 void Power::AddEnchant(Enchant&& enchant)

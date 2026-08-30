@@ -89,6 +89,9 @@ TaskStatus SummonTask::Run(Player& player, Minion& source)
         }
 
         Minion summonMinion{ card };
+        // Passive hero-power auras apply to every fresh owned minion, not
+        // merely to entities that originated in the Tavern.
+        player.ApplyFreshMinionModifiers(summonMinion);
         summonMinion.getPlayerCallback = [&player]() -> Player& {
             return player;
         };

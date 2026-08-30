@@ -254,6 +254,10 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern)
     std::size_t idx = 0;
     for (auto& minion : minions)
     {
+        // A passive such as ALL Will Burn! applies when a fresh minion
+        // instance is created, including fills that bypass Player::PrepareTavern
+        // in isolated bridge/replay setups.
+        player.ApplyFreshMinionModifiers(minion);
         tavern.fieldZone.Add(minion);
         std::get<2>(m_minions.at(minion.GetPoolIndex())) = false;
         ++idx;

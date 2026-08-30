@@ -62,6 +62,9 @@ class Trigger
     //! \param source The source of trigger.
     void Run(Minion& owner, Minion& source);
 
+    //! Runs a trigger while preserving the declared attack target.
+    void Run(Minion& owner, Minion& source, Minion& target);
+
  private:
     TriggerType m_triggerType = TriggerType::NONE;
     TriggerSource m_triggerSource = TriggerSource::NONE;

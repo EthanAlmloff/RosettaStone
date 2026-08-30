@@ -4,8 +4,8 @@
 // personal capacity and are not conveying any rights to any intellectual
 // property of any third parties.
 
-#include <Rosetta/Battlegrounds/Enchants/Power.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Enchants/Power.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 
@@ -196,10 +196,30 @@ bool Minion::MakeGolden()
     // turning this spell into a metadata-only flag.
     const int currentAttack = m_attack;
     const int currentHealth = m_health;
+    const int globalMinionAttack = m_globalMinionAttack;
+    // The premium card supplies the new identity and its static keywords,
+    // but conversion must not erase state accumulated by this particular
+    // instance.  Dark Gifts and other recruit effects mutate these fields
+    // without changing Card::gameTags, so snapshot them before replacing the
+    // card metadata.
+    const bool hadDeathrattle = m_hasDeathrattle;
+    const bool hadTaunt = m_hasTaunt;
+    const bool hadDivineShield = m_hasDivineShield;
+    const bool hadReborn = m_hasReborn;
+    const bool hadWindfury = m_hasWindfury;
+    const bool hadMegaWindfury = m_hasMegaWindfury;
+    const bool hadVenomous = m_hasVenomous;
+    const bool hadStealth = m_hasStealth;
+    const bool wasFrozen = m_isFrozen;
+    const bool wasDestroyed = m_isDestroyed;
+    const int startCombatAttackMultiplier = m_startCombatAttackMultiplier;
+    const int startCombatHealthMultiplier = m_startCombatHealthMultiplier;
+    const bool startCombatStatsApplied = m_startCombatStatsApplied;
     m_card = std::move(premium);
     m_card.Initialize();
     m_attack = currentAttack;
     m_health = currentHealth;
+    m_globalMinionAttack = globalMinionAttack;
 
     m_hasDeathrattle = false;
     m_hasTaunt = false;
@@ -242,6 +262,26 @@ bool Minion::MakeGolden()
                 break;
         }
     }
+
+    // Preserve the exact runtime keyword state previously accumulated by
+    // this instance.  In particular, OR-ing the premium metadata back in
+    // would incorrectly restore a Reborn charge that had already been
+    // consumed before Gilding.  Normal and premium entities carry the same
+    // static keyword set in the supported card data; the mutable fields below
+    // are therefore authoritative for the converted instance.
+    m_hasDeathrattle = hadDeathrattle;
+    m_hasTaunt = hadTaunt;
+    m_hasDivineShield = hadDivineShield;
+    m_hasReborn = hadReborn;
+    m_hasWindfury = hadWindfury;
+    m_hasMegaWindfury = hadMegaWindfury;
+    m_hasVenomous = hadVenomous;
+    m_hasStealth = hadStealth;
+    m_isFrozen = wasFrozen;
+    m_isDestroyed = wasDestroyed;
+    m_startCombatAttackMultiplier = startCombatAttackMultiplier;
+    m_startCombatHealthMultiplier = startCombatHealthMultiplier;
+    m_startCombatStatsApplied = startCombatStatsApplied;
     return true;
 }
 
@@ -263,6 +303,22 @@ int Minion::GetAttack() const
 void Minion::SetAttack(int val)
 {
     m_attack = val;
+}
+
+void Minion::ApplyGlobalMinionAttack(int attack)
+{
+    if (attack <= m_globalMinionAttack)
+    {
+        return;
+    }
+
+    m_attack += attack - m_globalMinionAttack;
+    m_globalMinionAttack = attack;
+}
+
+int Minion::GetGlobalMinionAttack() const
+{
+    return m_globalMinionAttack;
 }
 
 int Minion::GetHealth() const
@@ -322,8 +378,11 @@ void Minion::SetStartCombatStatMultipliers(int attackMultiplier,
     {
         return;
     }
-    m_startCombatAttackMultiplier = attackMultiplier;
-    m_startCombatHealthMultiplier = healthMultiplier;
+    // Multiple start-of-combat Dark Gifts compose.  Replacing the previous
+    // multiplier made Resistance + Hostility depend on application order and
+    // silently discarded one of the gifts.
+    m_startCombatAttackMultiplier *= attackMultiplier;
+    m_startCombatHealthMultiplier *= healthMultiplier;
     m_startCombatStatsApplied = false;
 }
 
@@ -374,8 +433,7 @@ void Minion::TakeDamage(Minion& source)
     }
 
     m_health -= source.GetAttack();
-    if (m_health <= 0 ||
-        (source.HasVenomous() && source.GetAttack() > 0))
+    if (m_health <= 0 || (source.HasVenomous() && source.GetAttack() > 0))
     {
         // Venomous applies only after actual damage. Divine Shield returned
         // above, and a zero-attack minion cannot poison its target.
@@ -560,6 +618,19 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
                        task);
         }
     }
+}
+
+void Minion::ActivateRally([[maybe_unused]] Player& player, Minion& source,
+                            Minion& target)
+{
+    auto& trigger = m_card.power.GetTrigger();
+    if (!trigger.has_value() ||
+        trigger.value().GetTriggerType() != TriggerType::RALLY)
+    {
+        return;
+    }
+
+    trigger.value().Run(*this, source, target);
 }
 
 std::vector<TaskType> Minion::GetTasks(PowerType type)

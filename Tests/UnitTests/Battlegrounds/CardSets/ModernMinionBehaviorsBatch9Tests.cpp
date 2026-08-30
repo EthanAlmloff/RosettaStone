@@ -78,9 +78,8 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - batch 9 target and damage s
     CHECK(std::holds_alternative<LeftmostFriendlyRaceTask>(
         cards.at("BG29_810_G").power.GetStartCombatTask().front()));
 
-    REQUIRE_EQ(cards.at("BG36_620").power.GetStartCombatTask().size(), 1);
-    REQUIRE_EQ(cards.at("BG36_620_G").power.GetStartCombatTask().size(), 2);
+    REQUIRE_EQ(cards.at("BG36_620").power.GetStartCombatTask().size(), 2);
+    REQUIRE_EQ(cards.at("BG36_620_G").power.GetStartCombatTask().size(), 4);
     CHECK(std::holds_alternative<DamageTask>(
         cards.at("BG36_620_G").power.GetStartCombatTask().front()));
 }
-
