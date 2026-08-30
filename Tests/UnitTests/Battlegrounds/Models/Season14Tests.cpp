@@ -1,4 +1,6 @@
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
+#include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Models/Player.hpp>
 
 #include <doctest/doctest.h>
 
@@ -18,6 +20,33 @@ TEST_CASE("[Season14] - Public decisions validate and clear")
     CHECK(state.SelectDecision(1));
     CHECK(state.pendingDecision == Season14Decision::NONE);
     CHECK(state.pendingOfferings.empty());
+}
+
+TEST_CASE("[Season14] - concrete choice offerings resolve into hand")
+{
+    Player player;
+    const auto minion = Cards::FindCardByDbfID(49169);
+    REQUIRE(minion.GetCardType() == CardType::MINION);
+
+    player.season14.BeginDecision(
+        Season14Decision::DISCOVER,
+        { Season14Offering{ minion.dbfID, 77 } });
+    CHECK(player.ApplyChoice(0));
+    CHECK(player.hand.GetCount() == 1);
+    CHECK(player.season14.pendingDecision == Season14Decision::NONE);
+    CHECK(std::get<Minion>(player.hand[0]).GetDbfID() == minion.dbfID);
+}
+
+TEST_CASE("[Season14] - unsupported choice remains pending")
+{
+    Player player;
+    player.season14.BeginDecision(
+        Season14Decision::CHOICE,
+        { Season14Offering{ 999999, 123 } });
+    CHECK(!player.ApplyChoice(0));
+    CHECK(player.hand.GetCount() == 0);
+    CHECK(player.season14.pendingDecision == Season14Decision::CHOICE);
+    CHECK(player.season14.pendingOfferings.size() == 1);
 }
 
 TEST_CASE("[Season14] - Hero power availability is costed and one-shot")

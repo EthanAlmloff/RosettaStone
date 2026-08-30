@@ -48,7 +48,6 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
 
     // Static-only modern minions. Their keyword state is authoritative in
     // Patch 36.4 metadata and therefore needs no custom task chain.
-    AddStatic(cards, "BG32_236");   // Aureate Laureate, Divine Shield
     AddStatic(cards, "BGS_119");    // Crackling Cyclone, DS/Windfury
     AddStatic(cards, "BGS_131");    // Deadly Spore, Venomous
     AddStatic(cards, "BG_BOT_911"); // Annoy-o-Module, DS/Taunt

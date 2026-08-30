@@ -305,6 +305,7 @@ void Game::Recruit()
         player.isInCombat = false;
 
         player.season14.Emit(Season14Event::RECRUIT_START);
+        player.season14.minionsPlayedThisTurn = 0;
         player.season14.heroPowerUsed = false;
         player.recruitField.ForEach([](MinionData& minion) {
             minion.value().ResetActivateUses();
@@ -322,6 +323,8 @@ void Game::Recruit()
         player.remainCoin = player.totalCoin +
                             player.season14.TakeNextTurnGold();
         player.remainCoin += player.season14.TakeImmediateGold();
+
+        player.RefreshSpellcraft();
 
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.remainCoin += heroPowerResult.goldDelta;

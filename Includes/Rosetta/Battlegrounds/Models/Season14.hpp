@@ -26,6 +26,7 @@ enum class Season14Decision : std::int32_t
     DISCOVER = 3,
     TRINKET_SELECTION = 4,
     DARK_GIFT_SELECTION = 5
+    ,CHOOSE_ONE = 6
 };
 
 //! Events at which modern effects may be activated.
@@ -53,6 +54,7 @@ struct Season14PersistentEffect
     std::uint8_t remainingUses = 0;
     bool active = true;
 };
+struct Season14ChooseOneState { bool pending = false; std::uint64_t sourceEntityID = 0; std::uint32_t targetMask = 0; std::int32_t sourceCardDbfID = 0; };
 
 //! A persistent Tavern stat bonus scoped to one or more concrete tribes.
 //! The vector is intentionally player-owned so the effect survives Tavern
@@ -73,6 +75,7 @@ class Season14State
     Season14Decision pendingDecision = Season14Decision::NONE;
     std::vector<Season14Offering> choiceOfferings;
     std::vector<Season14Offering> pendingOfferings;
+    Season14ChooseOneState chooseOne;
     std::vector<Season14PersistentEffect> trinkets;
     std::vector<Season14PersistentEffect> darkGifts;
 
@@ -102,6 +105,8 @@ class Season14State
     //! are player-owned so refreshing or replacing a Tavern cannot lose a
     //! spell's intended duration.
     std::int32_t nextTurnGold = 0;
+    std::int32_t minionsPlayedThisTurn = 0;
+    std::int32_t battlecriesTriggered = 0;
     std::int32_t maxGoldDelta = 0;
     std::int32_t freeRefreshes = 0;
     std::int32_t persistentShopAttack = 0;
@@ -111,6 +116,8 @@ class Season14State
     //! refreshes, and recruit-phase transitions.
     std::int32_t futureLobsterAttack = 0;
     std::int32_t futureLobsterHealth = 0;
+    std::int32_t futureBallerAttack = 0;
+    std::int32_t futureBallerHealth = 0;
     std::int32_t trinketExtraShopSlots = 0;
     std::int32_t trinketHigherTierRefreshes = 0;
     std::int32_t trinketMaxGoldDelta = 0;
@@ -118,6 +125,9 @@ class Season14State
     std::vector<Season14RaceShopStats> persistentShopRaceStats;
     std::int32_t refreshRandomShopAttack = 0;
     std::int32_t refreshRandomShopHealth = 0;
+    //! Additive attack/health applied by each subsequently played Blood Gem.
+    std::int32_t bloodGemAttackBonus = 0;
+    std::int32_t bloodGemHealthBonus = 0;
     std::array<std::uint64_t, static_cast<std::size_t>(
                                   Season14Event::COUNT)>
         eventCounts{};
@@ -129,6 +139,7 @@ class Season14State
     //! Selects one public offering and clears the pending decision.
     //! \return false when no matching pending offering exists.
     bool SelectDecision(std::size_t offeringIndex);
+    void BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t targetMask, std::int32_t sourceCardDbfID, std::vector<Season14Offering> offerings);
 
     //! Configures the hero power without claiming its behavior is supported.
     void SetHeroPower(std::int32_t dbfID, std::int32_t cost, bool available);
@@ -201,6 +212,13 @@ class Season14State
     //! Returns the effective cost of a Tavern spell before resolution.
     std::int32_t TavernSpellCost(std::int32_t baseCost) const;
 
+    //! Returns the resolved stats of one Blood Gem, including persistent
+    //! hero/effect scaling.
+    std::pair<std::int32_t, std::int32_t> BloodGemStats() const noexcept;
+
+    //! Adds persistent Blood Gem scaling for future generated/played gems.
+    void AddBloodGemBonus(std::int32_t attack, std::int32_t health) noexcept;
+
     //! Records a successful Tavern refresh so one-shot effects are consumed.
     void OnRefreshTavern(bool refreshSucceeded);
 
@@ -209,6 +227,12 @@ class Season14State
 
     //! Adds deferred gold paid at the next recruit start.
     void AddNextTurnGold(std::int32_t amount) noexcept;
+    void RecordMinionPlay(bool battlecry) noexcept
+    {
+        ++minionsPlayedThisTurn;
+        if (battlecry) ++battlecriesTriggered;
+    }
+    void RecordBattlecry() noexcept { ++battlecriesTriggered; }
 
     //! Returns and clears deferred next-turn gold.
     std::int32_t TakeNextTurnGold() noexcept;
@@ -241,6 +265,8 @@ class Season14State
 
     //! Returns the cumulative future-Lobster bonus.
     std::pair<std::int32_t, std::int32_t> FutureLobsterStats() const noexcept;
+    void ImproveFutureBallers(std::int32_t attack, std::int32_t health);
+    std::pair<std::int32_t, std::int32_t> FutureBallerStats() const noexcept;
 
     //! Adds a persistent Tavern stat bonus scoped to a concrete tribe.
     void AddPersistentShopRaceStats(Race race, std::int32_t attack,

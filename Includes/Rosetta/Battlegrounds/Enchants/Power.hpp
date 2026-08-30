@@ -12,6 +12,7 @@
 #include <Rosetta/Battlegrounds/Triggers/Trigger.hpp>
 
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace RosettaStone::Battlegrounds
@@ -23,6 +24,18 @@ enum class ActivateEffect : unsigned char
     NONE,
     BUFF_TARGET,
     SET_TARGET_STATS,
+    GAIN_GOLD,
+    ADD_CARD,
+};
+enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE };
+struct AvengeDefinition
+{
+    AvengeEffect effect = AvengeEffect::NONE;
+    int threshold = 0;
+    int attack = 0;
+    int health = 0;
+    Race race = Race::INVALID;
+    bool permanent = false;
 };
 
 struct ActivateDefinition
@@ -31,6 +44,9 @@ struct ActivateDefinition
     int cost = 0;
     int attack = 0;
     int health = 0;
+    int amount = 0;
+    bool nextTurn = false;
+    std::string cardID;
 };
 
 //!
@@ -55,6 +71,7 @@ class Power
     //! Returns a list of deathrattle tasks.
     //! \return A list of deathrattle tasks.
     std::vector<TaskType>& GetDeathrattleTask();
+    const std::vector<TaskType>& GetDeathrattleTask() const;
 
     //! Returns Rally tasks, resolved when this minion's friendly attacker
     //! declares an attack.
@@ -63,6 +80,9 @@ class Power
     //! Returns the explicit manual Activate definition, when present.
     std::optional<ActivateDefinition>& GetActivate();
     const std::optional<ActivateDefinition>& GetActivate() const;
+    std::optional<AvengeDefinition>& GetAvenge();
+    const std::optional<AvengeDefinition>& GetAvenge() const;
+    void AddAvenge(AvengeDefinition definition);
 
     //! Returns enchant.
     //! \return A reference to enchant.
@@ -105,6 +125,7 @@ class Power
     std::vector<TaskType> m_deathrattleTask;
     std::vector<TaskType> m_rallyTask;
     std::optional<ActivateDefinition> m_activate;
+    std::optional<AvengeDefinition> m_avenge;
     std::optional<Enchant> m_enchant;
     std::optional<Trigger> m_trigger;
 };

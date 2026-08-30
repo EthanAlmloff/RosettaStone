@@ -15,11 +15,13 @@ void Season14State::BeginDecision(
         pendingDecision = Season14Decision::NONE;
         choiceOfferings.clear();
         pendingOfferings.clear();
+        chooseOne = {};
         return;
     }
 
     pendingDecision = decision;
     pendingOfferings = std::move(offerings);
+    chooseOne = {};
     if (decision == Season14Decision::CHOICE ||
         decision == Season14Decision::DISCOVER)
     {
@@ -29,6 +31,16 @@ void Season14State::BeginDecision(
     {
         choiceOfferings.clear();
     }
+}
+
+void Season14State::BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t targetMask,
+                                   std::int32_t sourceCardDbfID,
+                                   std::vector<Season14Offering> offerings)
+{
+    pendingDecision = Season14Decision::CHOOSE_ONE;
+    pendingOfferings = std::move(offerings);
+    choiceOfferings = pendingOfferings;
+    chooseOne = { true, sourceEntityID, targetMask, sourceCardDbfID };
 }
 
 bool Season14State::SelectDecision(std::size_t offeringIndex)
@@ -42,6 +54,7 @@ bool Season14State::SelectDecision(std::size_t offeringIndex)
     choiceOfferings.clear();
     pendingOfferings.clear();
     pendingDecision = Season14Decision::NONE;
+    chooseOne = {};
     return true;
 }
 
@@ -230,6 +243,20 @@ std::int32_t Season14State::TavernSpellCost(std::int32_t baseCost) const
     return heroPowerBatch2.TavernSpellCost(withBatch1);
 }
 
+std::pair<std::int32_t, std::int32_t> Season14State::BloodGemStats() const noexcept
+{
+    return { 1 + bloodGemAttackBonus, 1 + bloodGemHealthBonus };
+}
+
+void Season14State::AddBloodGemBonus(std::int32_t attack,
+                                     std::int32_t health) noexcept
+{
+    bloodGemAttackBonus = std::max<std::int32_t>(
+        0, bloodGemAttackBonus + attack);
+    bloodGemHealthBonus = std::max<std::int32_t>(
+        0, bloodGemHealthBonus + health);
+}
+
 void Season14State::OnRefreshTavern(bool refreshSucceeded)
 {
     ResolveSeason14HeroPowerBatch1Event(
@@ -317,6 +344,19 @@ Season14State::FutureLobsterStats() const noexcept
     return { futureLobsterAttack, futureLobsterHealth };
 }
 
+void Season14State::ImproveFutureBallers(std::int32_t attack,
+                                         std::int32_t health)
+{
+    futureBallerAttack = std::max<std::int32_t>(0, futureBallerAttack + attack);
+    futureBallerHealth = std::max<std::int32_t>(0, futureBallerHealth + health);
+}
+
+std::pair<std::int32_t, std::int32_t>
+Season14State::FutureBallerStats() const noexcept
+{
+    return { futureBallerAttack, futureBallerHealth };
+}
+
 void Season14State::AddPersistentShopRaceStats(Race race,
                                                std::int32_t attack,
                                                std::int32_t health)
@@ -368,7 +408,10 @@ std::int32_t Season14State::HeroPowerBatch3CombatKillAttackBonus() const noexcep
 
 bool Season14State::CanUseHeroPower(std::int32_t availableGold) const
 {
-    return heroPowerAvailable && !heroPowerUsed && heroPowerDbfID != 0 &&
+    const bool bloodboundSecondUse =
+        heroPowerDbfID == 71459 && heroPowerBatch2.bloodboundUsesThisTurn < 2;
+    return heroPowerAvailable && (bloodboundSecondUse || !heroPowerUsed) &&
+           heroPowerDbfID != 0 &&
            availableGold >= EffectiveHeroPowerCost();
 }
 
@@ -380,12 +423,18 @@ std::int32_t Season14State::EffectiveHeroPowerCost() const
 
 bool Season14State::UseHeroPower()
 {
-    if (!heroPowerAvailable || heroPowerUsed || heroPowerDbfID == 0)
+    if (!heroPowerAvailable ||
+        (heroPowerUsed && !(heroPowerDbfID == 71459 &&
+                            heroPowerBatch2.bloodboundUsesThisTurn < 2)) ||
+        heroPowerDbfID == 0)
     {
         return false;
     }
 
-    heroPowerUsed = true;
+    if (heroPowerDbfID != 71459)
+    {
+        heroPowerUsed = true;
+    }
     // The Galaxy's Lens grants a one-use discount for the next hero power.
     // Consume it at the successful use site so failed/unauthorized attempts
     // cannot spend the discount and a later turn cannot reuse it indefinitely.

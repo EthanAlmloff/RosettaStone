@@ -17,6 +17,7 @@ void Power::ClearData()
     m_deathrattleTask.clear();
     m_rallyTask.clear();
     m_activate.reset();
+    m_avenge.reset();
     m_enchant.reset();
     m_trigger.reset();
 }
@@ -36,6 +37,11 @@ std::vector<TaskType>& Power::GetDeathrattleTask()
     return m_deathrattleTask;
 }
 
+const std::vector<TaskType>& Power::GetDeathrattleTask() const
+{
+    return m_deathrattleTask;
+}
+
 std::vector<TaskType>& Power::GetRallyTask()
 {
     return m_rallyTask;
@@ -50,6 +56,9 @@ const std::optional<ActivateDefinition>& Power::GetActivate() const
 {
     return m_activate;
 }
+std::optional<AvengeDefinition>& Power::GetAvenge() { return m_avenge; }
+const std::optional<AvengeDefinition>& Power::GetAvenge() const { return m_avenge; }
+void Power::AddAvenge(AvengeDefinition definition) { m_avenge = definition; }
 
 std::optional<Enchant>& Power::GetEnchant()
 {

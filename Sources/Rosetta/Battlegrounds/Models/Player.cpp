@@ -5,6 +5,7 @@
 // property of any third parties.
 
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch21.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 
@@ -43,6 +44,14 @@ void Player::ApplyFreshMinionModifiers(Minion& minion) const
     {
         const auto [attack, health] = season14.FutureLobsterStats();
         minion.ApplyFutureLobsterStats(attack, health);
+    }
+    if (minion.GetCardID() == "BG31_816" ||
+        minion.GetCardID() == "BG31_816_G" ||
+        minion.GetCardID() == "BG31_818" ||
+        minion.GetCardID() == "BG31_818_G")
+    {
+        const auto [attack, health] = season14.FutureBallerStats();
+        minion.ApplyFutureBallerStats(attack, health);
     }
 }
 
@@ -151,6 +160,61 @@ void Player::PrepareTavern()
     }
 }
 
+void Player::RefreshSpellcraft()
+{
+    recruitField.ForEach([](MinionData& data) {
+        data.value().ExpireTemporaryEffects();
+    });
+    // Spellcraft cards expire at the next recruit start. Remove only cards
+    // marked by this lifecycle, preserving ordinary copies of the same spell.
+    for (int i = hand.GetCount() - 1; i >= 0; --i)
+    {
+        if (std::holds_alternative<Spell>(hand[i]) &&
+            std::get<Spell>(hand[i]).IsTemporary())
+        {
+            hand.Remove(hand[i]);
+        }
+    }
+
+    struct SpellcraftSpec
+    {
+        const char* minion;
+        const char* spell;
+        int copies;
+    };
+    constexpr SpellcraftSpec specs[] = {
+        { "BG23_000", "BG23_000t", 1 },
+        { "BG23_000_G", "BG23_000_Gt", 1 },
+        { "BG23_004", "BG23_004t", 1 },
+        { "BG23_004_G", "BG23_004_Gt", 1 },
+        { "BG23_007", "BG23_007t", 1 },
+        { "BG23_007_G", "BG23_007_Gt", 1 },
+        { "BG23_008", "BG23_008t", 1 },
+        { "BG23_008_G", "BG23_008_Gt", 1 },
+        { "BG31_830", "BG31_830t", 1 },
+        { "BG31_830_G", "BG31_830_Gt", 1 },
+        { "BGS_200", "BG28_810", 1 },
+        { "TB_BaconUps_256", "BG33_815", 1 },
+    };
+    for (const auto& spec : specs)
+    {
+        bool present = false;
+        recruitField.ForEach([&](MinionData& data) {
+            if (data.value().GetCardID() == spec.minion)
+                present = true;
+        });
+        if (!present || hand.IsFull())
+            continue;
+        const auto card = Cards::FindCardByID(spec.spell);
+        if (card.id.empty())
+            continue;
+        Spell spell(card);
+        spell.SetTemporary(true);
+        for (int i = 0; i < spec.copies && !hand.IsFull(); ++i)
+            hand.Add(CardData{ spell });
+    }
+}
+
 void Player::PurchaseMinion(std::size_t idx)
 {
     if (idx >= static_cast<std::size_t>(tavern.fieldZone.GetCount()))
@@ -166,9 +230,10 @@ void Player::PurchaseMinion(std::size_t idx)
 
     const bool purchasedPirate =
         tavern.fieldZone[idx].GetRace() == Race::PIRATE;
+    const auto handCountBeforePurchase = hand.GetCount();
     purchaseMinionCallback(*this, idx);
 
-    if (hand.GetCount() > 0)
+    if (hand.GetCount() > handCountBeforePurchase)
     {
         auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
         ApplyFreshMinionModifiers(purchased);
@@ -176,31 +241,60 @@ void Player::PurchaseMinion(std::size_t idx)
         purchased.SetAttack(purchased.GetAttack() + attack);
     }
 
+    // Payment is committed before after-buy observers run.  The purchased
+    // entity is already in hand, and remains the event source for every
+    // friendly board trigger below.
     remainCoin -= cost;
+    if (hand.GetCount() > handCountBeforePurchase)
+    {
+        auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
+        recruitField.ForEachAlive([&purchased](MinionData& data) {
+            data.value().ActivateTrigger(TriggerType::BUY_MINION, purchased);
+        });
+    }
     remainCoin += season14.OnBuyMinion(purchasedPirate);
 }
 
 void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
 {
+    if (handIdx >= static_cast<std::size_t>(hand.GetCount()))
+        return;
     if (std::holds_alternative<Minion>(hand[handIdx]))
     {
-        // Check the field is full
-        if (recruitField.IsFull())
+        Minion& handMinion = std::get<Minion>(hand[handIdx]);
+        const bool magnetic = handMinion.IsMagnetic();
+        // Magnetic cards consume a hand slot but do not consume board space;
+        // their target must be a legal friendly Mech (or the explicit
+        // Prosthetic Hand Undead exception).
+        // Magnetic is an optional attachment mode.  With no target the card
+        // is still a normal minion play (and consumes a board slot), as in
+        // Battlegrounds; only a supplied target selects the attachment path.
+        if (magnetic && targetIdx != -1)
         {
+            if (targetIdx < 0 || targetIdx >= recruitField.GetCount() ||
+                !handMinion.CanMagnetizeTo(
+                    recruitField[static_cast<std::size_t>(targetIdx)]))
+                return;
+            Minion attachment = std::get<Minion>(hand.Remove(hand[handIdx]));
+            attachment.MagnetizeOnto(
+                recruitField[static_cast<std::size_t>(targetIdx)]);
             return;
         }
 
+        // Check the field is full
+        if (recruitField.IsFull())
+            return;
+
         // Check if we can play this card and the target is valid
-        if (!std::get<Minion>(hand[handIdx]).IsPlayableByCardReq(*this) ||
-            !std::get<Minion>(hand[handIdx])
-                 .IsValidPlayTarget(*this, targetIdx))
+        if (!handMinion.IsPlayableByCardReq(*this) ||
+            !handMinion.IsValidPlayTarget(*this, targetIdx))
         {
             return;
         }
 
         CardData card = hand.Remove(hand[handIdx]);
-
         auto minion = std::get<Minion>(card);
+        season14.RecordMinionPlay(false);
         ApplyFreshMinionModifiers(minion);
         minion.getPlayerCallback = [this]() -> Player& { return *this; };
         minion.SetIndex(getNextCardIndexCallback());
@@ -234,6 +328,62 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             minion.ActivateTask(PowerType::POWER, *this, target);
         }
 
+        // Choose One is a public modal after the minion has been committed;
+        // payment/board insertion above therefore remains atomic.  Only the
+        // deterministic Sprightly Scarab branches are staged here.
+        if (minion.GetCardID() == "BG27_084" ||
+            minion.GetCardID() == "BG27_084_G" ||
+            minion.GetCardID() == "BG30_123" ||
+            minion.GetCardID() == "BG30_123_G" ||
+            minion.GetCardID() == "BG36_330" ||
+            minion.GetCardID() == "BG36_330_G")
+        {
+            std::uint32_t targetMask = 0;
+            std::size_t targetSlot = 0;
+            recruitField.ForEach([&targetMask, &targetSlot](MinionData& data) {
+                const auto& candidate = data.value();
+                if (!candidate.IsDestroyed() && candidate.HasRace(Race::BEAST) &&
+                    targetSlot < 32)
+                    targetMask |= std::uint32_t{1} << targetSlot;
+                ++targetSlot;
+            });
+            const auto option0 = Cards::FindCardByID(
+                minion.GetCardID() == "BG27_084_G" ? "BG27_084_Gt" :
+                minion.GetCardID() == "BG30_123_G" ? "BG30_123_Gt" :
+                minion.GetCardID() == "BG36_330_G" ? "BG36_330_Gt" :
+                minion.GetCardID() == "BG30_123" ? "BG30_123t" :
+                minion.GetCardID() == "BG36_330" ? "BG36_330t" : "BG27_084t");
+            const auto option1 = Cards::FindCardByID(
+                minion.GetCardID() == "BG27_084_G" ? "BG27_084_Gt2" :
+                minion.GetCardID() == "BG30_123_G" ? "BG30_123_Gt2" :
+                minion.GetCardID() == "BG36_330_G" ? "BG36_330_Gt2" :
+                minion.GetCardID() == "BG30_123" ? "BG30_123t2" :
+                minion.GetCardID() == "BG36_330" ? "BG36_330t2" : "BG27_084t2");
+            // A target-dependent modal is only exposed when both generated
+            // options and at least one Beast target are available; otherwise
+            // do not leave the recruit phase permanently locked.
+            const bool targetless = minion.GetCardID() != "BG27_084" &&
+                                    minion.GetCardID() != "BG27_084_G";
+            if (targetless)
+                targetMask = 0;
+            if ((targetless || targetMask != 0) && option0.dbfID != 0 && option1.dbfID != 0)
+                season14.BeginChooseOne(static_cast<std::uint64_t>(minion.GetIndex()),
+                                        targetMask, minion.GetDbfID(),
+                                        {{option0.dbfID, 0}, {option1.dbfID, 0}});
+        }
+
+        // These simple Quilboar battlecries are intentionally resolved here
+        // until the simulator's full generated-card task graph is available.
+        // They still use the canonical AddBloodGems path and therefore retain
+        // exact card identity, hand capacity, and replay semantics.
+        if (minion.GetCardID() == "BG20_100")
+        {
+            AddBloodGems(2);
+        }
+        else if (minion.GetCardID() == "BG20_100_G")
+        {
+            AddBloodGems(4);
+        }
         if (minion.GetRace() == Race::ELEMENTAL)
         {
             const auto result = season14.OnPlayElemental();
@@ -245,6 +395,23 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             aliveMinion.value().ActivateTrigger(TriggerType::AFTER_PLAY_MINION,
                                                 minion);
         });
+
+        // Prophet of the Boar triggers after a Quilboar is played (including
+        // a golden one), rather than being a Battlecry on the Prophet itself.
+        if (minion.GetRace() == Race::QUILBOAR)
+        {
+            recruitField.ForEachAlive([this](const MinionData& data) {
+                const auto& observer = data.value();
+                if (observer.GetCardID() == "BG20_203")
+                {
+                    AddBloodGems(1);
+                }
+                else if (observer.GetCardID() == "BG20_203_G")
+                {
+                    AddBloodGems(2);
+                }
+            });
+        }
     }
     else
     {
@@ -253,6 +420,124 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             static_cast<void>(PlaySpell(handIdx));
         }
     }
+}
+
+bool Player::ApplyChoice(std::size_t offeringIdx)
+{
+    if (season14.pendingDecision != Season14Decision::CHOICE &&
+        season14.pendingDecision != Season14Decision::DISCOVER)
+    {
+        return false;
+    }
+    if (offeringIdx >= season14.pendingOfferings.size() || hand.IsFull())
+    {
+        return false;
+    }
+
+    const auto offering = season14.pendingOfferings[offeringIdx];
+    const auto card = Cards::FindCardByDbfID(offering.dbfID);
+    if (card.dbfID == 0 ||
+        (card.GetCardType() != CardType::MINION &&
+         card.GetCardType() != CardType::SPELL))
+    {
+        return false;
+    }
+
+    if (card.GetCardType() == CardType::MINION)
+    {
+        Minion minion(card);
+        ApplyFreshMinionModifiers(minion);
+        hand.Add(CardData{ std::move(minion) });
+    }
+    else
+    {
+        hand.Add(CardData{ Spell(card) });
+    }
+    return season14.SelectDecision(offeringIdx);
+}
+
+bool Player::ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx)
+{
+    if (season14.pendingDecision != Season14Decision::CHOOSE_ONE ||
+        !season14.chooseOne.pending || offeringIdx >= 2 ||
+        (!season14.chooseOne.targetMask && targetIdx != static_cast<std::size_t>(-1)) ||
+        (season14.chooseOne.targetMask &&
+         (targetIdx >= static_cast<std::size_t>(recruitField.GetCount()) ||
+          (season14.chooseOne.targetMask & (std::uint32_t{1} << targetIdx)) == 0)))
+        return false;
+    // The source is part of the public modal identity.  Refuse stale/replayed
+    // decisions even if a caller presents a currently valid Beast slot.
+    bool sourceStillOnBoard = false;
+    recruitField.ForEachAlive([&](MinionData& data) {
+        const auto& source = data.value();
+        if (static_cast<std::uint64_t>(source.GetIndex()) ==
+                season14.chooseOne.sourceEntityID &&
+            (season14.chooseOne.sourceCardDbfID == 0 ||
+             source.GetDbfID() == season14.chooseOne.sourceCardDbfID))
+            sourceStillOnBoard = true;
+    });
+    if (!sourceStillOnBoard) return false;
+
+    if (!season14.chooseOne.targetMask)
+    {
+        const bool golden = season14.chooseOne.sourceCardDbfID ==
+                            Cards::FindCardByID("BG30_123_G").dbfID ||
+                            season14.chooseOne.sourceCardDbfID ==
+                            Cards::FindCardByID("BG36_330_G").dbfID;
+        if (season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG30_123").dbfID ||
+            season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG30_123_G").dbfID)
+        {
+            if (offeringIdx == 0)
+                season14.AddBloodGemBonus(golden ? 2 : 1, golden ? 2 : 1);
+            else
+                AddBloodGems(golden ? 8 : 4);
+        }
+        else if (season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_330").dbfID ||
+                 season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_330_G").dbfID)
+        {
+            if (offeringIdx == 0)
+                season14.AddFreeRefreshes(golden ? 4 : 2);
+            else
+                AddBloodGems(golden ? 6 : 3);
+        }
+        else
+            return false;
+        return season14.SelectDecision(offeringIdx);
+    }
+
+    Minion& target = recruitField[targetIdx];
+    if (target.IsDestroyed() || !target.HasRace(Race::BEAST)) return false;
+    const bool golden = season14.chooseOne.sourceCardDbfID ==
+                        Cards::FindCardByID("BG27_084_G").dbfID;
+    if (offeringIdx == 0) {
+        target.SetAttack(target.GetAttack() + (golden ? 2 : 1));
+        target.SetHealth(target.GetHealth() + (golden ? 2 : 1));
+        target.SetReborn(true);
+    } else {
+        target.SetAttack(target.GetAttack() + (golden ? 8 : 4));
+        target.SetGameTag(GameTag::WINDFURY, 1);
+    }
+    return season14.SelectDecision(offeringIdx);
+}
+
+int Player::AddTavernCoins(int count)
+{
+    if (count <= 0 || hand.IsFull())
+        return 0;
+    // BG28_810 is the canonical Battlegrounds Tavern Coin entity. Resolve it
+    // by stable ID so this path cannot accidentally generate a normal-mode
+    // Coin if DBF assignments are refreshed.
+    const Card coin = Cards::FindCardByID("BG28_810");
+    if (coin.id != "BG28_810" ||
+        coin.GetCardType() != CardType::BATTLEGROUND_SPELL)
+        return 0;
+    int added = 0;
+    while (added < count && !hand.IsFull())
+    {
+        hand.Add(CardData{ Spell(coin) });
+        ++added;
+    }
+    return added;
 }
 
 namespace
@@ -365,7 +650,7 @@ std::size_t AliveFriendlyMinionCount(const Player& player)
 }
 
 void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
-                           int targetIdx)
+                           int targetIdx, bool temporary)
 {
     const auto addStats = [&effect](MinionData& aliveMinion) {
         Minion& minion = aliveMinion.value();
@@ -377,6 +662,87 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
     {
         case TavernSpellEffect::NONE:
             return;
+        case TavernSpellEffect::BLOOD_GEM:
+        {
+            if (targetIdx < 0 || targetIdx >= player.recruitField.GetCount())
+            {
+                return;
+            }
+            const auto [attack, health] = player.season14.BloodGemStats();
+            Minion& target =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            int scaledAttack = attack;
+            int scaledHealth = health;
+            if (target.GetBloodGemsThisTurn() == 0)
+            {
+                if (target.GetCardID() == "BG20_103")
+                {
+                    scaledAttack += 3;
+                    scaledHealth += 3;
+                }
+                else if (target.GetCardID() == "BG20_103_G")
+                {
+                    scaledAttack += 6;
+                    scaledHealth += 6;
+                }
+            }
+            // Agamaggan's aura modifies every Blood Gem, including the one
+            // being resolved.  It is deliberately derived from the visible
+            // board, never from hidden pool/card text state.
+            player.recruitField.ForEachAlive([&](const MinionData& data) {
+                const auto id = data.value().GetCardID();
+                if (id == "BG20_205")
+                {
+                    ++scaledAttack;
+                    ++scaledHealth;
+                }
+                else if (id == "BG20_205_G")
+                {
+                    scaledAttack += 2;
+                    scaledHealth += 2;
+                }
+            });
+            target.ApplyBloodGem(scaledAttack, scaledHealth);
+
+            // Tough Tusk gains a shield from the first gem played on it each
+            // recruit turn.  The normal copy is temporary; the golden copy
+            // keeps the keyword permanently.  The per-minion counter is
+            // incremented by ApplyBloodGem before this hook runs.
+            if (target.GetBloodGemsThisTurn() == 1)
+            {
+                if (target.GetCardID() == "BG20_102")
+                {
+                    target.ApplyTemporaryKeyword(GameTag::DIVINE_SHIELD);
+                }
+                else if (target.GetCardID() == "BG20_102_G")
+                {
+                    target.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+                }
+            }
+
+            // Dynamic Duo is a persistent +attack/+health response on other
+            // Quilboar.  Resolve it from the post-gem public board.
+            player.recruitField.ForEachAlive([&](MinionData& data) {
+                Minion& observer = data.value();
+                if (&observer == &target || !observer.HasRace(Race::QUILBOAR) ||
+                    !target.HasRace(Race::QUILBOAR))
+                {
+                    return;
+                }
+                if (observer.GetCardID() == "BG20_207")
+                {
+                    observer.SetAttack(observer.GetAttack() + 1);
+                    observer.SetHealth(observer.GetHealth() + 1);
+                }
+                else if (observer.GetCardID() == "BG20_207_G")
+                {
+                    observer.SetAttack(observer.GetAttack() + 2);
+                    observer.SetHealth(observer.GetHealth() + 2);
+                }
+            });
+
+            return;
+        }
         case TavernSpellEffect::ALL_STATS:
             player.recruitField.ForEachAlive(addStats);
             return;
@@ -524,8 +890,13 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         {
             Minion& minion =
                 player.recruitField[static_cast<std::size_t>(targetIdx)];
-            minion.SetAttack(minion.GetAttack() + effect.attack);
-            minion.SetHealth(minion.GetHealth() + effect.health);
+            if (temporary)
+                minion.ApplyTemporaryStats(effect.attack, effect.health);
+            else
+            {
+                minion.SetAttack(minion.GetAttack() + effect.attack);
+                minion.SetHealth(minion.GetHealth() + effect.health);
+            }
             return;
         }
         case TavernSpellEffect::SET_TARGET_STATS:
@@ -564,10 +935,39 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         {
             Minion& minion =
                 player.recruitField[static_cast<std::size_t>(targetIdx)];
-            minion.SetAttack(minion.GetAttack() + effect.attack);
-            minion.SetHealth(minion.GetHealth() + effect.health);
-            minion.SetTaunt(true);
+            if (temporary)
+                minion.ApplyTemporaryStats(effect.attack, effect.health, true);
+            else
+            {
+                minion.SetAttack(minion.GetAttack() + effect.attack);
+                minion.SetHealth(minion.GetHealth() + effect.health);
+                minion.SetTaunt(true);
+            }
             return;
+        case TavernSpellEffect::TARGET_STATS_AND_WINDFURY:
+        case TavernSpellEffect::TARGET_STATS_AND_REBORN:
+        {
+            Minion& minion = player.recruitField[static_cast<std::size_t>(targetIdx)];
+            if (temporary)
+            {
+                minion.ApplyTemporaryStats(effect.attack, effect.health);
+                if (minion.HasRace(effect.race))
+                    minion.ApplyTemporaryKeyword(effect.effect == TavernSpellEffect::TARGET_STATS_AND_WINDFURY ? GameTag::WINDFURY : GameTag::REBORN);
+            }
+            else
+            {
+                minion.SetAttack(minion.GetAttack() + effect.attack);
+                minion.SetHealth(minion.GetHealth() + effect.health);
+            }
+            return;
+        }
+        case TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP:
+        {
+            Minion& minion = player.recruitField[static_cast<std::size_t>(targetIdx)];
+            if (temporary) minion.ApplyTemporaryKeyword(GameTag::DIVINE_SHIELD);
+            else minion.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+            return;
+        }
         }
         case TavernSpellEffect::TARGET_DIVINE_SHIELD:
         {
@@ -818,6 +1218,26 @@ bool Player::CanPlaySpell(std::size_t handIdx) const
     return CanPlaySpell(handIdx, -1);
 }
 
+int Player::AddBloodGems(int count)
+{
+    if (count <= 0)
+    {
+        return 0;
+    }
+    const Card gemCard = Cards::FindCardByDbfID(70136);
+    if (gemCard.id != "BG20_GEM")
+    {
+        return 0;
+    }
+    int added = 0;
+    while (added < count && !hand.IsFull())
+    {
+        hand.Add(CardData{ Spell(gemCard) });
+        ++added;
+    }
+    return added;
+}
+
 bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
 {
     if (handIdx >= static_cast<std::size_t>(hand.GetCount()))
@@ -976,7 +1396,7 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     }
     remainCoin += effect.gold;
     season14.Emit(Season14Event::SPELL_CAST);
-    ApplySpellBoardEffect(*this, effect, targetIdx);
+    ApplySpellBoardEffect(*this, effect, targetIdx, spell.IsTemporary());
     // Arcane Knowledge and other one-shot Tavern-spell discounts are
     // consumed only after a supported spell has actually resolved.  The
     // legality check above ensures unaffordable/unsupported attempts leave
@@ -1028,10 +1448,43 @@ bool Player::ActivateMinion(std::size_t boardIdx, int targetIdx)
 
 void Player::SellMinion(std::size_t idx)
 {
-    const auto minion = recruitField.Remove(recruitField[idx]);
+    if (idx >= static_cast<std::size_t>(recruitField.GetCount()))
+    {
+        return;
+    }
+    const auto soldID = recruitField[idx].GetCardID();
+    auto minion = recruitField.Remove(recruitField[idx]);
     returnMinionCallback(minion.GetPoolIndex());
 
     remainCoin += 1;
+    recruitField.ForEachAlive([&minion](MinionData& data) {
+        data.value().ActivateTrigger(TriggerType::SELL_MINION,
+                                      minion);
+    });
+    if (soldID == "BG20_301")
+    {
+        AddBloodGems(2);
+    }
+    else if (soldID == "BG20_301_G")
+    {
+        AddBloodGems(4);
+    }
+    else if (soldID == "BG31_816" || soldID == "BG31_816_G" ||
+             soldID == "BG31_818" || soldID == "BG31_818_G")
+    {
+        const int amount = soldID.ends_with("_G") ? 2 : 1;
+        const int attack = soldID.starts_with("BG31_816") ? amount : 0;
+        const int health = soldID.starts_with("BG31_818") ? amount : 0;
+        recruitField.ForEachAlive([attack, health](MinionData& data) {
+            data.value().SetAttack(data.value().GetAttack() + attack);
+            data.value().SetHealth(data.value().GetHealth() + health);
+        });
+        season14.ImproveFutureBallers(attack, health);
+    }
+    else
+    {
+        AddTavernCoins(FindSellBehaviorBatch21(soldID).tavernCoins);
+    }
     season14.OnSellMinion();
 }
 

@@ -38,7 +38,7 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] - static keyword registration
     // Static keywords come from CardLoader metadata, so these definitions
     // intentionally contain no task chain while still satisfying the pool's
     // explicit behavior-registration contract.
-    for (const auto* id : { "BG32_236", "BGS_119", "BGS_131", "BG_BOT_911" })
+    for (const auto* id : { "BGS_119", "BGS_131", "BG_BOT_911" })
     {
         REQUIRE(cards.contains(id));
         CHECK(cards.at(id).power.GetBattlecryTask().empty());

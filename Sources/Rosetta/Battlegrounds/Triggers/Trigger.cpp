@@ -48,6 +48,15 @@ void Trigger::Validate(Minion& owner, Minion& source)
     {
         case TriggerSource::NONE:
             break;
+        case TriggerSource::SELF:
+            // Lifecycle dispatch supplies every minion as the event source;
+            // SELF must reject sibling dispatches or fire once per occupant.
+            if (owner.GetIndex() != source.GetIndex() ||
+                owner.getPlayerCallback().idx != source.getPlayerCallback().idx)
+            {
+                return;
+            }
+            break;
         case TriggerSource::MINIONS_EXCEPT_SELF:
             if (ownerPlayer.idx != sourcePlayer.idx ||
                 owner.GetIndex() == source.GetIndex())
@@ -119,13 +128,12 @@ void Trigger::Run(Minion& owner, Minion& source)
     }
 
     for (auto& task : m_tasks)
-    {
-        std::visit(
-            [&owner](auto& _task) {
+        std::visit([&owner, &source, this](auto& _task) {
+            if (m_triggerType == TriggerType::REBORN)
+                _task.Run(owner.getPlayerCallback(), owner, source);
+            else
                 _task.Run(owner.getPlayerCallback(), owner);
-            },
-            task);
-    }
+        }, task);
 
     m_isValidated = false;
 }

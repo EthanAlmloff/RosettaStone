@@ -41,6 +41,10 @@ class Player
     //! Prepare a list of minions in Tavern for purchase.
     void PrepareTavern();
 
+    //! Replaces last turn's temporary Spellcraft cards and emits this turn's
+    //! cards from the currently owned Spellcraft minions.
+    void RefreshSpellcraft();
+
     //! Applies passive modifiers that belong to a newly created minion
     //! instance.  This is intentionally callable by pool and summon paths so
     //! passive hero powers do not depend on the minion first appearing in the
@@ -78,6 +82,20 @@ class Player
     //! \param targetIdx The friendly board slot, or -1 for no target.
     //! \return false when the card, target, cost, or behavior is unsupported.
     bool PlaySpell(std::size_t handIdx, int targetIdx);
+
+    //! Creates up to `count` Blood Gem spells in the player's hand.  The
+    //! generated card keeps the canonical BG20_GEM identity so replay and
+    //! legality use the same path as a naturally generated gem.
+    int AddBloodGems(int count);
+
+    //! Creates up to `count` canonical Tavern Coin spells in hand.
+    int AddTavernCoins(int count);
+
+    //! Resolves a pending public Choice/Discover offering into the player's
+    //! hand.  Only concrete minion and spell cards are accepted; unsupported
+    //! modal effects remain pending and fail closed.
+    bool ApplyChoice(std::size_t offeringIdx);
+    bool ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx);
 
     //! Applies a fully resolved target-free Season 14 hero-power activation.
     //! Random recipient selection uses RosettaStone's shared RNG stream.

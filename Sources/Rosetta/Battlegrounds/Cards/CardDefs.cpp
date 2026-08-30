@@ -5,6 +5,7 @@
 
 #include <Rosetta/Battlegrounds/CardSets/BattlegroundsCardsGen.hpp>
 #include <Rosetta/Battlegrounds/CardSets/DarkGiftBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/BloodGemBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch3.hpp>
@@ -17,6 +18,35 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch10.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch11.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch12.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsSimpleBatch.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch16.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch13.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch15.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch17.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch19.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch20.hpp>
+#include <Rosetta/Battlegrounds/CardSets/SpellcraftMinionBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch21.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch22.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch23.hpp>
+#include <Rosetta/Battlegrounds/CardSets/MagneticMinionBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch24.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch28.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch30.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch32.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch33.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch34.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch35.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch36.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch37.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch39.hpp>
+#include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch31.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch26.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch25.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch29.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatchBaller.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch14.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ActivateBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
@@ -29,6 +59,7 @@ CardDefs::CardDefs()
 {
     BattlegroundsCardsGen::AddAll(m_data);
     DarkGiftBehaviors::AddAll(m_data);
+    BloodGemBehaviors::AddAll(m_data);
     ModernMinionBehaviors::AddAll(m_data);
     ModernMinionBehaviorsBatch2::AddAll(m_data);
     ModernMinionBehaviorsBatch3::AddAll(m_data);
@@ -41,6 +72,35 @@ CardDefs::CardDefs()
     ModernMinionBehaviorsBatch10::AddAll(m_data);
     ModernMinionBehaviorsBatch11::AddAll(m_data);
     ModernMinionBehaviorsBatch12::AddAll(m_data);
+    ModernMinionBehaviorsSimpleBatch::AddAll(m_data);
+    ModernMinionBehaviorsBatch16::AddAll(m_data);
+    ModernMinionBehaviorsBatch13::AddAll(m_data);
+    ModernMinionBehaviorsBatch15::AddAll(m_data);
+    ModernMinionBehaviorsBatch17::AddAll(m_data);
+    ModernMinionBehaviorsBatch19::AddAll(m_data);
+    ModernMinionBehaviorsBatch20::AddAll(m_data);
+    SpellcraftMinionBehaviors::AddAll(m_data);
+    ModernMinionBehaviorsBatch21::AddAll(m_data);
+    ModernMinionBehaviorsBatch22::AddAll(m_data);
+    ModernMinionBehaviorsBatch23::AddAll(m_data);
+    MagneticMinionBehaviors::AddAll(m_data);
+    ModernMinionBehaviorsBatch24::AddAll(m_data);
+    ModernMinionBehaviorsBatch28::AddAll(m_data);
+    ModernMinionBehaviorsBatch30::AddAll(m_data);
+    ModernMinionBehaviorsBatch32::AddAll(m_data);
+    ModernMinionBehaviorsBatch33::AddAll(m_data);
+    ModernMinionBehaviorsBatch34::AddAll(m_data);
+    ModernMinionBehaviorsBatch35::AddAll(m_data);
+    ModernMinionBehaviorsBatch36::AddAll(m_data);
+    ModernMinionBehaviorsBatch37::AddAll(m_data);
+    ModernMinionBehaviorsBatch39::AddAll(m_data);
+    GeneratedBehaviorMappings::AddAll(m_data);
+    ModernMinionBehaviorsBatch31::AddAll(m_data);
+    ModernMinionBehaviorsBatch26::AddAll(m_data);
+    ModernMinionBehaviorsBatch25::AddAll(m_data);
+    ModernMinionBehaviorsBatch29::AddAll(m_data);
+    ModernMinionBehaviorsBatchBaller::AddAll(m_data);
+    ModernMinionBehaviorsBatch14::AddAll(m_data);
     ActivateBehaviors::AddAll(m_data);
     TrinketBehaviors::AddAll(m_data);
 }

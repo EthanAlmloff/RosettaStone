@@ -1,0 +1,14 @@
+#ifndef ROSETTASTONE_BATTLEGROUNDS_SPELLCRAFT_MINION_BEHAVIORS_HPP
+#define ROSETTASTONE_BATTLEGROUNDS_SPELLCRAFT_MINION_BEHAVIORS_HPP
+#include <Rosetta/Battlegrounds/Cards/CardDef.hpp>
+#include <map>
+#include <string>
+namespace RosettaStone::Battlegrounds
+{
+class SpellcraftMinionBehaviors
+{
+ public:
+    static void AddAll(std::map<std::string, CardDef>& cards);
+};
+}
+#endif

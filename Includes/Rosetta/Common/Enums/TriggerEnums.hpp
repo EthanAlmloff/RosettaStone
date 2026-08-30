@@ -62,6 +62,9 @@ enum class TriggerType
                     //!< crystal.
     MULTI_TRIGGER,  //!< The effect for multi trigger.
     RALLY,       //!< The effect triggers when a friendly minion attacks.
+    REBORN,      //!< The effect triggers after a friendly minion Reborns.
+    SELL_MINION, //!< The effect triggers after a minion is sold.
+    BUY_MINION,  //!< The effect triggers after a minion is bought.
 };
 
 //! \brief An enumerator for identifying trigger source.

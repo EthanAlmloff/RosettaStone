@@ -33,6 +33,9 @@ enum class TavernSpellEffect
     TARGET_AND_RACE,
     TARGET_STATS_REPEAT,
     TARGET_STATS_AND_TAUNT,
+    TARGET_STATS_AND_WINDFURY,
+    TARGET_DIVINE_SHIELD_TEMP,
+    TARGET_STATS_AND_REBORN,
     TARGET_DIVINE_SHIELD,
     TARGET_STATS_TOGGLE_TAUNT,
     SET_PLAYER_ARMOR,
@@ -52,6 +55,7 @@ enum class TavernSpellEffect
     SELL_TARGET_GIVE_RANDOM_STATS,
     TARGET_CONSUME_SHOP_STATS,
     SELL_TARGET_GIVE_LEFTMOST_RACE_STATS,
+    BLOOD_GEM,
 };
 
 struct TavernSpellBehavior
@@ -84,6 +88,16 @@ constexpr std::size_t MenagerieTablewareRepeatCount(
 //! simulator support.  Every entry is covered by a focused behavior test.
 inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
 {
+    if (id == "BG23_000t") return { 0, 2, 0, TavernSpellEffect::TARGET_STATS };
+    if (id == "BG23_000_Gt") return { 0, 4, 0, TavernSpellEffect::TARGET_STATS };
+    if (id == "BG23_004t") return { 0, 2, 6, TavernSpellEffect::TARGET_STATS_AND_TAUNT };
+    if (id == "BG23_004_Gt") return { 0, 4, 12, TavernSpellEffect::TARGET_STATS_AND_TAUNT };
+    if (id == "BG23_007t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_WINDFURY, Race::NAGA };
+    if (id == "BG23_007_Gt") return { 0, 4, 4, TavernSpellEffect::TARGET_STATS_AND_WINDFURY, Race::NAGA };
+    if (id == "BG23_008t") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP };
+    if (id == "BG23_008_Gt") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP };
+    if (id == "BG31_830t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
+    if (id == "BG31_830_Gt") return { 0, 4, 4, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
     if (id == "BG28_168") // Shiny Ring: Give your minions +1/+1.
     {
         return { 0, 1, 1, TavernSpellEffect::ALL_STATS };
@@ -224,6 +238,11 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 1, 0, 0, TavernSpellEffect::SPELL_COSTS_HEALTH };
     }
 
+    if (id == "BG20_GEM") // Blood Gem: apply the player's current gem scale.
+    {
+        return { 0, 1, 1, TavernSpellEffect::BLOOD_GEM };
+    }
+
     // Patch 36.4 generated/tribal batch.  These entries are deliberately
     // limited to effects that can be resolved from public player state and
     // the existing structured TavernSpell target argument.
@@ -284,10 +303,14 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
 inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 {
     return effect == TavernSpellEffect::TARGET_STATS ||
+           effect == TavernSpellEffect::BLOOD_GEM ||
            effect == TavernSpellEffect::SET_TARGET_STATS ||
            effect == TavernSpellEffect::TARGET_AND_RACE ||
            effect == TavernSpellEffect::TARGET_STATS_REPEAT ||
            effect == TavernSpellEffect::TARGET_STATS_AND_TAUNT ||
+           effect == TavernSpellEffect::TARGET_STATS_AND_WINDFURY ||
+           effect == TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP ||
+           effect == TavernSpellEffect::TARGET_STATS_AND_REBORN ||
            effect == TavernSpellEffect::TARGET_DIVINE_SHIELD ||
            effect == TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT ||
            effect == TavernSpellEffect::TARGET_SHARED_RACE_STATS ||

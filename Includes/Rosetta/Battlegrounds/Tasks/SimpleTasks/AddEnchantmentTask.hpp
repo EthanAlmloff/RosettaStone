@@ -47,6 +47,10 @@ class AddEnchantmentTask
     //! \return The result of task processing.
     TaskStatus Run(Player& player, Minion& source, Minion& target);
 
+    std::string_view CardID() const noexcept { return m_cardID; }
+    EntityType Entity() const noexcept { return m_entityType; }
+    bool UsesScriptTag() const noexcept { return m_useScriptTag; }
+
  private:
     std::string_view m_cardID;
     EntityType m_entityType = EntityType::INVALID;

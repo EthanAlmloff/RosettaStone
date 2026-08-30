@@ -11,7 +11,7 @@ TEST_CASE("[Battlegrounds : Activate] - simple target families are registered")
     std::map<std::string, CardDef> cards;
     ActivateBehaviors::AddAll(cards);
 
-    REQUIRE_EQ(cards.size(), 4);
+    REQUIRE_EQ(cards.size(), 8);
     CHECK(cards.contains("BG36_345"));
     CHECK(cards.contains("BG36_345_G"));
     CHECK(cards.contains("BG36_356"));
@@ -21,6 +21,10 @@ TEST_CASE("[Battlegrounds : Activate] - simple target families are registered")
     CHECK_EQ(cards.at("BG36_345_G").power.GetActivate()->attack, 6);
     CHECK_EQ(cards.at("BG36_356").power.GetActivate()->health, 50);
     CHECK_EQ(cards.at("BG36_356_G").power.GetActivate()->health, 100);
+    CHECK(cards.at("BG21_002").power.GetAvenge()->effect == AvengeEffect::BUFF_RACE);
+    CHECK_EQ(cards.at("BG21_002_G").power.GetAvenge()->attack, 2);
+    CHECK(cards.at("BG25_014").power.GetAvenge()->permanent);
+    CHECK_EQ(cards.at("BG25_014_G").power.GetAvenge()->health, 4);
 }
 
 TEST_CASE("[Battlegrounds : Activate] - Activate is separate from Battlecry")
@@ -32,6 +36,9 @@ TEST_CASE("[Battlegrounds : Activate] - Activate is separate from Battlecry")
         CAPTURE(id);
         CHECK(definition.power.GetBattlecryTask().empty());
         CHECK(definition.power.GetRallyTask().empty());
-        CHECK(definition.power.GetActivate().has_value());
+        if (id.starts_with("BG36_"))
+            CHECK(definition.power.GetActivate().has_value());
+        else
+            CHECK(definition.power.GetAvenge().has_value());
     }
 }

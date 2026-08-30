@@ -35,27 +35,16 @@ struct Season14HeroPowerBatch5Definition
     bool passive;
 };
 
-//! Exact Patch 36.4 IDs.  These powers are all fixed-lifecycle families;
-//! choice/discover and random-selection powers remain outside this batch.
-inline constexpr std::array<Season14HeroPowerBatch5Definition, 8>
-    SEASON14_HERO_POWER_BEHAVIORS_BATCH5 = {{
-        {"TB_BaconShop_HP_062", 61408,
-         Season14HeroPowerBatch5Kind::EXTRA_DRAGON_REFRESH, 0, true},
-        {"TB_BaconShop_HP_065", 61915,
-         Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN, 0, true},
-        {"TB_BaconShop_HP_042", 59860,
-         Season14HeroPowerBatch5Kind::SELL_TAVERN_BUFF, 0, true},
-        {"TB_BaconShop_HP_048", 60218,
-         Season14HeroPowerBatch5Kind::BATTLECRY_PURCHASE_COUNTER, 0, true},
-        {"TB_BaconShop_HP_087t", 64426,
-         Season14HeroPowerBatch5Kind::END_TURN_SCALING_BUFF, 0, true},
-        {"TB_BaconShop_HP_107", 67554,
-         Season14HeroPowerBatch5Kind::COMBAT_SUMMON_AURA, 0, true},
-        {"BG22_HERO_305p", 82114,
-         Season14HeroPowerBatch5Kind::AVENGE_WHELP, 0, true},
-        {"TB_BaconShop_HP_087", 64424,
-         Season14HeroPowerBatch5Kind::ENEMY_KILL_COUNTER, 0, true},
-    }};
+// The first draft of this batch registered eight rows with guessed
+// thresholds/effects.  The pinned card data disproves those semantics (for
+// example, Demon Hunter Training is 14 attacks and a first-buy-free trigger,
+// while the old resolver counted refreshes).  Keep the family types and
+// state-machine scaffolding available for the next implementation pass, but
+// do not expose any row as implemented until its Player lifecycle and bridge
+// application are complete.  An empty registry is intentional fail-closed
+// behavior and prevents coverage tooling from crediting partial effects.
+inline constexpr std::array<Season14HeroPowerBatch5Definition, 0>
+    SEASON14_HERO_POWER_BEHAVIORS_BATCH5 = {{}};
 
 constexpr const Season14HeroPowerBatch5Definition*
 FindSeason14HeroPowerBehaviorBatch5(std::int32_t dbfID) noexcept
@@ -124,6 +113,13 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     Season14HeroPowerBatch5Result& result) noexcept
 {
     result = {};
+    // An empty registry is deliberate until a complete Player/bridge
+    // applicator is reviewed.  Keep even bookkeeping inert for unregistered
+    // IDs so this scaffolding cannot influence a live game accidentally.
+    if (FindSeason14HeroPowerBehaviorBatch5(dbfID) == nullptr)
+    {
+        return;
+    }
     if (event == Season14HeroPowerBatch5Event::BEGIN_TURN)
     {
         state.refreshesThisTurn = 0;
@@ -133,45 +129,20 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     if (event == Season14HeroPowerBatch5Event::REFRESH_TAVERN)
     {
         ++state.refreshesThisTurn;
-        if (dbfID == 61408)
-        {
-            result.extraDragonOffers = 1;
-            result.trigger = true;
-        }
-        if (dbfID == 61915 && state.refreshesThisTurn >= 5)
-        {
-            result.tavernSlotsDelta = 1;
-            result.trigger = true;
-        }
         return;
     }
     if (event == Season14HeroPowerBatch5Event::SELL_MINION)
     {
         ++state.sellsThisTurn;
-        if (dbfID == 59860)
-        {
-            result.attack = 1;
-            result.health = 1;
-            result.trigger = true;
-        }
         return;
     }
-    if (event == Season14HeroPowerBatch5Event::BUY_BATTLECRY_MINION &&
-        dbfID == 60218)
+    if (event == Season14HeroPowerBatch5Event::BUY_BATTLECRY_MINION)
     {
         ++state.battlecryPurchases;
-        result.trigger = state.battlecryPurchases >= 5;
         return;
     }
     if (event == Season14HeroPowerBatch5Event::END_TURN)
     {
-        if (dbfID == 64426)
-        {
-            ++state.endTurnBuffLevel;
-            result.attack = 3;
-            result.health = 3;
-            result.trigger = true;
-        }
         return;
     }
     if (event == Season14HeroPowerBatch5Event::COMBAT_START)
@@ -179,23 +150,14 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
         state.combatDeaths = 0;
         return;
     }
-    if (event == Season14HeroPowerBatch5Event::ENEMY_MINION_KILLED &&
-        dbfID == 64424)
+    if (event == Season14HeroPowerBatch5Event::ENEMY_MINION_KILLED)
     {
         ++state.enemyKills;
-        result.trigger = state.enemyKills >= 25;
         return;
     }
     if (event == Season14HeroPowerBatch5Event::FRIENDLY_MINION_DIED)
     {
         ++state.combatDeaths;
-        if (dbfID == 82114 && state.combatDeaths >= 4)
-        {
-            state.combatDeaths = 0;
-            result.summonAttack = 3;
-            result.summonHealth = 1;
-            result.trigger = true;
-        }
     }
 }
 }  // namespace RosettaStone::Battlegrounds

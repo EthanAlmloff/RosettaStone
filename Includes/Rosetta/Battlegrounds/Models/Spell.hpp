@@ -59,11 +59,15 @@ class Spell
     //! \param pos The value of zone position.
     void SetZonePosition(int pos);
 
+    bool IsTemporary() const noexcept { return m_temporary; }
+    void SetTemporary(bool value) noexcept { m_temporary = value; }
+
  private:
     Card m_card;
 
     ZoneType m_zoneType = ZoneType::INVALID;
     int m_zonePos = -1;
+    bool m_temporary = false;
 };
 }  // namespace RosettaStone::Battlegrounds
 

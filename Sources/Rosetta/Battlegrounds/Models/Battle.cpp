@@ -125,6 +125,8 @@ Battle::Battle(Player& player1, Player& player2)
 
 void Battle::Initialize()
 {
+    m_p1Field.ForEachAlive([](MinionData& data) { data.value().ResetAvengeProgress(); });
+    m_p2Field.ForEachAlive([](MinionData& data) { data.value().ResetAvengeProgress(); });
     m_player1.season14.BeginCombatBatch4();
     m_player2.season14.BeginCombatBatch4();
 
@@ -157,9 +159,11 @@ void Battle::Initialize()
     // minions, so they are applied exactly once per combat before any
     // START_OF_COMBAT task observes stats.
     m_p1Field.ForEach([](MinionData& minion) {
+        minion.value().ResetFrenzyUses();
         minion.value().ApplyStartCombatStatMultipliers();
     });
     m_p2Field.ForEach([](MinionData& minion) {
+        minion.value().ResetFrenzyUses();
         minion.value().ApplyStartCombatStatMultipliers();
     });
 
@@ -619,6 +623,13 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     alive.value().ActivateTrigger(TriggerType::SUMMON,
                                                   removedMinion);
                 });
+                // Dispatch only after the revived entity is inserted and
+                // alive. This preserves deathrattle -> Reborn -> summon
+                // ordering and gives post-Reborn effects the real instance.
+                ownerField.ForEachAlive([&removedMinion](MinionData& alive) {
+                    alive.value().ActivateTrigger(TriggerType::REBORN,
+                                                  removedMinion);
+                });
             }
         }
 
@@ -626,6 +637,10 @@ void Battle::ProcessDestroy(bool beforeAttack)
         // lifecycle.  Resolve it only after deathrattle and Reborn handling so
         // a newly reborn friendly minion also receives the permanent bonus.
         Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+        auto& combatField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
+        combatField.ForEachAlive([&owner](MinionData& data) {
+            data.value().TriggerAvenge(owner);
+        });
         const auto avenger = owner.season14.OnFriendlyMinionDiedBatch4();
         if (avenger.avengeTriggered)
         {

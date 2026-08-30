@@ -138,6 +138,43 @@ bool Minion::HasRace(Race race) const
     return m_card.HasRace(race);
 }
 
+bool Minion::IsMagnetic() const
+{
+    return m_card.gameTags.contains(GameTag::MAGNETIC) &&
+           m_card.gameTags.at(GameTag::MAGNETIC) != 0;
+}
+
+bool Minion::CanMagnetizeTo(const Minion& target) const
+{
+    if (!IsMagnetic() || target.IsDestroyed())
+        return false;
+    // Prosthetic Hand is the one pinned card in this supported family that
+    // explicitly permits Undead in addition to Mechs.
+    return target.HasRace(Race::MECHANICAL) ||
+           ((GetCardID() == "BG_DEEP_015" || GetCardID() == "BG_DEEP_015_G") &&
+            target.HasRace(Race::UNDEAD));
+}
+
+void Minion::MagnetizeOnto(Minion& target) const
+{
+    if (!CanMagnetizeTo(target))
+        return;
+    target.SetAttack(target.GetAttack() + GetAttack());
+    target.SetHealth(target.GetHealth() + GetHealth());
+    if (HasTaunt()) target.SetTaunt(true);
+    if (HasDivineShield()) target.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+    if (HasReborn()) target.SetReborn(true);
+    if (HasWindfury()) target.SetGameTag(GameTag::WINDFURY, 1);
+    if (m_card.gameTags.contains(GameTag::MEGA_WINDFURY))
+        target.SetGameTag(GameTag::MEGA_WINDFURY, 1);
+    if (HasDeathrattle())
+    {
+        for (const auto& task : m_card.power.GetDeathrattleTask())
+            target.m_card.power.AddDeathrattleTask(TaskType{ task });
+        target.m_hasDeathrattle = true;
+    }
+}
+
 ZoneType Minion::GetZoneType() const
 {
     return m_zoneType;
@@ -199,6 +236,10 @@ bool Minion::MakeGolden()
     const int globalMinionAttack = m_globalMinionAttack;
     const int futureLobsterAttack = m_futureLobsterAttack;
     const int futureLobsterHealth = m_futureLobsterHealth;
+    const int futureBallerAttack = m_futureBallerAttack;
+    const int futureBallerHealth = m_futureBallerHealth;
+    const int bloodGemCount = m_bloodGemCount;
+    const int bloodGemCountThisTurn = m_bloodGemCountThisTurn;
     // The premium card supplies the new identity and its static keywords,
     // but conversion must not erase state accumulated by this particular
     // instance.  Dark Gifts and other recruit effects mutate these fields
@@ -217,6 +258,13 @@ bool Minion::MakeGolden()
     const int startCombatAttackMultiplier = m_startCombatAttackMultiplier;
     const int startCombatHealthMultiplier = m_startCombatHealthMultiplier;
     const bool startCombatStatsApplied = m_startCombatStatsApplied;
+    const int temporaryAttack = m_temporaryAttack;
+    const int temporaryHealth = m_temporaryHealth;
+    const bool temporaryTaunt = m_temporaryTaunt;
+    const bool temporaryDivineShield = m_temporaryDivineShield;
+    const bool temporaryReborn = m_temporaryReborn;
+    const bool temporaryWindfury = m_temporaryWindfury;
+    const bool temporaryMegaWindfury = m_temporaryMegaWindfury;
     m_card = std::move(premium);
     m_card.Initialize();
     m_attack = currentAttack;
@@ -224,6 +272,10 @@ bool Minion::MakeGolden()
     m_globalMinionAttack = globalMinionAttack;
     m_futureLobsterAttack = futureLobsterAttack;
     m_futureLobsterHealth = futureLobsterHealth;
+    m_futureBallerAttack = futureBallerAttack;
+    m_futureBallerHealth = futureBallerHealth;
+    m_bloodGemCount = bloodGemCount;
+    m_bloodGemCountThisTurn = bloodGemCountThisTurn;
 
     m_hasDeathrattle = false;
     m_hasTaunt = false;
@@ -286,6 +338,13 @@ bool Minion::MakeGolden()
     m_startCombatAttackMultiplier = startCombatAttackMultiplier;
     m_startCombatHealthMultiplier = startCombatHealthMultiplier;
     m_startCombatStatsApplied = startCombatStatsApplied;
+    m_temporaryAttack = temporaryAttack;
+    m_temporaryHealth = temporaryHealth;
+    m_temporaryTaunt = temporaryTaunt;
+    m_temporaryDivineShield = temporaryDivineShield;
+    m_temporaryReborn = temporaryReborn;
+    m_temporaryWindfury = temporaryWindfury;
+    m_temporaryMegaWindfury = temporaryMegaWindfury;
     return true;
 }
 
@@ -339,6 +398,42 @@ void Minion::ApplyFutureLobsterStats(int attack, int health)
     }
 }
 
+void Minion::ApplyFutureBallerStats(int attack, int health)
+{
+    if (attack > m_futureBallerAttack)
+    {
+        m_attack += attack - m_futureBallerAttack;
+        m_futureBallerAttack = attack;
+    }
+    if (health > m_futureBallerHealth)
+    {
+        m_health += health - m_futureBallerHealth;
+        m_futureBallerHealth = health;
+    }
+}
+
+void Minion::ApplyBloodGem(int attack, int health)
+{
+    if (attack < 0 || health < 0)
+    {
+        return;
+    }
+    m_attack += attack;
+    m_health += health;
+    ++m_bloodGemCount;
+    ++m_bloodGemCountThisTurn;
+}
+
+int Minion::GetBloodGemCount() const
+{
+    return m_bloodGemCount;
+}
+
+int Minion::GetBloodGemsThisTurn() const
+{
+    return m_bloodGemCountThisTurn;
+}
+
 int Minion::GetHealth() const
 {
     return m_health;
@@ -347,6 +442,63 @@ int Minion::GetHealth() const
 void Minion::SetHealth(int val)
 {
     m_health = val;
+}
+
+void Minion::ApplyTemporaryStats(int attack, int health, bool taunt)
+{
+    SetAttack(GetAttack() + attack);
+    SetHealth(GetHealth() + health);
+    m_temporaryAttack += attack;
+    m_temporaryHealth += health;
+    if (taunt && !HasTaunt())
+    {
+        SetTaunt(true);
+        m_temporaryTaunt = true;
+    }
+}
+
+void Minion::ApplyTemporaryKeyword(GameTag tag)
+{
+    switch (tag)
+    {
+        case GameTag::DIVINE_SHIELD:
+            if (!HasDivineShield()) { SetGameTag(tag, 1); m_temporaryDivineShield = true; }
+            break;
+        case GameTag::REBORN:
+            if (!HasReborn()) { SetReborn(true); m_temporaryReborn = true; }
+            break;
+        case GameTag::WINDFURY:
+            if (!HasWindfury()) { SetGameTag(tag, 1); m_temporaryWindfury = true; }
+            break;
+        case GameTag::MEGA_WINDFURY:
+            if (!HasWindfury()) { SetGameTag(tag, 1); m_temporaryMegaWindfury = true; }
+            break;
+        default:
+            break;
+    }
+}
+
+void Minion::ExpireTemporaryEffects()
+{
+    SetAttack(GetAttack() - m_temporaryAttack);
+    SetHealth(GetHealth() - m_temporaryHealth);
+    if (m_temporaryTaunt)
+        SetTaunt(false);
+    if (m_temporaryDivineShield)
+        SetGameTag(GameTag::DIVINE_SHIELD, 0);
+    if (m_temporaryReborn)
+        SetReborn(false);
+    if (m_temporaryWindfury)
+        SetGameTag(GameTag::WINDFURY, 0);
+    if (m_temporaryMegaWindfury)
+        SetGameTag(GameTag::MEGA_WINDFURY, 0);
+    m_temporaryAttack = 0;
+    m_temporaryHealth = 0;
+    m_temporaryTaunt = false;
+    m_temporaryDivineShield = false;
+    m_temporaryReborn = false;
+    m_temporaryWindfury = false;
+    m_temporaryMegaWindfury = false;
 }
 
 bool Minion::HasDeathrattle() const
@@ -457,6 +609,13 @@ void Minion::TakeDamage(Minion& source)
         // above, and a zero-attack minion cannot poison its target.
         m_isDestroyed = true;
     }
+    const bool limitedFrenzy = GetCardID() == "BG20_204" || GetCardID() == "BG20_204_G";
+    const int frenzyLimit = GetCardID() == "BG20_204_G" ? 2 : 1;
+    if (!m_isDestroyed && (!limitedFrenzy || m_frenzyUses < frenzyLimit) && getPlayerCallback)
+    {
+        ++m_frenzyUses;
+        ActivateTrigger(TriggerType::TAKE_DAMAGE, *this);
+    }
 }
 
 void Minion::SetTaunt(bool taunt)
@@ -470,6 +629,13 @@ void Minion::TakeDamage(int amount)
     if (m_health <= 0)
     {
         m_isDestroyed = true;
+    }
+    const bool limitedFrenzy = GetCardID() == "BG20_204" || GetCardID() == "BG20_204_G";
+    const int frenzyLimit = GetCardID() == "BG20_204_G" ? 2 : 1;
+    if (amount > 0 && !m_isDestroyed && (!limitedFrenzy || m_frenzyUses < frenzyLimit) && getPlayerCallback)
+    {
+        ++m_frenzyUses;
+        ActivateTrigger(TriggerType::TAKE_DAMAGE, *this);
     }
 }
 
@@ -587,7 +753,10 @@ void Minion::ActivateTrigger(TriggerType type, Minion& source)
         return;
     }
 
-    trigger.value().Run(*this, source);
+    if (type == TriggerType::BUY_MINION)
+        trigger.value().Run(*this, source, source);
+    else
+        trigger.value().Run(*this, source);
 }
 
 void Minion::ActivateTask(PowerType type, Player& player)
@@ -596,6 +765,10 @@ void Minion::ActivateTask(PowerType type, Player& player)
     if (tasks.empty())
     {
         return;
+    }
+    if (type == PowerType::POWER)
+    {
+        player.season14.RecordBattlecry();
     }
 
     for (auto& task : tasks)
@@ -621,6 +794,10 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
     {
         return;
     }
+    if (type == PowerType::POWER)
+    {
+        player.season14.RecordBattlecry();
+    }
 
     for (auto& task : tasks)
     {
@@ -636,6 +813,11 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
                        task);
         }
     }
+}
+
+void Minion::ResetFrenzyUses()
+{
+    m_frenzyUses = 0;
 }
 
 void Minion::ActivateRally([[maybe_unused]] Player& player, Minion& source,
@@ -669,9 +851,73 @@ bool Minion::CanActivate(const Player& player, int targetIdx) const
         definition->effect == ActivateEffect::SET_TARGET_STATS)
     {
         return targetIdx >= 0 && targetIdx < player.recruitField.GetCount() &&
+               targetIdx != GetZonePosition() &&
                !player.recruitField[static_cast<std::size_t>(targetIdx)].IsDestroyed();
     }
+    if (definition->effect == ActivateEffect::ADD_CARD)
+    {
+        if (player.hand.IsFull() || definition->amount <= 0 ||
+            definition->cardID.empty())
+            return false;
+        const auto card = Cards::FindCardByID(definition->cardID);
+        if (card.id.empty() ||
+            (card.GetCardType() != CardType::SPELL &&
+             card.GetCardType() != CardType::BATTLEGROUND_SPELL))
+            return false;
+    }
     return targetIdx < 0;
+}
+
+int Minion::TriggerAvenge(Player& player)
+{
+    const auto& definition = m_card.power.GetAvenge();
+    if (!definition || definition->threshold <= 0 || IsDestroyed()) return 0;
+    ++m_avengeDeaths;
+    int activations = 0;
+    while (m_avengeDeaths >= definition->threshold)
+    {
+        m_avengeDeaths -= definition->threshold;
+        ++activations;
+        if (definition->effect == AvengeEffect::BUFF_SELF)
+        {
+            SetAttack(GetAttack() + definition->attack);
+            SetHealth(GetHealth() + definition->health);
+        }
+        else if (definition->effect == AvengeEffect::BUFF_RACE)
+        {
+            // Avenge resolves during combat.  Use the active field so the
+            // temporary Bird Buddy-style race buff affects combat copies;
+            // permanent effects are committed to recruitField below.
+            player.GetField().ForEachAlive([&](MinionData& data) {
+                if (data.value().HasRace(definition->race))
+                {
+                    data.value().SetAttack(data.value().GetAttack() + definition->attack);
+                    data.value().SetHealth(data.value().GetHealth() + definition->health);
+                }
+            });
+        }
+    }
+    if (definition->permanent && activations > 0)
+    {
+        player.recruitField.ForEachAlive([this, &definition, activations](MinionData& data) {
+            Minion& target = data.value();
+            const bool same = GetIndex() >= 0 && target.GetIndex() == GetIndex();
+            if ((definition->effect == AvengeEffect::BUFF_SELF && same) ||
+                (definition->effect == AvengeEffect::BUFF_RACE && target.HasRace(definition->race)))
+            {
+                target.SetAttack(target.GetAttack() + definition->attack * activations);
+                target.SetHealth(target.GetHealth() + definition->health * activations);
+            }
+        });
+    }
+    return activations;
+}
+
+void Minion::ResetAvengeProgress() { m_avengeDeaths = 0; }
+const AvengeDefinition* Minion::GetAvengeDefinition() const
+{
+    const auto& definition = m_card.power.GetAvenge();
+    return definition ? &*definition : nullptr;
 }
 
 bool Minion::Activate(Player& player, int targetIdx)
@@ -682,16 +928,29 @@ bool Minion::Activate(Player& player, int targetIdx)
     }
     const auto definition = *m_card.power.GetActivate();
     player.remainCoin -= definition.cost;
-    auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
     if (definition.effect == ActivateEffect::BUFF_TARGET)
     {
+        auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
         target.SetAttack(target.GetAttack() + definition.attack);
         target.SetHealth(target.GetHealth() + definition.health);
     }
     else if (definition.effect == ActivateEffect::SET_TARGET_STATS)
     {
+        auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
         target.SetAttack(definition.attack);
         target.SetHealth(definition.health);
+    }
+    else if (definition.effect == ActivateEffect::GAIN_GOLD)
+    {
+        if (definition.nextTurn)
+            player.season14.AddNextTurnGold(definition.amount);
+        else
+            player.remainCoin += definition.amount;
+    }
+    else if (definition.effect == ActivateEffect::ADD_CARD)
+    {
+        SimpleTasks::AddCardTask task{ definition.cardID, definition.amount };
+        task.Run(player, *this);
     }
     --m_activateUses;
     return true;
@@ -700,6 +959,23 @@ bool Minion::Activate(Player& player, int targetIdx)
 void Minion::ResetActivateUses()
 {
     m_activateUses = m_card.power.GetActivate().has_value() ? 1 : 0;
+    m_bloodGemCountThisTurn = 0;
+    m_buyTriggerUses = 0;
+}
+
+bool Minion::CanUseBuyTrigger(int limit) const
+{
+    return limit <= 0 || m_buyTriggerUses < limit;
+}
+
+void Minion::ConsumeBuyTrigger()
+{
+    ++m_buyTriggerUses;
+}
+
+void Minion::ResetBuyTriggerUses()
+{
+    m_buyTriggerUses = 0;
 }
 
 std::vector<TaskType> Minion::GetTasks(PowerType type)

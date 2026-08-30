@@ -35,6 +35,10 @@ class FriendlyRaceEnchantmentTask
     //! Runs the task against an explicit target (the target is ignored).
     TaskStatus Run(Player& player, Minion& source, Minion& target);
 
+    std::string_view CardID() const noexcept { return m_cardID; }
+    Race GetRace() const noexcept { return m_race; }
+    bool ExcludesSource() const noexcept { return m_excludeSource; }
+
  private:
     std::string_view m_cardID;
     Race m_race = Race::INVALID;

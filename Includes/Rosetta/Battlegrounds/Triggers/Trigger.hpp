@@ -39,6 +39,9 @@ class Trigger
     //! \return The source of the trigger.
     TriggerSource GetTriggerSource() const;
 
+    //! Returns the configured tasks for focused behavior inspection.
+    const std::vector<TaskType>& GetTasks() const { return m_tasks; }
+
     //! Sets the value of trigger source.
     //! \param val The value of trigger source.
     void SetTriggerSource(TriggerSource val);

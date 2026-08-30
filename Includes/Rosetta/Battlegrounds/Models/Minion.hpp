@@ -81,6 +81,17 @@ class Minion
     //! \return true when this minion has the requested tribe.
     bool HasRace(Race race) const;
 
+    //! Returns whether this card has the Magnetic keyword.
+    bool IsMagnetic() const;
+
+    //! Returns whether this Magnetic card may attach to the target.
+    bool CanMagnetizeTo(const Minion& target) const;
+
+    //! Merges this Magnetic card into an existing friendly target. The
+    //! attachment's stats, supported keywords, and deathrattle tasks are
+    //! transferred; the attachment itself is not placed on the board.
+    void MagnetizeOnto(Minion& target) const;
+
     //! Returns the value of zone type.
     //! \return The value of zone type.
     ZoneType GetZoneType() const;
@@ -142,6 +153,17 @@ class Minion
     //! this instance.  Re-running fresh-instance hooks while a card moves
     //! between Tavern, hand, and board must not stack the same aura.
     void ApplyFutureLobsterStats(int attack, int health);
+    void ApplyFutureBallerStats(int attack, int health);
+
+    //! Applies one Blood Gem's resolved stats and records the permanent
+    //! instance count used by observation/diagnostics.
+    void ApplyBloodGem(int attack, int health);
+
+    //! Returns the number of Blood Gems applied to this instance.
+    int GetBloodGemCount() const;
+
+    //! Returns the number of Blood Gems applied since the last recruit start.
+    int GetBloodGemsThisTurn() const;
 
     //! Returns the value of health.
     //! \return The value of health.
@@ -150,6 +172,11 @@ class Minion
     //! Sets the value of health.
     //! \param val The value of health to set.
     void SetHealth(int val);
+
+    //! Applies recruit-turn-only Spellcraft stats/keywords.
+    void ApplyTemporaryStats(int attack, int health, bool taunt = false);
+    void ApplyTemporaryKeyword(GameTag tag);
+    void ExpireTemporaryEffects();
 
     //! Returns the flag that indicates whether it has deathrattle.
     //! \return The flag that indicates whether it has deathrattle.
@@ -212,6 +239,7 @@ class Minion
     //! Takes damage to the minion.
     //! \param amount The amount of damage.
     void TakeDamage(int amount);
+    void ResetFrenzyUses();
 
     //! Returns the flag that indicates whether it is destroyed.
     //! \return The flag that indicates whether it is destroyed.
@@ -263,12 +291,18 @@ class Minion
 
     //! Returns whether this instance has a legal manual Activate available.
     bool CanActivate(const Player& player, int targetIdx = -1) const;
+    int TriggerAvenge(Player& player);
+    void ResetAvengeProgress();
+    const AvengeDefinition* GetAvengeDefinition() const;
 
     //! Consumes gold and resolves this instance's manual Activate effect.
     bool Activate(Player& player, int targetIdx = -1);
 
     //! Re-arms a once-per-recruit-turn Activate.
     void ResetActivateUses();
+    bool CanUseBuyTrigger(int limit) const;
+    void ConsumeBuyTrigger();
+    void ResetBuyTriggerUses();
 
     Trigger activatedTrigger;
 
@@ -290,9 +324,16 @@ class Minion
 
     int m_attack = 0;
     int m_health = 0;
+    int m_frenzyUses = 0;
     int m_globalMinionAttack = 0;
     int m_futureLobsterAttack = 0;
     int m_futureLobsterHealth = 0;
+    int m_futureBallerAttack = 0;
+    int m_futureBallerHealth = 0;
+    int m_buyTriggerUses = 0;
+    int m_bloodGemCount = 0;
+    int m_bloodGemCountThisTurn = 0;
+    int m_avengeDeaths = 0;
 
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
@@ -300,6 +341,13 @@ class Minion
     bool m_hasReborn = false;
     bool m_hasWindfury = false;
     bool m_hasMegaWindfury = false;
+    int m_temporaryAttack = 0;
+    int m_temporaryHealth = 0;
+    bool m_temporaryTaunt = false;
+    bool m_temporaryDivineShield = false;
+    bool m_temporaryReborn = false;
+    bool m_temporaryWindfury = false;
+    bool m_temporaryMegaWindfury = false;
     bool m_hasVenomous = false;
     bool m_hasStealth = false;
     bool m_isFrozen = false;
