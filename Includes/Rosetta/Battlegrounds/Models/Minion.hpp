@@ -67,6 +67,11 @@ class Minion
     //! \param value The value of game tag to set.
     void SetGameTag(GameTag tag, int value);
 
+    //! Sets whether this minion has Taunt.  Tavern-spell effects use the
+    //! same mutable keyword state as combat resolution rather than changing
+    //! card metadata.
+    void SetTaunt(bool taunt);
+
     //! Returns the value of race.
     //! \return The value of race.
     Race GetRace() const;

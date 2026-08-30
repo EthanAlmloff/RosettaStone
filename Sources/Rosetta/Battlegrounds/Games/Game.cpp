@@ -308,11 +308,13 @@ void Game::Recruit()
         player.playerIdxNextFight = FindPlayerNextFight(player.idx);
 
         // Set the value of coin (remain/total)
-        if (player.totalCoin < COIN_UPPER_LIMIT)
+        if (player.totalCoin <
+            player.season14.EffectiveMaxGold(COIN_UPPER_LIMIT))
         {
             ++player.totalCoin;
         }
-        player.remainCoin = player.totalCoin;
+        player.remainCoin = player.totalCoin +
+                            player.season14.TakeNextTurnGold();
 
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.remainCoin += heroPowerResult.goldDelta;

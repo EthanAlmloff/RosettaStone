@@ -7,6 +7,8 @@
 #include <Rosetta/Battlegrounds/Models/Hero.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 
+#include <algorithm>
+
 namespace RosettaStone::Battlegrounds
 {
 void Hero::Initialize(const Card& heroCard)
@@ -17,6 +19,9 @@ void Hero::Initialize(const Card& heroCard)
 
 void Hero::TakeDamage(Player& player, int amount)
 {
+    const int absorbed = std::min(player.armor, std::max(0, amount));
+    player.armor -= absorbed;
+    amount -= absorbed;
     health -= amount;
     if (health <= 0)
     {

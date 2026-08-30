@@ -112,6 +112,7 @@ class Player
 
     int remainCoin = 0;
     int totalCoin = 0;
+    int armor = 0;
     int currentTier = 0;
     int coinToUpgradeTavern = 0;
 

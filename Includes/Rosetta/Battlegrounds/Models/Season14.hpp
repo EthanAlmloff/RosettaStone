@@ -82,6 +82,14 @@ class Season14State
     //! Hooks for effects whose entity behavior is implemented elsewhere.
     bool lockboxActive = false;
     bool fishbaitActive = false;
+    //! Deferred/economy state used by simple Tavern spells.  These counters
+    //! are player-owned so refreshing or replacing a Tavern cannot lose a
+    //! spell's intended duration.
+    std::int32_t nextTurnGold = 0;
+    std::int32_t maxGoldDelta = 0;
+    std::int32_t freeRefreshes = 0;
+    std::int32_t persistentShopAttack = 0;
+    std::int32_t persistentShopHealth = 0;
     std::array<std::uint64_t, static_cast<std::size_t>(
                                   Season14Event::COUNT)>
         eventCounts{};
@@ -143,6 +151,31 @@ class Season14State
 
     //! Records a successfully resolved Tavern spell.
     void OnTavernSpellResolved(bool spellResolved);
+
+    //! Adds deferred gold paid at the next recruit start.
+    void AddNextTurnGold(std::int32_t amount) noexcept;
+
+    //! Returns and clears deferred next-turn gold.
+    std::int32_t TakeNextTurnGold() noexcept;
+
+    //! Returns the configured maximum gold cap.
+    std::int32_t EffectiveMaxGold(std::int32_t baseCap) const noexcept;
+
+    //! Increases the maximum gold cap for future turns.
+    void IncreaseMaxGold(std::int32_t amount) noexcept;
+
+    //! Adds free Tavern refresh allowances.
+    void AddFreeRefreshes(std::int32_t amount) noexcept;
+
+    //! Returns whether a free refresh can be consumed.
+    bool HasFreeRefresh() const noexcept;
+
+    //! Consumes one free refresh after a successful refresh.
+    bool ConsumeFreeRefresh() noexcept;
+
+    //! Adds a persistent stat bonus to newly generated Tavern minions.
+    void AddPersistentShopStats(std::int32_t attack,
+                                std::int32_t health) noexcept;
 
     //! Resolves a complete target-free Batch-3 activation for this hero.
     bool ResolveHeroPowerBatch3Activation(

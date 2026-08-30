@@ -32,6 +32,15 @@ enum class TavernSpellEffect
     SET_TARGET_STATS,
     TARGET_AND_RACE,
     TARGET_STATS_REPEAT,
+    TARGET_STATS_AND_TAUNT,
+    TARGET_DIVINE_SHIELD,
+    TARGET_STATS_TOGGLE_TAUNT,
+    SET_PLAYER_ARMOR,
+    NEXT_TURN_GOLD,
+    INCREASE_MAX_GOLD,
+    FREE_REFRESHES,
+    SHOP_STATS_PERSISTENT,
+    SPELL_COSTS_HEALTH,
 };
 
 struct TavernSpellBehavior
@@ -42,6 +51,10 @@ struct TavernSpellBehavior
     TavernSpellEffect effect = TavernSpellEffect::NONE;
     Race race = Race::INVALID;
     int randomCount = 0;
+    //! Secondary scalar for economy/player-state effects.  Keeping this
+    //! separate from attack/health makes table entries self-describing and
+    //! prevents a future executor from confusing a gold value with a stat.
+    int value = 0;
 };
 
 //! Menagerie Tableware applies its base buff once, then repeats it once for
@@ -152,6 +165,54 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 0, 4, 8, TavernSpellEffect::TARGET_STATS };
     }
 
+    // Patch 36.4 simple keyword/economy batch.  These entries intentionally
+    // stay within effects that Player can resolve without choices, generated
+    // entities, or hidden/persistent card rules.
+    if (id == "BG28_503") // Fortify: a minion +3 Health and Taunt.
+    {
+        return { 0, 0, 3, TavernSpellEffect::TARGET_STATS_AND_TAUNT };
+    }
+    if (id == "BG28_507") // Sacred Gift: give a minion Divine Shield.
+    {
+        return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD };
+    }
+    if (id == "BG28_520") // Tricky Trousers: +1/+2; toggle Taunt.
+    {
+        return { 0, 1, 2, TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT };
+    }
+    if (id == "BG28_825") // Defender's Rites: +7/+7 and Taunt.
+    {
+        return { 0, 7, 7, TavernSpellEffect::TARGET_STATS_AND_TAUNT };
+    }
+    if (id == "BG28_500") // Armor Stash: set hero Armor to 5.
+    {
+        return { 0, 0, 0, TavernSpellEffect::SET_PLAYER_ARMOR,
+                 Race::INVALID, 0, 5 };
+    }
+    if (id == "BG28_800") // Careful Investment: gain 2 Gold next turn.
+    {
+        return { 0, 0, 0, TavernSpellEffect::NEXT_TURN_GOLD,
+                 Race::INVALID, 0, 2 };
+    }
+    if (id == "BG28_805") // Strike Oil: increase maximum Gold by 1.
+    {
+        return { 0, 0, 0, TavernSpellEffect::INCREASE_MAX_GOLD,
+                 Race::INVALID, 0, 1 };
+    }
+    if (id == "BG28_827") // Leaf Through the Pages: gain 2 free Refreshes.
+    {
+        return { 0, 0, 0, TavernSpellEffect::FREE_REFRESHES,
+                 Race::INVALID, 0, 2 };
+    }
+    if (id == "BG28_886") // Staff of Enrichment: Tavern minions +2/+2.
+    {
+        return { 0, 2, 2, TavernSpellEffect::SHOP_STATS_PERSISTENT };
+    }
+    if (id == "BG28_571") // Hasty Excavation: pay this spell with Health.
+    {
+        return { 1, 0, 0, TavernSpellEffect::SPELL_COSTS_HEALTH };
+    }
+
     return {};
 }
 
@@ -161,7 +222,10 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
     return effect == TavernSpellEffect::TARGET_STATS ||
            effect == TavernSpellEffect::SET_TARGET_STATS ||
            effect == TavernSpellEffect::TARGET_AND_RACE ||
-           effect == TavernSpellEffect::TARGET_STATS_REPEAT;
+           effect == TavernSpellEffect::TARGET_STATS_REPEAT ||
+           effect == TavernSpellEffect::TARGET_STATS_AND_TAUNT ||
+           effect == TavernSpellEffect::TARGET_DIVINE_SHIELD ||
+           effect == TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT;
 }
 }  // namespace RosettaStone::Battlegrounds
 

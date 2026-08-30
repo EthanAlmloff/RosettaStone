@@ -87,6 +87,10 @@ int Minion::GetGameTag(GameTag tag) const
     {
         case GameTag::ATK:
             return GetAttack();
+        case GameTag::TAUNT:
+            return HasTaunt() ? 1 : 0;
+        case GameTag::DIVINE_SHIELD:
+            return HasDivineShield() ? 1 : 0;
         default:
             return 0;
     }
@@ -96,6 +100,9 @@ void Minion::SetGameTag(GameTag tag, int value)
 {
     switch (tag)
     {
+        case GameTag::TAUNT:
+            m_hasTaunt = value == 1;
+            break;
         case GameTag::DIVINE_SHIELD:
             m_hasDivineShield = value == 1 ? true : false;
             break;
@@ -265,6 +272,11 @@ void Minion::TakeDamage(Minion& source)
         // above, and a zero-attack minion cannot poison its target.
         m_isDestroyed = true;
     }
+}
+
+void Minion::SetTaunt(bool taunt)
+{
+    m_hasTaunt = taunt;
 }
 
 void Minion::TakeDamage(int amount)

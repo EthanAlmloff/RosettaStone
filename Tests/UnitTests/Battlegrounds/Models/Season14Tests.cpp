@@ -133,3 +133,28 @@ TEST_CASE("[Season14] - Temporal Tavern refresh allowance is one-shot")
     CHECK(state.TakeHigherTierRefresh() == 2);
     CHECK(state.TakeHigherTierRefresh() == 0);
 }
+
+TEST_CASE("[Season14] - simple Tavern spell economy state is deterministic")
+{
+    Season14State state;
+
+    state.AddNextTurnGold(2);
+    state.AddNextTurnGold(1);
+    CHECK(state.TakeNextTurnGold() == 3);
+    CHECK(state.TakeNextTurnGold() == 0);
+
+    CHECK(state.EffectiveMaxGold(10) == 10);
+    state.IncreaseMaxGold(1);
+    CHECK(state.EffectiveMaxGold(10) == 11);
+
+    state.AddFreeRefreshes(2);
+    CHECK(state.HasFreeRefresh());
+    CHECK(state.ConsumeFreeRefresh());
+    CHECK(state.ConsumeFreeRefresh());
+    CHECK(!state.HasFreeRefresh());
+    CHECK(!state.ConsumeFreeRefresh());
+
+    state.AddPersistentShopStats(2, 2);
+    CHECK(state.persistentShopAttack == 2);
+    CHECK(state.persistentShopHealth == 2);
+}

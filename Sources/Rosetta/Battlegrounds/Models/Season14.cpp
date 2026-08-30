@@ -171,6 +171,56 @@ void Season14State::OnTavernSpellResolved(bool spellResolved)
     heroPowerBatch2.ConsumeTavernSpellDiscount(spellResolved);
 }
 
+void Season14State::AddNextTurnGold(std::int32_t amount) noexcept
+{
+    nextTurnGold = std::max<std::int32_t>(0, nextTurnGold + amount);
+}
+
+std::int32_t Season14State::TakeNextTurnGold() noexcept
+{
+    const auto result = nextTurnGold;
+    nextTurnGold = 0;
+    return result;
+}
+
+std::int32_t Season14State::EffectiveMaxGold(
+    std::int32_t baseCap) const noexcept
+{
+    return std::max<std::int32_t>(0, baseCap + maxGoldDelta);
+}
+
+void Season14State::IncreaseMaxGold(std::int32_t amount) noexcept
+{
+    maxGoldDelta = std::max<std::int32_t>(0, maxGoldDelta + amount);
+}
+
+void Season14State::AddFreeRefreshes(std::int32_t amount) noexcept
+{
+    freeRefreshes = std::max<std::int32_t>(0, freeRefreshes + amount);
+}
+
+bool Season14State::HasFreeRefresh() const noexcept
+{
+    return freeRefreshes > 0;
+}
+
+bool Season14State::ConsumeFreeRefresh() noexcept
+{
+    if (!HasFreeRefresh())
+    {
+        return false;
+    }
+    --freeRefreshes;
+    return true;
+}
+
+void Season14State::AddPersistentShopStats(std::int32_t attack,
+                                           std::int32_t health) noexcept
+{
+    persistentShopAttack += attack;
+    persistentShopHealth += health;
+}
+
 bool Season14State::ResolveHeroPowerBatch3Activation(
     std::int32_t currentTier,
     Season14HeroPowerBatch3Activation& result) const noexcept

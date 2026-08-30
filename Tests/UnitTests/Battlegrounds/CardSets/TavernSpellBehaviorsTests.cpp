@@ -2,7 +2,55 @@
 
 #include <doctest/doctest.h>
 
+#include <array>
+
 using namespace RosettaStone::Battlegrounds;
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - initial lookup table batch")
+{
+    struct Expected
+    {
+        const char* id;
+        TavernSpellEffect effect;
+        int attack;
+        int health;
+        int gold;
+        Race race;
+    };
+
+    constexpr std::array expected{
+        Expected{ "BG28_168", TavernSpellEffect::ALL_STATS, 1, 1, 0,
+                  Race::INVALID },
+        Expected{ "BG28_169", TavernSpellEffect::ALL_STATS, 4, 4, 0,
+                  Race::INVALID },
+        Expected{ "BG33_813", TavernSpellEffect::LEFTMOST_STATS, 6, 6, 0,
+                  Race::INVALID },
+        Expected{ "BG33_817", TavernSpellEffect::DIVINE_SHIELD_ATTACK, 6, 0,
+                  0, Race::INVALID },
+        Expected{ "BG35_922", TavernSpellEffect::ALL_AND_RACE, 2, 2, 0,
+                  Race::NAGA },
+        Expected{ "BG36_246",
+                  TavernSpellEffect::ALL_RACE_AND_DIVINE_SHIELD,
+                  2,
+                  1,
+                  0,
+                  Race::DRAGON },
+        Expected{ "BG28_810", TavernSpellEffect::NONE, 0, 0, 1,
+                  Race::INVALID },
+        Expected{ "BG33_815", TavernSpellEffect::NONE, 0, 0, 2,
+                  Race::INVALID },
+    };
+
+    for (const auto& item : expected)
+    {
+        const auto behavior = FindTavernSpellBehavior(item.id);
+        CHECK(behavior.effect == item.effect);
+        CHECK(behavior.attack == item.attack);
+        CHECK(behavior.health == item.health);
+        CHECK(behavior.gold == item.gold);
+        CHECK(behavior.race == item.race);
+    }
+}
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Patch 36.4 batch")
 {
@@ -42,12 +90,12 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - targeted stat batch")
 
     const auto tide = FindTavernSpellBehavior("BG32_815");
     CHECK(tide.effect == TavernSpellEffect::TARGET_STATS_REPEAT);
-    CHECK(tide.race == Race::NAGA);
+    CHECK(tide.race == RosettaStone::Race::NAGA);
     CHECK(TavernSpellRequiresTarget(tide.effect));
 
     const auto deepwater = FindTavernSpellBehavior("BG35_149");
     CHECK(deepwater.effect == TavernSpellEffect::TARGET_AND_RACE);
-    CHECK(deepwater.race == Race::MURLOC);
+    CHECK(deepwater.race == RosettaStone::Race::MURLOC);
     CHECK(TavernSpellRequiresTarget(deepwater.effect));
 
     const auto repair = FindTavernSpellBehavior("BG36_624");
@@ -78,7 +126,55 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - seeded random batch")
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - unsupported is fail closed")
 {
-    const auto behavior = FindTavernSpellBehavior("BG28_503");
+    const auto behavior = FindTavernSpellBehavior("BG28_504");
     CHECK(behavior.effect == TavernSpellEffect::NONE);
     CHECK(behavior.gold < 0);
+}
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - simple keyword/economy batch")
+{
+    struct Expected
+    {
+        const char* id;
+        TavernSpellEffect effect;
+        int attack;
+        int health;
+        int value;
+        int gold;
+        bool target;
+    };
+
+    constexpr std::array expected{
+        Expected{ "BG28_503", TavernSpellEffect::TARGET_STATS_AND_TAUNT, 0,
+                  3, 0, 0, true },
+        Expected{ "BG28_507", TavernSpellEffect::TARGET_DIVINE_SHIELD, 0, 0,
+                  0, 0, true },
+        Expected{ "BG28_520", TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT, 1,
+                  2, 0, 0, true },
+        Expected{ "BG28_825", TavernSpellEffect::TARGET_STATS_AND_TAUNT, 7,
+                  7, 0, 0, true },
+        Expected{ "BG28_500", TavernSpellEffect::SET_PLAYER_ARMOR, 0, 0, 5,
+                  0, false },
+        Expected{ "BG28_800", TavernSpellEffect::NEXT_TURN_GOLD, 0, 0, 2,
+                  0, false },
+        Expected{ "BG28_805", TavernSpellEffect::INCREASE_MAX_GOLD, 0, 0, 1,
+                  0, false },
+        Expected{ "BG28_827", TavernSpellEffect::FREE_REFRESHES, 0, 0, 2,
+                  0, false },
+        Expected{ "BG28_886", TavernSpellEffect::SHOP_STATS_PERSISTENT, 2, 2,
+                  0, 0, false },
+        Expected{ "BG28_571", TavernSpellEffect::SPELL_COSTS_HEALTH, 0, 0, 0,
+                  1, false },
+    };
+
+    for (const auto& item : expected)
+    {
+        const auto behavior = FindTavernSpellBehavior(item.id);
+        CHECK(behavior.effect == item.effect);
+        CHECK(behavior.attack == item.attack);
+        CHECK(behavior.health == item.health);
+        CHECK(behavior.value == item.value);
+        CHECK(TavernSpellRequiresTarget(behavior.effect) == item.target);
+        CHECK(behavior.gold == item.gold);
+    }
 }

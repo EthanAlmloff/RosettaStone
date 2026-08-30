@@ -49,7 +49,30 @@ void Player::SelectHero(std::size_t idx)
 
 void Player::PrepareTavern()
 {
+    // Preserve the identity of cards already in the Tavern.  Independently
+    // frozen cards survive a normal fill and must not receive a persistent
+    // spell bonus more than once on every subsequent turn.
+    std::set<int> existingPoolIndices;
+    tavern.fieldZone.ForEach([&existingPoolIndices](MinionData& minion) {
+        existingPoolIndices.insert(minion.value().GetPoolIndex());
+    });
     prepareTavernMinionsCallback(*this);
+    if (season14.persistentShopAttack != 0 ||
+        season14.persistentShopHealth != 0)
+    {
+        tavern.fieldZone.ForEach(
+            [this, &existingPoolIndices](MinionData& minion) {
+                if (existingPoolIndices.contains(
+                        minion.value().GetPoolIndex()))
+                {
+                    return;
+                }
+                minion.value().SetAttack(minion.value().GetAttack() +
+                                         season14.persistentShopAttack);
+                minion.value().SetHealth(minion.value().GetHealth() +
+                                         season14.persistentShopHealth);
+            });
+    }
 }
 
 void Player::PurchaseMinion(std::size_t idx)
@@ -350,6 +373,57 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             minion.SetHealth(minion.GetHealth() + repeats * effect.health);
             return;
         }
+        case TavernSpellEffect::TARGET_STATS_AND_TAUNT:
+        {
+            Minion& minion =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            minion.SetAttack(minion.GetAttack() + effect.attack);
+            minion.SetHealth(minion.GetHealth() + effect.health);
+            minion.SetTaunt(true);
+            return;
+        }
+        case TavernSpellEffect::TARGET_DIVINE_SHIELD:
+        {
+            Minion& minion =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            minion.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+            return;
+        }
+        case TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT:
+        {
+            Minion& minion =
+                player.recruitField[static_cast<std::size_t>(targetIdx)];
+            const bool alreadyTaunted = minion.HasTaunt();
+            minion.SetAttack(minion.GetAttack() + effect.attack);
+            minion.SetHealth(minion.GetHealth() + effect.health);
+            minion.SetTaunt(!alreadyTaunted);
+            return;
+        }
+        case TavernSpellEffect::SET_PLAYER_ARMOR:
+            player.armor = effect.value;
+            return;
+        case TavernSpellEffect::NEXT_TURN_GOLD:
+            player.season14.AddNextTurnGold(effect.value);
+            return;
+        case TavernSpellEffect::INCREASE_MAX_GOLD:
+            player.season14.IncreaseMaxGold(effect.value);
+            return;
+        case TavernSpellEffect::FREE_REFRESHES:
+            player.season14.AddFreeRefreshes(effect.value);
+            return;
+        case TavernSpellEffect::SHOP_STATS_PERSISTENT:
+            player.tavern.fieldZone.ForEach(
+                [&effect](MinionData& minion) {
+                    minion.value().SetAttack(minion.value().GetAttack() +
+                                             effect.attack);
+                    minion.value().SetHealth(minion.value().GetHealth() +
+                                             effect.health);
+                });
+            player.season14.AddPersistentShopStats(effect.attack,
+                                                   effect.health);
+            return;
+        case TavernSpellEffect::SPELL_COSTS_HEALTH:
+            return;
     }
 }
 }  // namespace
@@ -383,7 +457,18 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
     }
     const int baseCost = spell.GetCost();
     const int cost = season14.TavernSpellCost(baseCost);
-    return baseCost >= 0 && remainCoin >= cost;
+    if (baseCost < 0)
+    {
+        return false;
+    }
+    if (behavior.effect == TavernSpellEffect::SPELL_COSTS_HEALTH)
+    {
+        // This is a health payment, not damage: Armor must not absorb it.
+        // It also cannot reduce the hero to zero; a lethal payment is not a
+        // legal purchase and must not partially resolve the spell.
+        return hero.health > cost;
+    }
+    return remainCoin >= cost;
 }
 
 bool Player::PlaySpell(std::size_t handIdx)
@@ -403,7 +488,16 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     const int cost = season14.TavernSpellCost(spell.GetCost());
     const TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
     hand.Remove(card);
-    remainCoin -= cost;
+    if (effect.effect == TavernSpellEffect::SPELL_COSTS_HEALTH)
+    {
+        // Hasty Excavation explicitly costs Health instead of Gold, so do
+        // not route this through Hero::TakeDamage (which would consume Armor).
+        hero.health -= cost;
+    }
+    else
+    {
+        remainCoin -= cost;
+    }
     remainCoin += effect.gold;
     season14.Emit(Season14Event::SPELL_CAST);
     ApplySpellBoardEffect(*this, effect, targetIdx);
@@ -468,7 +562,8 @@ void Player::UpgradeTavern()
 
 void Player::RefreshTavern(bool freeRefresh)
 {
-    const int cost = freeRefresh
+    const bool allowanceRefresh = !freeRefresh && season14.HasFreeRefresh();
+    const int cost = freeRefresh || allowanceRefresh
                          ? 0
                          : season14.RefreshCost(NUM_COIN_REFRESH_TAVERN);
     if (remainCoin < cost)
@@ -479,7 +574,12 @@ void Player::RefreshTavern(bool freeRefresh)
     clearTavernMinionsCallback(*this);
     remainCoin -= cost;
 
-    prepareTavernMinionsCallback(*this);
+    if (allowanceRefresh)
+    {
+        season14.ConsumeFreeRefresh();
+    }
+
+    PrepareTavern();
     season14.OnRefreshTavern(true);
 }
 
