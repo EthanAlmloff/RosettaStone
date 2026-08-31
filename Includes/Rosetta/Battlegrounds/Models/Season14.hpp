@@ -78,6 +78,13 @@ struct Season14SpellModalState {
     bool secondBranchDelayed = false;
     std::string offeringFilter;
 };
+struct Season14PendingCombatBuff
+{
+    std::int32_t sourceCardDbfID = 0;
+    std::uint64_t targetEntityID = 0;
+    std::int32_t attack = 0;
+    std::int32_t health = 0;
+};
 
 //! A persistent Tavern stat bonus scoped to one or more concrete tribes.
 //! The vector is intentionally player-owned so the effect survives Tavern
@@ -137,6 +144,10 @@ class Season14State
     //! spell's intended duration.
     std::int32_t nextTurnGold = 0;
     std::int32_t pendingCombatRewardDbfID = 0;
+    std::vector<Season14PendingCombatBuff> pendingCombatBuffs;
+    std::vector<std::int32_t> pendingCombatStartEffects;
+    //! Number of BG28_884 casts waiting for the same upcoming combat.
+    std::int32_t pendingCombatRewardCount = 0;
     std::int32_t minionsPlayedThisTurn = 0;
     std::int32_t battlecriesTriggered = 0;
     std::int32_t deathrattlesTriggered = 0;
@@ -327,6 +338,16 @@ class Season14State
     void AddNextTurnGold(std::int32_t amount) noexcept;
     void ArmNextCombatReward(std::int32_t sourceCardDbfID) noexcept;
     void ResolveNextCombatReward(BattleResult result, bool playerOne) noexcept;
+    void ArmNextCombatBuff(std::int32_t sourceCardDbfID,
+                           std::uint64_t targetEntityID,
+                           std::int32_t attack,
+                           std::int32_t health) noexcept;
+    bool ResolveNextCombatBuff(BattleResult result, bool playerOne,
+                               std::vector<Season14PendingCombatBuff>& resolved) noexcept;
+    void ArmCombatStartLeftmostAttackDouble(std::int32_t sourceCardDbfID) noexcept;
+    std::size_t TakeCombatStartLeftmostAttackDoubles() noexcept;
+    void ArmCombatStartNearestStats(std::int32_t sourceCardDbfID) noexcept;
+    std::size_t TakeCombatStartNearestStats() noexcept;
     void RecordMinionPlay(bool battlecry) noexcept
     {
         ++minionsPlayedThisTurn;

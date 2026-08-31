@@ -48,6 +48,10 @@ bool TavernSpellReceivesHealthBonus(TavernSpellEffect effect)
         case TavernSpellEffect::TARGET_STATS_AND_REBORN:
         case TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT:
         case TavernSpellEffect::TARGET_SHARED_RACE_STATS:
+        case TavernSpellEffect::TARGET_NEXT_COMBAT_BUFF:
+        case TavernSpellEffect::TARGET_CHOOSE_ONE_STATS:
+        case TavernSpellEffect::ALL_MINION_CHOOSE_ONE_STATS:
+        case TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS:
         case TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT:
         case TavernSpellEffect::SHOP_STATS_PERSISTENT:
         case TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH:
@@ -67,6 +71,31 @@ bool TavernSpellReceivesAttackBonus(TavernSpellEffect effect)
         return true;
     }
     return TavernSpellReceivesHealthBonus(effect);
+}
+
+// Enchanted Sentinel and Humong'oz are continuous Tavern-spell auras.  Keep
+// this derived from the live recruit field so copies, triples, and removals
+// take effect immediately without a stale player counter.
+std::pair<int, int> TavernSpellAuraBonus(const FieldZone& field)
+{
+    int attack = 0;
+    int health = 0;
+    field.ForEachAlive([&](const MinionData& data) {
+        const auto& minion = data.value();
+        const auto id = minion.GetCardID();
+        const int scale = minion.IsGolden() ? 2 : 1;
+        if (id == "BG32_341" || id == "BG32_341_G")
+        {
+            attack += scale;
+            health += 2 * scale;
+        }
+        else if (id == "BG35_341" || id == "BG35_341_G")
+        {
+            attack += scale;
+            health += scale;
+        }
+    });
+    return {attack, health};
 }
 }
 
@@ -489,6 +518,11 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             });
 
             minion.ActivateTask(PowerType::POWER, *this);
+            if (minion.GetRace() == Race::DRAGON &&
+                ShouldDuplicateDragonBattlecry())
+                // PlayCard's POWER activation is the minion Battlecry path;
+                // preserve the same source/target for the extra resolution.
+                minion.ActivateTask(PowerType::POWER, *this);
         }
         else
         {
@@ -502,6 +536,10 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             });
 
             minion.ActivateTask(PowerType::POWER, *this, target);
+            if (minion.GetRace() == Race::DRAGON &&
+                ShouldDuplicateDragonBattlecry())
+                // Targeted Battlecries receive the identical target again.
+                minion.ActivateTask(PowerType::POWER, *this, target);
         }
 
         // Choose One is a public modal after the minion has been committed;
@@ -740,6 +778,37 @@ void Player::ApplyAfterPlayCardTrinkets()
             }
         });
     }
+}
+
+void Player::ApplyAfterRebornTrinkets()
+{
+    for (const auto& trinket : season14.trinkets)
+    {
+        if (!trinket.active || trinket.remainingUses == 0) continue;
+        const auto behavior = FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id);
+        if (behavior.effect != TrinketEffect::AFTER_REBORN_STATS) continue;
+        // Deathwhisper fires from combat Reborn. Apply the temporary combat
+        // buff to the active field; never mutate the recruit copy while a
+        // battle is resolving.
+        GetField().ForEachAlive([&](MinionData& data) {
+            auto& minion = data.value();
+            minion.SetAttack(minion.GetAttack() + behavior.attack);
+            minion.SetHealth(minion.GetHealth() + behavior.health);
+        });
+    }
+}
+
+bool Player::ShouldDuplicateDragonBattlecry() const noexcept
+{
+    for (const auto& trinket : season14.trinkets)
+    {
+        if (!trinket.active || trinket.remainingUses == 0) continue;
+        const auto behavior = FindTrinketBehavior(
+            Cards::FindCardByDbfID(trinket.dbfID).id);
+        if (behavior.effect == TrinketEffect::DUPLICATE_DRAGON_BATTLECRY)
+            return true;
+    }
+    return false;
 }
 
 bool Player::ApplySpellChoice(std::size_t offeringIdx)
@@ -1850,6 +1919,24 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         case TavernSpellEffect::NEXT_COMBAT_REWARD:
             player.season14.ArmNextCombatReward(105267);
             return;
+        case TavernSpellEffect::TARGET_NEXT_COMBAT_BUFF:
+        {
+            if (targetIdx < 0 || targetIdx >= player.recruitField.GetCount())
+                return;
+            auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
+            target.SetAttack(target.GetAttack() + effect.attack);
+            target.SetHealth(target.GetHealth() + effect.health);
+            player.season14.ArmNextCombatBuff(
+                sourceCardDbfID, static_cast<std::uint64_t>(target.GetIndex()),
+                4, 6);
+            return;
+        }
+        case TavernSpellEffect::COMBAT_START_LEFTMOST_ATTACK_DOUBLE:
+            player.season14.ArmCombatStartLeftmostAttackDouble(sourceCardDbfID);
+            return;
+        case TavernSpellEffect::COMBAT_START_LEFTMOST_NEAREST_STATS:
+            player.season14.ArmCombatStartNearestStats(sourceCardDbfID);
+            return;
         case TavernSpellEffect::INCREASE_MAX_GOLD:
             player.season14.IncreaseMaxGold(effect.value);
             return;
@@ -2099,6 +2186,15 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     const int sourceSpellDbfID = spell.GetDbfID();
     const bool temporarySpell = spell.IsTemporary();
     TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
+    const auto [auraAttack, auraHealth] = TavernSpellAuraBonus(recruitField);
+    if (TavernSpellReceivesHealthBonus(effect.effect))
+    {
+        effect.health += auraHealth;
+    }
+    if (TavernSpellReceivesAttackBonus(effect.effect))
+    {
+        effect.attack += auraAttack;
+    }
     // Blue Whelp's Rally is player-owned and cumulative.  Apply it at
     // resolution so spells already in hand, refreshed spells, and generated
     // copies all receive the same bonus exactly once.
@@ -2129,7 +2225,8 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
         season14.BeginSpellTargetChoice(
             sourceSpellDbfID, targetIdx,
             static_cast<std::uint64_t>(recruitField[targetIdx].GetIndex()),
-                                        3, 1, 1, 3,
+                                        3 + auraAttack, 1 + auraHealth,
+                                        1 + auraAttack, 3 + auraHealth,
                                         "friendly_minion_target");
         return true;
     }
@@ -2137,7 +2234,8 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     {
         season14.BeginSpellAllMinionChoice(
             Season14SpellModalKind::ALL_MINION_STATS, sourceSpellDbfID,
-            2, 2, 2, 2, true);
+            2 + auraAttack, 2 + auraHealth,
+            2 + auraAttack, 2 + auraHealth, true);
         return true;
     }
     if (effect.effect == TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS)
@@ -2145,7 +2243,8 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
         season14.BeginSpellTargetChoice(
             sourceSpellDbfID, targetIdx,
             static_cast<std::uint64_t>(recruitField[targetIdx].GetIndex()),
-            6, 6, 2, 2, "friendly_minion_target",
+            6 + auraAttack, 6 + auraHealth,
+            2 + auraAttack, 2 + auraHealth, "friendly_minion_target",
             Season14SpellModalKind::TARGET_OR_ALL_STATS);
         return true;
     }

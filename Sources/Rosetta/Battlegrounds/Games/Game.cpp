@@ -230,6 +230,12 @@ void Game::Start()
     // Initialize variables and callbacks
     for (auto& player : m_gameState.players)
     {
+        // Start() is also the deterministic replay/reset boundary.  Season 14
+        // counters are player-owned (including BG28_884's pending combat
+        // reward), so reconstruct them before the new lobby is initialized;
+        // otherwise a replay can leak queued gold or a consumed arm from the
+        // previous run.
+        player.season14 = Season14State{};
         player.playState = PlayState::PLAYING;
         player.idx = playerIdx;
 
@@ -478,6 +484,38 @@ void Game::Combat()
         const CombatResult result = battle.Run();
         player1.season14.ResolveNextCombatReward(result.outcome, true);
         player2.season14.ResolveNextCombatReward(result.outcome, false);
+        std::vector<Season14PendingCombatBuff> player1Buffs;
+        if (player1.season14.ResolveNextCombatBuff(result.outcome, true,
+                                                   player1Buffs))
+        {
+            for (const auto& player1Buff : player1Buffs)
+                player1.recruitField.ForEachAlive([&](MinionData& data) {
+                    if (static_cast<std::uint64_t>(data.value().GetIndex()) ==
+                        player1Buff.targetEntityID)
+                    {
+                        data.value().SetAttack(data.value().GetAttack() +
+                                               player1Buff.attack);
+                        data.value().SetHealth(data.value().GetHealth() +
+                                               player1Buff.health);
+                    }
+                });
+        }
+        std::vector<Season14PendingCombatBuff> player2Buffs;
+        if (player2.season14.ResolveNextCombatBuff(result.outcome, false,
+                                                   player2Buffs))
+        {
+            for (const auto& player2Buff : player2Buffs)
+                player2.recruitField.ForEachAlive([&](MinionData& data) {
+                    if (static_cast<std::uint64_t>(data.value().GetIndex()) ==
+                        player2Buff.targetEntityID)
+                    {
+                        data.value().SetAttack(data.value().GetAttack() +
+                                               player2Buff.attack);
+                        data.value().SetHealth(data.value().GetHealth() +
+                                               player2Buff.health);
+                    }
+                });
+        }
 
         if (player1.playState == PlayState::PLAYING)
         {

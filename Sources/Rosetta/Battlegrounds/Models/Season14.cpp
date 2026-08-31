@@ -504,22 +504,87 @@ void Season14State::AddNextTurnGold(std::int32_t amount) noexcept
 
 void Season14State::ArmNextCombatReward(std::int32_t sourceCardDbfID) noexcept
 {
-    pendingCombatRewardDbfID = sourceCardDbfID == 105267 ? sourceCardDbfID : 0;
+    if (sourceCardDbfID != 105267)
+        return;
+    pendingCombatRewardDbfID = sourceCardDbfID;
+    ++pendingCombatRewardCount;
 }
 
 void Season14State::ResolveNextCombatReward(BattleResult result,
                                              bool playerOne) noexcept
 {
-    if (pendingCombatRewardDbfID == 0)
+    if (pendingCombatRewardDbfID == 0 || pendingCombatRewardCount <= 0)
         return;
     const bool won = (playerOne && result == BattleResult::PLAYER1_WIN) ||
                      (!playerOne && result == BattleResult::PLAYER2_WIN);
     const bool tied = result == BattleResult::DRAW;
+    const auto count = pendingCombatRewardCount;
     pendingCombatRewardDbfID = 0;
+    pendingCombatRewardCount = 0;
     if (won)
-        AddNextTurnGold(3);
+        AddNextTurnGold(3 * count);
     else if (tied)
-        AddNextTurnGold(1);
+        AddNextTurnGold(count);
+}
+
+void Season14State::ArmNextCombatBuff(std::int32_t sourceCardDbfID,
+                                      std::uint64_t targetEntityID,
+                                      std::int32_t attack,
+                                      std::int32_t health) noexcept
+{
+    if (sourceCardDbfID != 133369 || targetEntityID == 0)
+    {
+        pendingCombatBuffs.clear();
+        return;
+    }
+    pendingCombatBuffs.push_back(
+        { sourceCardDbfID, targetEntityID, attack, health });
+}
+
+bool Season14State::ResolveNextCombatBuff(
+    BattleResult result, bool playerOne,
+    std::vector<Season14PendingCombatBuff>& resolved) noexcept
+{
+    if (pendingCombatBuffs.empty())
+        return false;
+    const bool won = (playerOne && result == BattleResult::PLAYER1_WIN) ||
+                     (!playerOne && result == BattleResult::PLAYER2_WIN);
+    resolved = std::move(pendingCombatBuffs);
+    pendingCombatBuffs.clear();
+    return won;
+}
+
+void Season14State::ArmCombatStartLeftmostAttackDouble(
+    std::int32_t sourceCardDbfID) noexcept
+{
+    if (sourceCardDbfID == 127503)
+        pendingCombatStartEffects.push_back(sourceCardDbfID);
+}
+
+void Season14State::ArmCombatStartNearestStats(
+    std::int32_t sourceCardDbfID) noexcept
+{
+    if (sourceCardDbfID == 119599)
+        pendingCombatStartEffects.push_back(-sourceCardDbfID);
+}
+
+std::size_t Season14State::TakeCombatStartLeftmostAttackDoubles() noexcept
+{
+    const auto result = pendingCombatStartEffects.size();
+    pendingCombatStartEffects.clear();
+    return result;
+}
+
+std::size_t Season14State::TakeCombatStartNearestStats() noexcept
+{
+    const auto count = static_cast<std::size_t>(std::count(
+        pendingCombatStartEffects.begin(), pendingCombatStartEffects.end(),
+        -119599));
+    pendingCombatStartEffects.erase(
+        std::remove(pendingCombatStartEffects.begin(),
+                    pendingCombatStartEffects.end(), -119599),
+        pendingCombatStartEffects.end());
+    return count;
 }
 
 std::int32_t Season14State::TakeNextTurnGold() noexcept

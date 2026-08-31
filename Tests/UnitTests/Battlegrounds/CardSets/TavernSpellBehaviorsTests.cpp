@@ -77,6 +77,18 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Patch 36.4 batch")
     const auto combatReward = FindTavernSpellBehavior("BG28_884");
     CHECK(combatReward.effect == TavernSpellEffect::NEXT_COMBAT_REWARD);
     CHECK(!TavernSpellRequiresTarget(combatReward.effect));
+    const auto delayedBuff = FindTavernSpellBehavior("BG36_883");
+    CHECK(delayedBuff.effect == TavernSpellEffect::TARGET_NEXT_COMBAT_BUFF);
+    CHECK(delayedBuff.attack == 2);
+    CHECK(delayedBuff.health == 3);
+    CHECK(TavernSpellRequiresTarget(delayedBuff.effect));
+    const auto combatStart = FindTavernSpellBehavior("BG34_889");
+    CHECK(combatStart.effect ==
+          TavernSpellEffect::COMBAT_START_LEFTMOST_ATTACK_DOUBLE);
+    CHECK(!TavernSpellRequiresTarget(combatStart.effect));
+    const auto nearest = FindTavernSpellBehavior("BG31_889");
+    CHECK(nearest.effect == TavernSpellEffect::COMBAT_START_LEFTMOST_NEAREST_STATS);
+    CHECK(!TavernSpellRequiresTarget(nearest.effect));
 }
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - targeted stat batch")

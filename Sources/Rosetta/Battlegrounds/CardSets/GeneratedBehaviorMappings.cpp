@@ -257,5 +257,9 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; Trigger t{TriggerType::AFTER_CAST_SPELL}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::SpellCastSelfScalingTask{4, 2}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_921_G", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::AFTER_CAST_SPELL}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::SpellCastOnSelfHealthTask{1}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_921", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::AFTER_CAST_SPELL}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::SpellCastOnSelfHealthTask{2}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_921_G", CardDef{std::move(p)}); }
+  { cards.emplace("BG32_341", CardDef{}); }
+  { cards.emplace("BG32_341_G", CardDef{}); }
+  { cards.emplace("BG35_341", CardDef{}); }
+  { cards.emplace("BG35_341_G", CardDef{}); }
 }
 }

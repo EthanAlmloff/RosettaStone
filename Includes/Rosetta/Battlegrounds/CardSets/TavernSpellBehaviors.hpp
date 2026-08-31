@@ -44,6 +44,9 @@ enum class TavernSpellEffect
     SET_PLAYER_ARMOR,
     NEXT_TURN_GOLD,
     NEXT_COMBAT_REWARD,
+    TARGET_NEXT_COMBAT_BUFF,
+    COMBAT_START_LEFTMOST_ATTACK_DOUBLE,
+    COMBAT_START_LEFTMOST_NEAREST_STATS,
     INCREASE_MAX_GOLD,
     FREE_REFRESHES,
     SHOP_STATS_PERSISTENT,
@@ -245,6 +248,20 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     {
         return { 0, 0, 0, TavernSpellEffect::NEXT_COMBAT_REWARD };
     }
+    if (id == "BG36_883") // +2/+3 now; +4/+6 to that minion after a win.
+    {
+        return { 0, 2, 3, TavernSpellEffect::TARGET_NEXT_COMBAT_BUFF };
+    }
+    if (id == "BG34_889") // Double the left-most minion's Attack in combat.
+    {
+        return { 0, 0, 0,
+                 TavernSpellEffect::COMBAT_START_LEFTMOST_ATTACK_DOUBLE };
+    }
+    if (id == "BG31_889") // Copy stats from the nearest enemy at combat start.
+    {
+        return { 0, 0, 0,
+                 TavernSpellEffect::COMBAT_START_LEFTMOST_NEAREST_STATS };
+    }
     if (id == "BG28_805") // Strike Oil: increase maximum Gold by 1.
     {
         return { 0, 0, 0, TavernSpellEffect::INCREASE_MAX_GOLD,
@@ -366,6 +383,7 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
 inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 {
     return effect == TavernSpellEffect::TARGET_STATS ||
+           effect == TavernSpellEffect::TARGET_NEXT_COMBAT_BUFF ||
            effect == TavernSpellEffect::TARGET_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::BLOOD_GEM ||

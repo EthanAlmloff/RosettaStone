@@ -40,6 +40,8 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG30_MagicItem_900t") return {TrinketEffect::AFTER_PLAY_CARD_RANDOM_RACE_BUFF, 6, 4, 1, Race::DRAGON};
     if (id == "BG30_MagicItem_989") return {TrinketEffect::STATIC_RACE_STATS, 3, 0, 0, Race::UNDEAD};
     if (id == "BG30_MagicItem_989t") return {TrinketEffect::STATIC_RACE_STATS, 15, 0, 0, Race::UNDEAD};
+    if (id == "BG36_MagicItem_205") return {TrinketEffect::AFTER_REBORN_STATS, 2, 2};
+    if (id == "BG36_MagicItem_215") return {TrinketEffect::DUPLICATE_DRAGON_BATTLECRY};
     return {};
 }
 
@@ -72,5 +74,7 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG30_MagicItem_900t", CardDef{});
     cards.emplace("BG30_MagicItem_989", CardDef{});
     cards.emplace("BG30_MagicItem_989t", CardDef{});
+    cards.emplace("BG36_MagicItem_205", CardDef{});
+    cards.emplace("BG36_MagicItem_215", CardDef{});
 }
 }  // namespace RosettaStone::Battlegrounds

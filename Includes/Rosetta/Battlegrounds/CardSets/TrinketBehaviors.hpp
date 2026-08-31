@@ -25,7 +25,9 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            AFTER_BUY_RANDOM_FRIENDLY_BUFF,
                            END_TURN_DIVINE_SHIELD_ATTACK,
                            AFTER_PLAY_CARD_RANDOM_RACE_BUFF,
-                           STATIC_RACE_STATS };
+                           STATIC_RACE_STATS,
+                           AFTER_REBORN_STATS,
+                           DUPLICATE_DRAGON_BATTLECRY };
                            
                            
                            

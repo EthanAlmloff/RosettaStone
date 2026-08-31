@@ -10,6 +10,8 @@
 #include <effolkronium/random.hpp>
 
 #include <algorithm>
+#include <cstdlib>
+#include <limits>
 #include <stdexcept>
 
 using Random = effolkronium::random_thread_local;
@@ -121,6 +123,59 @@ Battle::Battle(Player& player1, Player& player2)
 {
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
+    const auto apply = [](Player& owner, FieldZone& field) {
+        const auto doubles = owner.season14.TakeCombatStartLeftmostAttackDoubles();
+        for (std::size_t i = 0; i < doubles; ++i)
+        {
+            bool applied = false;
+            field.ForEachAlive([&applied](MinionData& data) {
+                // The field iteration is ordered; only the first occupied
+                // slot is affected.  Mutate the combat copy only.
+                if (!applied)
+                {
+                    data.value().SetAttack(data.value().GetAttack() * 2);
+                    applied = true;
+                }
+            });
+        }
+    };
+    apply(m_player1, m_p1Field);
+    apply(m_player2, m_p2Field);
+    const auto copyNearest = [](Player& owner, FieldZone& ownField,
+                                const FieldZone& enemyField) {
+        const auto copies = owner.season14.TakeCombatStartNearestStats();
+        for (std::size_t i = 0; i < copies; ++i)
+        {
+            Minion* leftmost = nullptr;
+            ownField.ForEachAlive([&leftmost](MinionData& data) {
+                if (leftmost == nullptr)
+                    leftmost = &data.value();
+            });
+            if (leftmost == nullptr)
+                continue;
+            const Minion* nearest = nullptr;
+            int bestDistance = std::numeric_limits<int>::max();
+            enemyField.ForEachAlive([&](const MinionData& data) {
+                const Minion& candidate = data.value();
+                const int distance = std::abs(
+                    candidate.GetZonePosition() - leftmost->GetZonePosition());
+                if (nearest == nullptr || distance < bestDistance ||
+                    (distance == bestDistance &&
+                     candidate.GetZonePosition() < nearest->GetZonePosition()))
+                {
+                    nearest = &candidate;
+                    bestDistance = distance;
+                }
+            });
+            if (nearest != nullptr)
+            {
+                leftmost->SetAttack(leftmost->GetAttack() + nearest->GetAttack());
+                leftmost->SetHealth(leftmost->GetHealth() + nearest->GetHealth());
+            }
+        }
+    };
+    copyNearest(m_player1, m_p1Field, m_p2Field);
+    copyNearest(m_player2, m_p2Field, m_p1Field);
 }
 
 void Battle::Initialize()
@@ -656,6 +711,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     alive.value().ActivateTrigger(TriggerType::REBORN,
                                                   removedMinion);
                 });
+                owner.ApplyAfterRebornTrinkets();
             }
         }
 

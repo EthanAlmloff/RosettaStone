@@ -211,6 +211,10 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG35_921_G","after_cast_spell","self","tavern_spell","spell_cast_self_scaling",4,2,2,0,0,0,false},
   {"BG36_921","after_cast_spell","self","spell_targets_self","spell_cast_on_self_health",0,1,1,0,0,0,false},
   {"BG36_921_G","after_cast_spell","self","spell_targets_self","spell_cast_on_self_health",0,2,2,0,0,0,false},
+  {"BG32_341","static","self","always","static",0,1,0,0,0,0,false},
+  {"BG32_341_G","static","self","always","static",0,2,0,0,0,0,false},
+  {"BG35_341","static","self","always","static",0,1,0,0,0,0,false},
+  {"BG35_341_G","static","self","always","static",0,2,0,0,0,0,false},
 };
 inline constexpr DeclarativeEnchantmentRow DeclarativeEnchantmentRows[] = {
   {"BG26_523e","BG26_523","BG26_523","permanent",3,3,0},

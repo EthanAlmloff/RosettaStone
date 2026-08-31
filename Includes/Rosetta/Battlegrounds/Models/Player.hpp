@@ -110,6 +110,8 @@ class Player
     //! including modal/Choose-One completion paths.
     void ApplyTavernSpellTrinkets();
     void ApplyAfterPlayCardTrinkets();
+    void ApplyAfterRebornTrinkets();
+    bool ShouldDuplicateDragonBattlecry() const noexcept;
     void ApplyDeferredTavernSpellStats();
 
     //! Applies a fully resolved target-free Season 14 hero-power activation.

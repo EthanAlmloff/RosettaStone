@@ -1,6 +1,7 @@
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 
 #include <doctest/doctest.h>
 
@@ -269,6 +270,102 @@ TEST_CASE("[Season14] - next-combat reward is owner-relative and one-shot")
     state.ArmNextCombatReward(105267);
     state.ResolveNextCombatReward(BattleResult::PLAYER1_WIN, false);
     CHECK(state.TakeNextTurnGold() == 0);
+}
+
+TEST_CASE("[Season14] - Reborn trinket is a friendly-board-only trigger")
+{
+    const auto behavior = FindTrinketBehavior("BG36_MagicItem_205");
+    CHECK(behavior.effect == TrinketEffect::AFTER_REBORN_STATS);
+    CHECK(behavior.attack == 2);
+    CHECK(behavior.health == 2);
+
+    Player player;
+    player.season14.trinkets.push_back({
+        Cards::FindCardByID("BG36_MagicItem_205").dbfID, 1, true});
+    player.season14.trinkets.push_back({
+        Cards::FindCardByID("BG36_MagicItem_205").dbfID, 1, true});
+    Minion minion(Cards::FindCardByDbfID(49169));
+    player.battleField.Add(minion);
+    player.isInCombat = true;
+    const int attack = player.battleField[0].GetAttack();
+    const int health = player.battleField[0].GetHealth();
+    player.ApplyAfterRebornTrinkets();
+    CHECK(player.battleField[0].GetAttack() == attack + 4);
+    CHECK(player.battleField[0].GetHealth() == health + 4);
+    CHECK(player.recruitField.GetCount() == 0);
+}
+
+TEST_CASE("[Season14] - Dragon's Eye respects active and consumed state")
+{
+    Player player;
+    const auto dbf = Cards::FindCardByID("BG36_MagicItem_215").dbfID;
+    player.season14.trinkets.push_back({dbf, 1, true});
+    CHECK(player.ShouldDuplicateDragonBattlecry());
+    player.season14.trinkets.front().remainingUses = 0;
+    CHECK(!player.ShouldDuplicateDragonBattlecry());
+    player.season14.trinkets.front().remainingUses = 1;
+    player.season14.trinkets.front().active = false;
+    CHECK(!player.ShouldDuplicateDragonBattlecry());
+}
+
+TEST_CASE("[Season14] - next-combat buff resolves only on owner win")
+{
+    Season14State state;
+    state.ArmNextCombatBuff(133369, 42, 4, 6);
+    state.ArmNextCombatBuff(133369, 42, 4, 6);
+    std::vector<Season14PendingCombatBuff> resolved;
+    CHECK(state.ResolveNextCombatBuff(BattleResult::PLAYER1_WIN, true,
+                                      resolved));
+    CHECK(resolved.size() == 2);
+    CHECK(resolved.front().targetEntityID == 42);
+    CHECK(resolved.front().attack == 4);
+
+    state.ArmNextCombatBuff(133369, 42, 4, 6);
+    CHECK(!state.ResolveNextCombatBuff(BattleResult::DRAW, true, resolved));
+    CHECK(resolved.size() == 1);
+    CHECK(!state.ResolveNextCombatBuff(BattleResult::PLAYER1_WIN, true,
+                                       resolved));
+}
+
+TEST_CASE("[Season14] - combat-start attack doubles stack and reset")
+{
+    Season14State state;
+    state.ArmCombatStartLeftmostAttackDouble(127503);
+    state.ArmCombatStartLeftmostAttackDouble(127503);
+    CHECK(state.TakeCombatStartLeftmostAttackDoubles() == 2);
+    CHECK(state.TakeCombatStartLeftmostAttackDoubles() == 0);
+    state.ArmCombatStartLeftmostAttackDouble(1);
+    CHECK(state.TakeCombatStartLeftmostAttackDoubles() == 0);
+}
+
+TEST_CASE("[Season14] - nearest enemy stat copies stack and reset")
+{
+    Season14State state;
+    state.ArmCombatStartNearestStats(119599);
+    state.ArmCombatStartNearestStats(119599);
+    CHECK(state.TakeCombatStartNearestStats() == 2);
+    CHECK(state.TakeCombatStartNearestStats() == 0);
+    state.ArmCombatStartNearestStats(1);
+    CHECK(state.TakeCombatStartNearestStats() == 0);
+}
+
+TEST_CASE("[Season14] - next-combat reward stacks casts and maps both combat perspectives")
+{
+    Season14State winner;
+    winner.ArmNextCombatReward(105267);
+    winner.ArmNextCombatReward(105267);
+    winner.ResolveNextCombatReward(BattleResult::PLAYER1_WIN, true);
+    CHECK(winner.TakeNextTurnGold() == 6);
+
+    Season14State loser;
+    loser.ArmNextCombatReward(105267);
+    loser.ResolveNextCombatReward(BattleResult::PLAYER1_WIN, false);
+    CHECK(loser.TakeNextTurnGold() == 0);
+
+    Season14State tied;
+    tied.ArmNextCombatReward(105267);
+    tied.ResolveNextCombatReward(BattleResult::DRAW, true);
+    CHECK(tied.TakeNextTurnGold() == 1);
 }
 
 TEST_CASE("[Season14] - spend-gold thresholds roll over and reset per recruit turn")

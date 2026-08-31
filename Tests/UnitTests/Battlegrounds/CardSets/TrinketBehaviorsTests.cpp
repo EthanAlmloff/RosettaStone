@@ -94,6 +94,8 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - end of recruit family")
     CHECK(undead.attack == 3);
     const auto goldenUndead = FindTrinketBehavior("BG30_MagicItem_989t");
     CHECK(goldenUndead.attack == 15);
+    const auto dragonsEye = FindTrinketBehavior("BG36_MagicItem_215");
+    CHECK(dragonsEye.effect == TrinketEffect::DUPLICATE_DRAGON_BATTLECRY);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Kodo Leather Pouch purchase family")
