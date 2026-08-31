@@ -96,6 +96,11 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - end of recruit family")
     CHECK(goldenUndead.attack == 15);
     const auto dragonsEye = FindTrinketBehavior("BG36_MagicItem_215");
     CHECK(dragonsEye.effect == TrinketEffect::DUPLICATE_DRAGON_BATTLECRY);
+    const auto firstMinionShield = FindTrinketBehavior("BG36_MagicItem_811");
+    CHECK(firstMinionShield.effect == TrinketEffect::FIRST_MINION_DIVINE_SHIELD);
+    const auto warcryTotem = FindTrinketBehavior("BG36_MagicItem_202");
+    CHECK(warcryTotem.effect == TrinketEffect::BATTLECRY_BUY_DISCOUNT);
+    CHECK(warcryTotem.value == 2);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Kodo Leather Pouch purchase family")

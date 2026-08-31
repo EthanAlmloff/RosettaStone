@@ -58,6 +58,10 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonedMinionStatMultiplierTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTavernSpellHealthBonusTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTavernSpellToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnStatTransferTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyHighestHandSummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyHighestHandMurlocBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellAttackBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GrowingSummonAttackTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MinionOfferingTask.hpp>
@@ -96,6 +100,10 @@ using TaskType =
                  SimpleTasks::OnePerTypeRallyBuffTask,
                  SimpleTasks::SummonedMinionStatMultiplierTask,
                  SimpleTasks::RallyTavernSpellHealthBonusTask,
+                 SimpleTasks::RandomTavernSpellToHandTask,
+                 SimpleTasks::EndTurnStatTransferTask,
+                 SimpleTasks::RallyHighestHandSummonTask,
+                 SimpleTasks::RallyHighestHandMurlocBuffTask,
                  SimpleTasks::BattlecryTavernSpellAttackBonusTask,
                  SimpleTasks::GrowingSummonAttackTask,
                  SimpleTasks::MinionOfferingTask, SimpleTasks::DarkGiftRandomPoolTask,

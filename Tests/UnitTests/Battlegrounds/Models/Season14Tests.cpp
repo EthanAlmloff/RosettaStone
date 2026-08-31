@@ -308,6 +308,27 @@ TEST_CASE("[Season14] - Dragon's Eye respects active and consumed state")
     CHECK(!player.ShouldDuplicateDragonBattlecry());
 }
 
+TEST_CASE("[Season14] - first-minion shield is once per recruit turn")
+{
+    Player player;
+    const auto dbf = Cards::FindCardByID("BG36_MagicItem_811").dbfID;
+    player.season14.trinkets.push_back({dbf, 1, true});
+    Minion first(Cards::FindCardByDbfID(49169));
+    Minion second(Cards::FindCardByDbfID(49169));
+    player.recruitField.Add(first);
+    player.ApplyFirstMinionDivineShield(player.recruitField[0]);
+    CHECK(player.recruitField[0].HasDivineShield());
+    player.recruitField.Add(second);
+    player.ApplyFirstMinionDivineShield(player.recruitField[1]);
+    CHECK(!player.recruitField[1].HasDivineShield());
+    player.season14.firstMinionPlayedThisTurn = false;
+    player.season14.trinkets.front().active = false;
+    Minion third(Cards::FindCardByDbfID(49169));
+    player.recruitField.Add(third);
+    player.ApplyFirstMinionDivineShield(player.recruitField[2]);
+    CHECK(!player.recruitField[2].HasDivineShield());
+}
+
 TEST_CASE("[Season14] - next-combat buff resolves only on owner win")
 {
     Season14State state;
@@ -347,6 +368,54 @@ TEST_CASE("[Season14] - nearest enemy stat copies stack and reset")
     CHECK(state.TakeCombatStartNearestStats() == 0);
     state.ArmCombatStartNearestStats(1);
     CHECK(state.TakeCombatStartNearestStats() == 0);
+}
+
+TEST_CASE("[Season14] - random enemy health effect stacks and resets")
+{
+    Season14State state;
+    state.ArmCombatStartRandomEnemySetHealth(104560);
+    state.ArmCombatStartRandomEnemySetHealth(104560);
+    CHECK(state.TakeCombatStartRandomEnemySetHealth() == 2);
+    CHECK(state.TakeCombatStartRandomEnemySetHealth() == 0);
+    state.ArmCombatStartRandomEnemySetHealth(1);
+    CHECK(state.TakeCombatStartRandomEnemySetHealth() == 0);
+}
+
+TEST_CASE("[Season14] - refresh Blood Gem aura is player-owned")
+{
+    Season14State state;
+    CHECK(!state.HasShopBloodGemsOnRefresh());
+    state.ArmShopBloodGemsOnRefresh(126676);
+    CHECK(state.HasShopBloodGemsOnRefresh());
+    state.ArmShopBloodGemsOnRefresh(1);
+    CHECK(state.HasShopBloodGemsOnRefresh());
+}
+
+TEST_CASE("[Season14] - mixed combat-start effects consume only their own entries")
+{
+    Season14State state;
+    state.ArmCombatStartLeftmostAttackDouble(127503);
+    state.ArmCombatStartNearestStats(119599);
+    state.ArmCombatStartRandomEnemySetHealth(104560);
+    state.ArmCombatStartLeftmostAttackDouble(127503);
+
+    CHECK(state.TakeCombatStartLeftmostAttackDoubles() == 2);
+    CHECK(state.TakeCombatStartNearestStats() == 1);
+    CHECK(state.TakeCombatStartRandomEnemySetHealth() == 1);
+    CHECK(state.TakeCombatStartLeftmostAttackDoubles() == 0);
+    CHECK(state.TakeCombatStartNearestStats() == 0);
+    CHECK(state.TakeCombatStartRandomEnemySetHealth() == 0);
+}
+
+TEST_CASE("[Season14] - combat-start Beetle casts stack and reset")
+{
+    Season14State state;
+    state.ArmCombatStartBeetles(110401);
+    state.ArmCombatStartBeetles(110401);
+    CHECK(state.TakeCombatStartBeetles() == 2);
+    CHECK(state.TakeCombatStartBeetles() == 0);
+    state.ArmCombatStartBeetles(1);
+    CHECK(state.TakeCombatStartBeetles() == 0);
 }
 
 TEST_CASE("[Season14] - next-combat reward stacks casts and maps both combat perspectives")

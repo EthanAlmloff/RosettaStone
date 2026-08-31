@@ -47,6 +47,10 @@ enum class TavernSpellEffect
     TARGET_NEXT_COMBAT_BUFF,
     COMBAT_START_LEFTMOST_ATTACK_DOUBLE,
     COMBAT_START_LEFTMOST_NEAREST_STATS,
+    COMBAT_START_RANDOM_ENEMY_SET_HEALTH,
+    DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK,
+    SHOP_BLOOD_GEMS_ON_REFRESH,
+    COMBAT_START_SUMMON_BEETLES,
     INCREASE_MAX_GOLD,
     FREE_REFRESHES,
     SHOP_STATS_PERSISTENT,
@@ -64,6 +68,7 @@ enum class TavernSpellEffect
     SELL_TARGET_GIVE_LEFTMOST_RACE_STATS,
     BLOOD_GEM,
     DISCOVER_MINION,
+    DISCOVER_BATTLECRY_MINION,
     TRANSFORM_HIGHER_TIER,
     DISCOVER_DIFFERENT_RACE,
     RANDOM_MINION_AND_COPY,
@@ -262,6 +267,25 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 0, 0, 0,
                  TavernSpellEffect::COMBAT_START_LEFTMOST_NEAREST_STATS };
     }
+    if (id == "BG28_573") // Set a random enemy minion's Health to 1.
+    {
+        return { 0, 0, 0,
+                 TavernSpellEffect::COMBAT_START_RANDOM_ENEMY_SET_HEALTH };
+    }
+    if (id == "BG28_604") // Destroy an Undead; your Undead gain +5 Attack.
+    {
+        return { 0, 5, 0,
+                 TavernSpellEffect::DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK,
+                 Race::UNDEAD };
+    }
+    if (id == "BG34_689") // Each Tavern refresh gives its minions +1/+1.
+    {
+        return { 0, 1, 1, TavernSpellEffect::SHOP_BLOOD_GEMS_ON_REFRESH };
+    }
+    if (id == "BG28_603") // Summon two 2/2 Taunt Beetles in combat.
+    {
+        return { 0, 0, 0, TavernSpellEffect::COMBAT_START_SUMMON_BEETLES };
+    }
     if (id == "BG28_805") // Strike Oil: increase maximum Gold by 1.
     {
         return { 0, 0, 0, TavernSpellEffect::INCREASE_MAX_GOLD,
@@ -327,6 +351,8 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     if (id == "BG28_882") // Contracted Corpse: Discover a Deathrattle minion.
         return { 0, 0, 0, TavernSpellEffect::DISCOVER_MINION,
                  Race::INVALID, 3, 8 };
+    if (id == "BG28_GIL_836") // Battlecry: Discover a Battlecry minion.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_BATTLECRY_MINION };
     if (id == "EBG_Spell_037") // Unmasked Identity: Discover a new Hero Power.
         return { 0, 0, 0, TavernSpellEffect::DISCOVER_HERO_POWER };
     if (id == "BG30_804") // Robust Evolution: random higher-Tier transform.
@@ -383,6 +409,7 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
 inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 {
     return effect == TavernSpellEffect::TARGET_STATS ||
+           effect == TavernSpellEffect::DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK ||
            effect == TavernSpellEffect::TARGET_NEXT_COMBAT_BUFF ||
            effect == TavernSpellEffect::TARGET_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS ||

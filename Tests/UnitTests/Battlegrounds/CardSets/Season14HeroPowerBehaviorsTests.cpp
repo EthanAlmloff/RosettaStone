@@ -6,9 +6,19 @@
 
 using namespace RosettaStone::Battlegrounds;
 
+TEST_CASE("[Season14HeroPowerBehaviors] - Nine Frogs is registered")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(110472);
+    REQUIRE(entry != nullptr);
+    REQUIRE(FindSeason14HeroPowerBehavior("BG28_HERO_801p") == entry);
+    CHECK(entry->kind == Season14HeroPowerKind::TAVERN_SPELL_DISCOVER);
+    CHECK(entry->cost == 1);
+    CHECK(!entry->passive);
+}
+
 TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 8);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 9);
 
     for (std::size_t i = 0; i < SEASON14_HERO_POWER_BEHAVIORS.size(); ++i)
     {

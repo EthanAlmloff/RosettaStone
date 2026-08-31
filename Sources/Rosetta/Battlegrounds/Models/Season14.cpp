@@ -568,11 +568,52 @@ void Season14State::ArmCombatStartNearestStats(
         pendingCombatStartEffects.push_back(-sourceCardDbfID);
 }
 
+void Season14State::ArmShopBloodGemsOnRefresh(std::int32_t sourceCardDbfID) noexcept
+{
+    if (sourceCardDbfID == 126676)
+        shopBloodGemsOnRefresh = true;
+}
+
+bool Season14State::HasShopBloodGemsOnRefresh() const noexcept
+{
+    return shopBloodGemsOnRefresh;
+}
+
+void Season14State::ArmCombatStartBeetles(std::int32_t sourceCardDbfID) noexcept
+{
+    if (sourceCardDbfID == 110401)
+        pendingCombatStartEffects.push_back(sourceCardDbfID);
+}
+
+std::size_t Season14State::TakeCombatStartBeetles() noexcept
+{
+    const auto count = static_cast<std::size_t>(std::count(
+        pendingCombatStartEffects.begin(), pendingCombatStartEffects.end(),
+        110401));
+    pendingCombatStartEffects.erase(
+        std::remove(pendingCombatStartEffects.begin(),
+                    pendingCombatStartEffects.end(), 110401),
+        pendingCombatStartEffects.end());
+    return count;
+}
+
+void Season14State::ArmCombatStartRandomEnemySetHealth(
+    std::int32_t sourceCardDbfID) noexcept
+{
+    if (sourceCardDbfID == 104560)
+        pendingCombatStartEffects.push_back(-sourceCardDbfID);
+}
+
 std::size_t Season14State::TakeCombatStartLeftmostAttackDoubles() noexcept
 {
-    const auto result = pendingCombatStartEffects.size();
-    pendingCombatStartEffects.clear();
-    return result;
+    const auto count = static_cast<std::size_t>(std::count(
+        pendingCombatStartEffects.begin(), pendingCombatStartEffects.end(),
+        127503));
+    pendingCombatStartEffects.erase(
+        std::remove(pendingCombatStartEffects.begin(),
+                    pendingCombatStartEffects.end(), 127503),
+        pendingCombatStartEffects.end());
+    return count;
 }
 
 std::size_t Season14State::TakeCombatStartNearestStats() noexcept
@@ -583,6 +624,18 @@ std::size_t Season14State::TakeCombatStartNearestStats() noexcept
     pendingCombatStartEffects.erase(
         std::remove(pendingCombatStartEffects.begin(),
                     pendingCombatStartEffects.end(), -119599),
+        pendingCombatStartEffects.end());
+    return count;
+}
+
+std::size_t Season14State::TakeCombatStartRandomEnemySetHealth() noexcept
+{
+    const auto count = static_cast<std::size_t>(std::count(
+        pendingCombatStartEffects.begin(), pendingCombatStartEffects.end(),
+        -104560));
+    pendingCombatStartEffects.erase(
+        std::remove(pendingCombatStartEffects.begin(),
+                    pendingCombatStartEffects.end(), -104560),
         pendingCombatStartEffects.end());
     return count;
 }

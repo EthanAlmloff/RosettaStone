@@ -10,6 +10,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch5.hpp>
 #include <Rosetta/Common/Enums/CardEnums.hpp>
 #include <Rosetta/Common/Enums/GameEnums.hpp>
+#include <Rosetta/Battlegrounds/Models/Minion.hpp>
 
 #include <array>
 #include <cstddef>
@@ -17,6 +18,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <optional>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -145,9 +147,14 @@ class Season14State
     std::int32_t nextTurnGold = 0;
     std::int32_t pendingCombatRewardDbfID = 0;
     std::vector<Season14PendingCombatBuff> pendingCombatBuffs;
+    std::optional<Minion> pendingCombatHandSummon;
+    std::int32_t pendingCombatHandSummonCount = 0;
     std::vector<std::int32_t> pendingCombatStartEffects;
+    bool shopBloodGemsOnRefresh = false;
     //! Number of BG28_884 casts waiting for the same upcoming combat.
     std::int32_t pendingCombatRewardCount = 0;
+    bool firstMinionPlayedThisTurn = false;
+    std::int32_t battlecryBuysThisTurn = 0;
     std::int32_t minionsPlayedThisTurn = 0;
     std::int32_t battlecriesTriggered = 0;
     std::int32_t deathrattlesTriggered = 0;
@@ -344,10 +351,18 @@ class Season14State
                            std::int32_t health) noexcept;
     bool ResolveNextCombatBuff(BattleResult result, bool playerOne,
                                std::vector<Season14PendingCombatBuff>& resolved) noexcept;
+    void ArmCombatHandSummon(Minion snapshot, std::int32_t count) { pendingCombatHandSummon = std::move(snapshot); pendingCombatHandSummonCount += count; }
+    std::pair<std::optional<Minion>, std::int32_t> TakeCombatHandSummon() { auto out = std::make_pair(std::move(pendingCombatHandSummon), pendingCombatHandSummonCount); pendingCombatHandSummon.reset(); pendingCombatHandSummonCount = 0; return out; }
     void ArmCombatStartLeftmostAttackDouble(std::int32_t sourceCardDbfID) noexcept;
     std::size_t TakeCombatStartLeftmostAttackDoubles() noexcept;
     void ArmCombatStartNearestStats(std::int32_t sourceCardDbfID) noexcept;
+    void ArmShopBloodGemsOnRefresh(std::int32_t sourceCardDbfID) noexcept;
+    bool HasShopBloodGemsOnRefresh() const noexcept;
+    void ArmCombatStartBeetles(std::int32_t sourceCardDbfID) noexcept;
+    std::size_t TakeCombatStartBeetles() noexcept;
     std::size_t TakeCombatStartNearestStats() noexcept;
+    void ArmCombatStartRandomEnemySetHealth(std::int32_t sourceCardDbfID) noexcept;
+    std::size_t TakeCombatStartRandomEnemySetHealth() noexcept;
     void RecordMinionPlay(bool battlecry) noexcept
     {
         ++minionsPlayedThisTurn;

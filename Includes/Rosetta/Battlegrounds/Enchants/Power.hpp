@@ -67,6 +67,7 @@ class Power
     //! Returns a list of battlecry tasks.
     //! \return A list of battlecry tasks.
     std::vector<TaskType>& GetBattlecryTask();
+    const std::vector<TaskType>& GetBattlecryTask() const;
 
     //! Returns a list of start of combat tasks.
     //! \return A list of start of combat tasks.

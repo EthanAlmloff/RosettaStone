@@ -24,6 +24,7 @@ enum class Season14HeroPowerKind : std::uint8_t
     BUY_PIRATE_GOLD,
     TAVERN_SPELL_AURA,
     MAX_GOLD,
+    TAVERN_SPELL_DISCOVER,
 };
 
 struct Season14HeroPowerDefinition
@@ -36,7 +37,7 @@ struct Season14HeroPowerDefinition
 };
 
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 8>
+inline constexpr std::array<Season14HeroPowerDefinition, 9>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},
@@ -54,6 +55,8 @@ inline constexpr std::array<Season14HeroPowerDefinition, 8>
          Season14HeroPowerKind::TAVERN_SPELL_AURA, 0, true},
         {"BG32_HERO_001p", 116921,
          Season14HeroPowerKind::MAX_GOLD, 3, false},
+        {"BG28_HERO_801p", 110472,
+         Season14HeroPowerKind::TAVERN_SPELL_DISCOVER, 1, false},
     }};
 
 constexpr const Season14HeroPowerDefinition* FindSeason14HeroPowerBehavior(

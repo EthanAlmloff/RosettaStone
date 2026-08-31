@@ -234,6 +234,7 @@ class Minion
     void ApplyPlayCardStatBonus();
     void SetEndTurnBattlecryTrigger(bool enabled);
     bool HasEndTurnBattlecryTrigger() const;
+    bool HasBattlecry() const;
     void SetDeathrattleStatTransfer(int attack, int health);
     int DeathrattleAttackTransfer() const;
     int DeathrattleHealthTransfer() const;

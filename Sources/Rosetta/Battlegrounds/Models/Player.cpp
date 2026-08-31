@@ -394,7 +394,19 @@ void Player::PurchaseMinion(std::size_t idx)
         return;
     }
 
-    const int cost = season14.MinionPurchaseCost(NUM_COIN_PURCHASE_MINION);
+    const bool battlecryDiscount =
+        tavern.fieldZone[idx].HasBattlecry() &&
+        season14.battlecryBuysThisTurn < 2 &&
+        std::any_of(season14.trinkets.begin(), season14.trinkets.end(),
+                    [](const Season14PersistentEffect& trinket) {
+                        return trinket.active && trinket.remainingUses > 0 &&
+                               FindTrinketBehavior(
+                                   Cards::FindCardByDbfID(trinket.dbfID).id)
+                                   .effect == TrinketEffect::BATTLECRY_BUY_DISCOUNT;
+                    });
+    const int cost = battlecryDiscount
+                         ? 0
+                         : season14.MinionPurchaseCost(NUM_COIN_PURCHASE_MINION);
     if (remainCoin < cost)
     {
         return;
@@ -407,6 +419,7 @@ void Player::PurchaseMinion(std::size_t idx)
 
     if (hand.GetCount() > handCountBeforePurchase)
     {
+        if (battlecryDiscount) ++season14.battlecryBuysThisTurn;
         auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
         ApplyFreshMinionModifiers(purchased);
         const auto attack = season14.OnBuyMinionBatch4();
@@ -481,6 +494,8 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             Minion attachment = std::get<Minion>(hand.Remove(hand[handIdx]));
             attachment.MagnetizeOnto(
                 recruitField[static_cast<std::size_t>(targetIdx)]);
+            ApplyFirstMinionDivineShield(
+                recruitField[static_cast<std::size_t>(targetIdx)]);
             ApplyAfterPlayCardTrinkets();
             return;
         }
@@ -511,6 +526,8 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
         if (targetIdx == -1)
         {
             recruitField.Add(minion, fieldIdx);
+            ApplyFirstMinionDivineShield(
+                recruitField[static_cast<std::size_t>(minion.GetZonePosition())]);
 
             recruitField.ForEachAlive([&minion](MinionData& aliveMinion) {
                 aliveMinion.value().ActivateTrigger(TriggerType::SUMMON,
@@ -529,6 +546,8 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             Minion& target = recruitField[targetIdx];
 
             recruitField.Add(minion, fieldIdx);
+            ApplyFirstMinionDivineShield(
+                recruitField[static_cast<std::size_t>(minion.GetZonePosition())]);
 
             recruitField.ForEachAlive([&minion](MinionData& aliveMinion) {
                 aliveMinion.value().ActivateTrigger(TriggerType::SUMMON,
@@ -809,6 +828,22 @@ bool Player::ShouldDuplicateDragonBattlecry() const noexcept
             return true;
     }
     return false;
+}
+
+void Player::ApplyFirstMinionDivineShield(Minion& minion)
+{
+    if (season14.firstMinionPlayedThisTurn) return;
+    for (const auto& trinket : season14.trinkets)
+    {
+        if (!trinket.active || trinket.remainingUses == 0) continue;
+        if (FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
+            TrinketEffect::FIRST_MINION_DIVINE_SHIELD)
+        {
+            minion.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+            season14.firstMinionPlayedThisTurn = true;
+            return;
+        }
+    }
 }
 
 bool Player::ApplySpellChoice(std::size_t offeringIdx)
@@ -1145,6 +1180,23 @@ std::vector<Card> SupportedDeathrattleMinions()
     };
     append(Cards::GetTier1Minions()); append(Cards::GetTier2Minions()); append(Cards::GetTier3Minions());
     append(Cards::GetTier4Minions()); append(Cards::GetTier5Minions()); append(Cards::GetTier6Minions()); append(Cards::GetTier7Minions());
+    return result;
+}
+
+std::vector<Card> SupportedBattlecryMinions()
+{
+    std::vector<Card> result;
+    const auto append = [&result](const auto& cards) {
+        for (const auto& card : cards)
+            if (card.hasBehavior && card.normalDbfID == 0 &&
+                card.GetCardType() == CardType::MINION &&
+                !card.power.GetBattlecryTask().empty())
+                result.push_back(card);
+    };
+    append(Cards::GetTier1Minions()); append(Cards::GetTier2Minions());
+    append(Cards::GetTier3Minions()); append(Cards::GetTier4Minions());
+    append(Cards::GetTier5Minions()); append(Cards::GetTier6Minions());
+    append(Cards::GetTier7Minions());
     return result;
 }
 
@@ -1689,6 +1741,10 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             static_cast<void>(BeginMinionDiscover(player, std::move(candidates), sourceCardDbfID, effect.lockHand));
             return;
         }
+        case TavernSpellEffect::DISCOVER_BATTLECRY_MINION:
+            static_cast<void>(BeginMinionDiscover(
+                player, SupportedBattlecryMinions(), sourceCardDbfID));
+            return;
         case TavernSpellEffect::TRANSFORM_HIGHER_TIER:
         {
             std::vector<Card> candidates;
@@ -1937,6 +1993,33 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         case TavernSpellEffect::COMBAT_START_LEFTMOST_NEAREST_STATS:
             player.season14.ArmCombatStartNearestStats(sourceCardDbfID);
             return;
+        case TavernSpellEffect::COMBAT_START_RANDOM_ENEMY_SET_HEALTH:
+            player.season14.ArmCombatStartRandomEnemySetHealth(sourceCardDbfID);
+            return;
+        case TavernSpellEffect::DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK:
+        {
+            if (targetIdx < 0 || targetIdx >= player.recruitField.GetCount())
+                return;
+            Minion& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
+            if (!target.HasRace(Race::UNDEAD))
+                return;
+            // Destroy is distinct from selling: resolve the target's owned
+            // deathrattle while it is still on the recruit board, then return
+            // the spent instance to the pool.
+            if (target.HasDeathrattle())
+                target.ActivateTask(PowerType::DEATHRATTLE, player);
+            const int poolIndex = target.GetPoolIndex();
+            player.recruitField.Remove(target);
+            player.returnMinionCallback(poolIndex);
+            player.ApplyPersistentRaceStats(Race::UNDEAD, effect.attack, 0);
+            return;
+        }
+        case TavernSpellEffect::SHOP_BLOOD_GEMS_ON_REFRESH:
+            player.season14.ArmShopBloodGemsOnRefresh(sourceCardDbfID);
+            return;
+        case TavernSpellEffect::COMBAT_START_SUMMON_BEETLES:
+            player.season14.ArmCombatStartBeetles(sourceCardDbfID);
+            return;
         case TavernSpellEffect::INCREASE_MAX_GOLD:
             player.season14.IncreaseMaxGold(effect.value);
             return;
@@ -2015,6 +2098,12 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         {
             return false;
         }
+        if (behavior.effect ==
+                TavernSpellEffect::DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK &&
+            !target.HasRace(Race::UNDEAD))
+        {
+            return false;
+        }
         if (!TavernSpellTargetIsLegal(behavior.effect, target.GetTier(),
                                       target.IsGolden()))
         {
@@ -2064,6 +2153,11 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         else
             candidates = SupportedMinionsForRace(MostCommonFriendlyRace(*this));
         if (candidates.empty()) return false;
+    }
+    if (behavior.effect == TavernSpellEffect::DISCOVER_BATTLECRY_MINION &&
+        (hand.IsFull() || SupportedBattlecryMinions().empty()))
+    {
+        return false;
     }
     if (behavior.effect == TavernSpellEffect::TRANSFORM_HIGHER_TIER) {
         if (targetIdx < 0 || targetIdx >= recruitField.GetCount()) return false;
@@ -2390,6 +2484,13 @@ void Player::RefreshTavern(bool freeRefresh)
     }
 
     PrepareTavern();
+    if (season14.HasShopBloodGemsOnRefresh())
+    {
+        tavern.fieldZone.ForEachAlive([](MinionData& data) {
+            data.value().SetAttack(data.value().GetAttack() + 1);
+            data.value().SetHealth(data.value().GetHealth() + 1);
+        });
+    }
     const auto [randomAttack, randomHealth] =
         season14.RefreshRandomShopStats();
     if (randomAttack != 0 || randomHealth != 0)

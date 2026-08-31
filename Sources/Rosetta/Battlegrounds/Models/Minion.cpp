@@ -921,6 +921,11 @@ bool Minion::HasEndTurnBattlecryTrigger() const
     return m_endTurnBattlecryTrigger;
 }
 
+bool Minion::HasBattlecry() const
+{
+    return !m_card.power.GetBattlecryTask().empty();
+}
+
 void Minion::SetDeathrattleStatTransfer(int attack, int health)
 {
     m_deathrattleAttackTransfer = attack;

@@ -89,6 +89,27 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Patch 36.4 batch")
     const auto nearest = FindTavernSpellBehavior("BG31_889");
     CHECK(nearest.effect == TavernSpellEffect::COMBAT_START_LEFTMOST_NEAREST_STATS);
     CHECK(!TavernSpellRequiresTarget(nearest.effect));
+    const auto randomHealth = FindTavernSpellBehavior("BG28_573");
+    CHECK(randomHealth.effect ==
+          TavernSpellEffect::COMBAT_START_RANDOM_ENEMY_SET_HEALTH);
+    CHECK(!TavernSpellRequiresTarget(randomHealth.effect));
+    const auto undeadSacrifice = FindTavernSpellBehavior("BG28_604");
+    CHECK(undeadSacrifice.effect ==
+          TavernSpellEffect::DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK);
+    CHECK(undeadSacrifice.attack == 5);
+    CHECK(undeadSacrifice.race == Race::UNDEAD);
+    CHECK(TavernSpellRequiresTarget(undeadSacrifice.effect));
+    const auto refreshGems = FindTavernSpellBehavior("BG34_689");
+    CHECK(refreshGems.effect == TavernSpellEffect::SHOP_BLOOD_GEMS_ON_REFRESH);
+    CHECK(refreshGems.attack == 1);
+    CHECK(refreshGems.health == 1);
+    const auto beetles = FindTavernSpellBehavior("BG28_603");
+    CHECK(beetles.effect == TavernSpellEffect::COMBAT_START_SUMMON_BEETLES);
+    CHECK(!TavernSpellRequiresTarget(beetles.effect));
+    const auto battlecryDiscover = FindTavernSpellBehavior("BG28_GIL_836");
+    CHECK(battlecryDiscover.effect ==
+          TavernSpellEffect::DISCOVER_BATTLECRY_MINION);
+    CHECK(!TavernSpellRequiresTarget(battlecryDiscover.effect));
 }
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - targeted stat batch")

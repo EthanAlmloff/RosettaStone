@@ -112,6 +112,7 @@ class Player
     void ApplyAfterPlayCardTrinkets();
     void ApplyAfterRebornTrinkets();
     bool ShouldDuplicateDragonBattlecry() const noexcept;
+    void ApplyFirstMinionDivineShield(Minion& minion);
     void ApplyDeferredTavernSpellStats();
 
     //! Applies a fully resolved target-free Season 14 hero-power activation.

@@ -314,6 +314,8 @@ void Game::Recruit()
 
         player.season14.Emit(Season14Event::RECRUIT_START);
         player.ApplyDeferredTavernSpellStats();
+        player.season14.firstMinionPlayedThisTurn = false;
+        player.season14.battlecryBuysThisTurn = 0;
         player.season14.minionsPlayedThisTurn = 0;
         player.season14.heroPowerUsed = false;
         player.recruitField.ForEach([](MinionData& minion) {

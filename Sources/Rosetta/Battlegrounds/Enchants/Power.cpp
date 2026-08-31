@@ -27,6 +27,11 @@ std::vector<TaskType>& Power::GetBattlecryTask()
     return m_battlecryTask;
 }
 
+const std::vector<TaskType>& Power::GetBattlecryTask() const
+{
+    return m_battlecryTask;
+}
+
 std::vector<TaskType>& Power::GetStartCombatTask()
 {
     return m_startCombatTask;

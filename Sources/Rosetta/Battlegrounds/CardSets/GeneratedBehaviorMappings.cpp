@@ -261,5 +261,19 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { cards.emplace("BG32_341_G", CardDef{}); }
   { cards.emplace("BG35_341", CardDef{}); }
   { cards.emplace("BG35_341_G", CardDef{}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::RandomTavernSpellToHandTask{2, 0}}); p.AddTrigger(std::move(t)); cards.emplace("BG28_595", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::RandomTavernSpellToHandTask{4, 0}}); p.AddTrigger(std::move(t)); cards.emplace("BG28_595_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::RandomTavernSpellToHandTask{2, 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_764", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::RandomTavernSpellToHandTask{4, 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_764_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnStatTransferTask{1, 0, false, 0}}); p.AddTrigger(std::move(t)); cards.emplace("BG32_235", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnStatTransferTask{2, 0, false, 0}}); p.AddTrigger(std::move(t)); cards.emplace("BG32_235_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnStatTransferTask{1, 1, true, 0}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_145", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnStatTransferTask{2, 2, true, 2}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_145_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyHighestHandSummonTask{1}); cards.emplace("BG34_140", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyHighestHandSummonTask{2}); cards.emplace("BG34_140_G", CardDef{std::move(p)}); }
+  { cards.emplace("BG34_142", CardDef{}); }
+  { cards.emplace("BG34_142_G", CardDef{}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyHighestHandMurlocBuffTask{1}); cards.emplace("BG34_143", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyHighestHandMurlocBuffTask{2}); cards.emplace("BG34_143_G", CardDef{std::move(p)}); }
 }
 }

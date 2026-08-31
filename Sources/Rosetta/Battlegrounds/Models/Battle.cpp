@@ -123,6 +123,30 @@ Battle::Battle(Player& player1, Player& player2)
 {
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
+    const auto summonHandSnapshot = [](Player& owner, FieldZone& field) {
+        auto [snapshot, count] = owner.season14.TakeCombatHandSummon();
+        if (!snapshot.has_value() || count <= 0) return;
+        for (int i = 0; i < count && !field.IsFull(); ++i) {
+            Minion copy{*snapshot};
+            owner.ApplyFreshMinionModifiers(copy);
+            field.Add(copy);
+        }
+    };
+    summonHandSnapshot(m_player1, m_p1Field);
+    summonHandSnapshot(m_player2, m_p2Field);
+    const auto applyHighestHandAttack = [](Player& owner, FieldZone& field) {
+        int highest = 0;
+        owner.hand.ForEach([&](const std::optional<CardData>& entry) {
+            if (std::holds_alternative<Minion>(*entry)) highest = std::max(highest, std::get<Minion>(*entry).GetAttack());
+        });
+        field.ForEachAlive([&](MinionData& data) {
+            auto& minion = data.value();
+            if (minion.GetCardID() == "BG34_142" || minion.GetCardID() == "BG34_142_G")
+                minion.SetAttack(minion.GetAttack() + highest * (minion.IsGolden() ? 2 : 1));
+        });
+    };
+    applyHighestHandAttack(m_player1, m_p1Field);
+    applyHighestHandAttack(m_player2, m_p2Field);
     const auto apply = [](Player& owner, FieldZone& field) {
         const auto doubles = owner.season14.TakeCombatStartLeftmostAttackDoubles();
         for (std::size_t i = 0; i < doubles; ++i)
@@ -139,6 +163,9 @@ Battle::Battle(Player& player1, Player& player2)
             });
         }
     };
+    // Resolve player-owned spell effects in seat order, before any combat
+    // triggers run.  The order is explicit so seeded RNG and cross-player
+    // nearest-stat interactions remain replay-stable.
     apply(m_player1, m_p1Field);
     apply(m_player2, m_p2Field);
     const auto copyNearest = [](Player& owner, FieldZone& ownField,
@@ -176,6 +203,35 @@ Battle::Battle(Player& player1, Player& player2)
     };
     copyNearest(m_player1, m_p1Field, m_p2Field);
     copyNearest(m_player2, m_p2Field, m_p1Field);
+    const auto setRandomHealth = [](Player& owner, FieldZone& enemyField) {
+        const auto count = owner.season14.TakeCombatStartRandomEnemySetHealth();
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            std::vector<Minion*> candidates;
+            enemyField.ForEachAlive([&candidates](MinionData& data) {
+                candidates.push_back(&data.value());
+            });
+            if (!candidates.empty())
+                candidates[static_cast<std::size_t>(Random::get<int>(
+                    0, static_cast<int>(candidates.size() - 1)))]
+                    ->SetHealth(1);
+        }
+    };
+    setRandomHealth(m_player1, m_p2Field);
+    setRandomHealth(m_player2, m_p1Field);
+    const auto summonBeetles = [](Player& owner, FieldZone& field) {
+        const auto casts = owner.season14.TakeCombatStartBeetles();
+        const Card beetleCard = Cards::FindCardByID("BG28_603t");
+        for (std::size_t cast = 0; cast < casts && !field.IsFull(); ++cast)
+            for (int i = 0; i < 2 && !field.IsFull(); ++i)
+            {
+                Minion beetle{ beetleCard };
+                owner.ApplyFreshMinionModifiers(beetle);
+                field.Add(beetle);
+            }
+    };
+    summonBeetles(m_player1, m_p1Field);
+    summonBeetles(m_player2, m_p2Field);
 }
 
 void Battle::Initialize()
