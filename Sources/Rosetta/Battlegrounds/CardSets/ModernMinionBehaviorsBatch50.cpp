@@ -1,0 +1,2 @@
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch50.hpp>
+namespace RosettaStone::Battlegrounds { void ModernMinionBehaviorsBatch50::AddAll(std::map<std::string,CardDef>& cards) { ActivateDefinition a; a.effect=ActivateEffect::RANDOM_CARD; a.cost=2; a.amount=1; a.race=Race::MURLOC; Power p; p.AddActivate(a); cards.emplace("BG36_507",CardDef{std::move(p)}); ActivateDefinition g; g.effect=ActivateEffect::RANDOM_CARD; g.cost=2; g.amount=2; g.race=Race::MURLOC; Power q; q.AddActivate(g); cards.emplace("BG36_507_G",CardDef{std::move(q)}); } }

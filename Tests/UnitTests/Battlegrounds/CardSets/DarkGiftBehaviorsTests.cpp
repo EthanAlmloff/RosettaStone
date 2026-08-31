@@ -35,6 +35,20 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - verified Patch 36.4 batch")
     const auto toxicity = FindDarkGiftBehavior("BG36_MidGameEffect_000t69");
     CHECK(toxicity.effect == DarkGiftEffect::TARGET_KEYWORDS);
     CHECK(toxicity.venomous);
+
+    for (const auto* id : {"BG36_MidGameEffect_000t64",
+                           "BG36_MidGameEffect_000t74",
+                           "BG36_MidGameEffect_000t75"})
+    {
+        const auto behavior = FindDarkGiftBehavior(id);
+        CHECK(behavior.effect == DarkGiftEffect::PLAY_CARD_STATS);
+        CHECK(DarkGiftTargetIsLegal(Cards::FindCardByID("BGS_039"), behavior));
+    }
+    const auto endTurn = FindDarkGiftBehavior("BG36_MidGameEffect_000t10");
+    CHECK(endTurn.effect == DarkGiftEffect::END_TURN_BATTLECRY);
+    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t").effect ==
+          DarkGiftEffect::DEATHRATTLE_STATS);
+    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t2").health == 10);
 }
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
@@ -115,12 +129,12 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
 {
-    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t4").effect ==
+    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t11").effect ==
           DarkGiftEffect::NONE);
 
     std::map<std::string, CardDef> cards;
     DarkGiftBehaviors::AddAll(cards);
-    CHECK(cards.size() == 10);
+    CHECK(cards.size() == 16);
     CHECK(cards.contains("BG36_MidGameEffect_000t73"));
     CHECK(cards.contains("BG36_MidGameEffect_000t72"));
     CHECK(cards.contains("BG36_MidGameEffect_000t13"));
@@ -131,6 +145,36 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
     CHECK(cards.contains("BG36_MidGameEffect_000t7"));
     CHECK(cards.contains("BG36_MidGameEffect_000t71"));
     CHECK(cards.contains("BG36_MidGameEffect_000t81"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t64"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t74"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t75"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t10"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t2"));
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - play card stat gifts persist")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion minion(base);
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t64")));
+    minion.ApplyPlayCardStatBonus();
+    CHECK(minion.GetAttack() == base.GetAttack() + 2);
+    CHECK(minion.GetHealth() == base.GetHealth() + 2);
+    minion.ApplyPlayCardStatBonus();
+    CHECK(minion.GetAttack() == base.GetAttack() + 4);
+    CHECK(minion.GetHealth() == base.GetHealth() + 4);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - end turn trigger requires battlecry")
+{
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t10");
+    const Card plain = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(plain.id.empty());
+    Minion minion(plain);
+    CHECK_FALSE(DarkGiftTargetIsLegal(minion, behavior));
 }
 
 TEST_CASE(

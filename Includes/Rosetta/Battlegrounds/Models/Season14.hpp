@@ -9,10 +9,12 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch4.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch5.hpp>
 #include <Rosetta/Common/Enums/CardEnums.hpp>
+#include <Rosetta/Common/Enums/GameEnums.hpp>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -56,6 +58,27 @@ struct Season14PersistentEffect
 };
 struct Season14ChooseOneState { bool pending = false; std::uint64_t sourceEntityID = 0; std::uint32_t targetMask = 0; std::int32_t sourceCardDbfID = 0; };
 
+//! State for a modal originating from a Tavern spell.  Unlike minion
+//! Choose-One state, the source is consumed from hand before the decision is
+//! presented, so the source DBF and target slot are retained explicitly.
+enum class Season14SpellModalKind : std::uint8_t
+{
+    NONE,
+    TARGET_STATS,
+    ALL_MINION_STATS,
+    TARGET_OR_ALL_STATS
+};
+struct Season14SpellModalState {
+    Season14SpellModalKind kind = Season14SpellModalKind::NONE;
+    std::int32_t sourceCardDbfID = 0;
+    std::int32_t targetIndex = -1;
+    std::uint64_t targetEntityID = 0;
+    std::int32_t firstAttack = 0, firstHealth = 0;
+    std::int32_t secondAttack = 0, secondHealth = 0;
+    bool secondBranchDelayed = false;
+    std::string offeringFilter;
+};
+
 //! A persistent Tavern stat bonus scoped to one or more concrete tribes.
 //! The vector is intentionally player-owned so the effect survives Tavern
 //! refreshes without exposing hidden pool state to the bridge.
@@ -81,6 +104,7 @@ class Season14State
     std::uint64_t pendingSourceEntityID = 0;
     std::int32_t pendingSourceCardDbfID = 0;
     Season14ChooseOneState chooseOne;
+    Season14SpellModalState spellModal;
     std::vector<Season14PersistentEffect> trinkets;
     std::vector<Season14PersistentEffect> darkGifts;
 
@@ -105,13 +129,17 @@ class Season14State
 
     //! Hooks for effects whose entity behavior is implemented elsewhere.
     bool lockboxActive = false;
+    std::int32_t lockboxAdvance = 0;
     bool fishbaitActive = false;
+    bool pendingHandLock = false;
     //! Deferred/economy state used by simple Tavern spells.  These counters
     //! are player-owned so refreshing or replacing a Tavern cannot lose a
     //! spell's intended duration.
     std::int32_t nextTurnGold = 0;
+    std::int32_t pendingCombatRewardDbfID = 0;
     std::int32_t minionsPlayedThisTurn = 0;
     std::int32_t battlecriesTriggered = 0;
+    std::int32_t deathrattlesTriggered = 0;
     std::int32_t maxGoldDelta = 0;
     std::int32_t freeRefreshes = 0;
     std::int32_t persistentShopAttack = 0;
@@ -127,12 +155,30 @@ class Season14State
     std::int32_t trinketHigherTierRefreshes = 0;
     std::int32_t trinketMaxGoldDelta = 0;
     std::int32_t trinketImmediateGold = 0;
+    //! Number of end-of-recruit effects that increase the next turn's gold cap.
+    std::int32_t trinketEndTurnMaxGold = 0;
     std::vector<Season14RaceShopStats> persistentShopRaceStats;
     std::vector<Season14RaceShopStats> persistentRaceStats;
     std::int32_t refreshRandomShopAttack = 0;
     std::int32_t refreshRandomShopHealth = 0;
+    std::int32_t fodderRefreshes = 0;
+    std::int32_t goldenMinionsPlayed = 0;
+    std::int32_t unboundElementals = 0;
+    std::vector<std::string> combatAvengeCards;
+    std::int32_t foddersPerRefresh = 1;
     //! Cumulative health added by future Tavern spells this game.
     std::int32_t tavernSpellHealthBonus = 0;
+    //! Cumulative attack added by future Tavern spells this game.
+    std::int32_t tavernSpellAttackBonus = 0;
+    std::int32_t deferredMinionAttack = 0;
+    std::int32_t deferredMinionHealth = 0;
+    std::uint8_t deferredMinionStatTurns = 0;
+    std::int32_t persistentBeetleAttack = 0;
+    std::int32_t persistentBeetleHealth = 0;
+    std::int32_t nextTavernSpellDiscount = 0;
+    std::int32_t persistentTavernTierAttack = 0;
+    std::int32_t persistentTavernTierHealth = 0;
+    std::int32_t persistentTavernTierMax = 0;
     struct GrowingSummonBonus { std::int32_t entityIndex; std::int32_t nextAttack; std::int32_t increment; };
     std::vector<GrowingSummonBonus> growingSummonBonuses;
     //! Additive attack/health applied by each subsequently played Blood Gem.
@@ -156,6 +202,21 @@ class Season14State
     //! \return false when no matching pending offering exists.
     bool SelectDecision(std::size_t offeringIndex);
     void BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t targetMask, std::int32_t sourceCardDbfID, std::vector<Season14Offering> offerings);
+    void BeginSpellTargetChoice(std::int32_t sourceCardDbfID, std::int32_t targetIndex,
+                                std::uint64_t targetEntityID,
+                                std::int32_t firstAttack, std::int32_t firstHealth,
+                                std::int32_t secondAttack, std::int32_t secondHealth,
+                                std::string offeringFilter = {},
+                                Season14SpellModalKind kind = Season14SpellModalKind::TARGET_STATS);
+    void BeginSpellAllMinionChoice(Season14SpellModalKind kind,
+                                   std::int32_t sourceCardDbfID,
+                                   std::int32_t firstAttack,
+                                   std::int32_t firstHealth,
+                                   std::int32_t secondAttack,
+                                   std::int32_t secondHealth,
+                                   bool secondBranchDelayed = false);
+    bool SelectSpellTargetChoice(std::size_t offeringIndex,
+                                 std::int32_t& attack, std::int32_t& health);
 
     //! Configures the hero power without claiming its behavior is supported.
     void SetHeroPower(std::int32_t dbfID, std::int32_t cost, bool available);
@@ -166,6 +227,7 @@ class Season14State
 
     //! Advances target-free Batch-4 lifecycle state at recruit start.
     void BeginRecruitTurnBatch4();
+    void BeginRecruitTurnBatch5();
 
     //! Resets per-combat Avenge progress before combat starts.
     void BeginCombatBatch4();
@@ -214,6 +276,12 @@ class Season14State
     //! Commits an already-validated target-free Batch-4 activation.
     bool ApplyHeroPowerBatch4Activation(
         Season14HeroPowerBatch4Result& result) noexcept;
+    bool ResolveHeroPowerBatch5Activation(
+        Season14HeroPowerBatch5Result& result,
+        std::int32_t tier = 1) const noexcept;
+    bool ApplyHeroPowerBatch5Activation(
+        Season14HeroPowerBatch5Result& result,
+        std::int32_t tier = 1) noexcept;
 
     //! Arms the next Tavern fill with minions from one tier above the player.
     //! The count is consumed by MinionPool when that fill occurs.
@@ -227,6 +295,7 @@ class Season14State
 
     //! Returns the effective cost of a Tavern spell before resolution.
     std::int32_t TavernSpellCost(std::int32_t baseCost) const;
+    std::int32_t ConsumeTavernSpellDiscount() noexcept;
 
     //! Returns the resolved stats of one Blood Gem, including persistent
     //! hero/effect scaling.
@@ -241,6 +310,7 @@ class Season14State
     //! Adds persistent Blood Gem scaling for future generated/played gems.
     void AddBloodGemBonus(std::int32_t attack, std::int32_t health) noexcept;
     void AddTavernSpellHealthBonus(std::int32_t health) noexcept;
+    void AddTavernSpellAttackBonus(std::int32_t attack) noexcept;
     std::int32_t TakeGrowingSummonAttack(std::int32_t entityIndex,
                                           std::int32_t initialAttack,
                                           std::int32_t increment);
@@ -255,6 +325,8 @@ class Season14State
 
     //! Adds deferred gold paid at the next recruit start.
     void AddNextTurnGold(std::int32_t amount) noexcept;
+    void ArmNextCombatReward(std::int32_t sourceCardDbfID) noexcept;
+    void ResolveNextCombatReward(BattleResult result, bool playerOne) noexcept;
     void RecordMinionPlay(bool battlecry) noexcept
     {
         ++minionsPlayedThisTurn;
@@ -310,7 +382,11 @@ class Season14State
 
     //! Returns the armed random-refresh bonus, or zeroes when none is armed.
     std::pair<std::int32_t, std::int32_t>
-    RefreshRandomShopStats() const noexcept;
+    RefreshRandomShopStats() noexcept;
+    void ArmFodderRefreshes(std::int32_t count, std::int32_t amount = 1) noexcept { if (count > 0) { fodderRefreshes += count; foddersPerRefresh = std::max(foddersPerRefresh, amount); } }
+    std::int32_t ConsumeFodderRefresh() noexcept { if (fodderRefreshes <= 0) return 0; --fodderRefreshes; const auto result = foddersPerRefresh; if (fodderRefreshes == 0) foddersPerRefresh = 1; return result; }
+    void TrackCombatAvengeCard(std::string id) { combatAvengeCards.push_back(std::move(id)); }
+    std::vector<std::string> TakeCombatAvengeCards() { auto result = std::move(combatAvengeCards); combatAvengeCards.clear(); return result; }
 
     //! Resolves a complete target-free Batch-3 activation for this hero.
     bool ResolveHeroPowerBatch3Activation(

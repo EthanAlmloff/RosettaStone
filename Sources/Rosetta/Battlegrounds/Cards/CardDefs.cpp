@@ -40,6 +40,16 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch36.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch37.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch39.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch40.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch41.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch42.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch43.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch44.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch45.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch46.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch47.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch48.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch50.hpp>
 #include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch31.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch26.hpp>
@@ -94,6 +104,16 @@ CardDefs::CardDefs()
     ModernMinionBehaviorsBatch36::AddAll(m_data);
     ModernMinionBehaviorsBatch37::AddAll(m_data);
     ModernMinionBehaviorsBatch39::AddAll(m_data);
+    ModernMinionBehaviorsBatch40::AddAll(m_data);
+    ModernMinionBehaviorsBatch41::AddAll(m_data);
+    ModernMinionBehaviorsBatch42::AddAll(m_data);
+    ModernMinionBehaviorsBatch43::AddAll(m_data);
+    ModernMinionBehaviorsBatch44::AddAll(m_data);
+    ModernMinionBehaviorsBatch45::AddAll(m_data);
+    ModernMinionBehaviorsBatch46::AddAll(m_data);
+    ModernMinionBehaviorsBatch47::AddAll(m_data);
+    ModernMinionBehaviorsBatch48::AddAll(m_data);
+    ModernMinionBehaviorsBatch50::AddAll(m_data);
     GeneratedBehaviorMappings::AddAll(m_data);
     ModernMinionBehaviorsBatch31::AddAll(m_data);
     ModernMinionBehaviorsBatch26::AddAll(m_data);

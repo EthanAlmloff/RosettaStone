@@ -127,6 +127,8 @@ void Battle::Initialize()
 {
     m_p1Field.ForEachAlive([](MinionData& data) { data.value().ResetAvengeProgress(); });
     m_p2Field.ForEachAlive([](MinionData& data) { data.value().ResetAvengeProgress(); });
+    m_player1.season14.TakeCombatAvengeCards();
+    m_player2.season14.TakeCombatAvengeCards();
     m_player1.season14.BeginCombatBatch4();
     m_player2.season14.BeginCombatBatch4();
 
@@ -189,7 +191,7 @@ void Battle::Initialize()
     ProcessDestroy(true);
 }
 
-void Battle::Run()
+CombatResult Battle::Run()
 {
     Initialize();
 
@@ -261,6 +263,8 @@ void Battle::Run()
         m_player1.hero.TakeDamage(m_player1, damage,
                                    HeroDamageSource::COMBAT_OPPONENT);
     }
+    return { m_result, damage, static_cast<int>(m_player1.idx),
+             static_cast<int>(m_player2.idx) };
 }
 
 bool Battle::Attack()
@@ -595,6 +599,26 @@ void Battle::ProcessDestroy(bool beforeAttack)
             removedMinion.ActivateTask(
                 PowerType::DEATHRATTLE,
                 std::get<0>(deadMinion) == 1 ? m_player1 : m_player2);
+            Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+            ++owner.season14.deathrattlesTriggered;
+            owner.AdvanceDarkGiftCounters(2);
+        }
+
+        if (removedMinion.DeathrattleAttackTransfer() != 0 ||
+            removedMinion.DeathrattleHealthTransfer() != 0)
+        {
+            FieldZone& ownerField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
+            bool transferred = false;
+            ownerField.ForEachAlive([&](MinionData& data) {
+                if (transferred) return;
+                auto& target = data.value();
+                target.SetAttack(target.GetAttack() + removedMinion.DeathrattleAttackTransfer());
+                target.SetHealth(target.GetHealth() + removedMinion.DeathrattleHealthTransfer());
+                // The gift specifies another friendly minion; the first live
+                // recipient is the deterministic simulator selection.
+                transferred = true;
+            });
+            removedMinion.SetDeathrattleStatTransfer(0, 0);
         }
 
         if (removedMinion.HasReborn())

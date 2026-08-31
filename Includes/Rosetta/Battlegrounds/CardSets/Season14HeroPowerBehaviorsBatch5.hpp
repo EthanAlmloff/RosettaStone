@@ -24,6 +24,7 @@ enum class Season14HeroPowerBatch5Kind : std::uint8_t
     COMBAT_SUMMON_AURA,
     AVENGE_WHELP,
     ENEMY_KILL_COUNTER,
+    TARGET_TIER_ATTACK,
 };
 
 struct Season14HeroPowerBatch5Definition
@@ -43,8 +44,13 @@ struct Season14HeroPowerBatch5Definition
 // do not expose any row as implemented until its Player lifecycle and bridge
 // application are complete.  An empty registry is intentional fail-closed
 // behavior and prevents coverage tooling from crediting partial effects.
-inline constexpr std::array<Season14HeroPowerBatch5Definition, 0>
-    SEASON14_HERO_POWER_BEHAVIORS_BATCH5 = {{}};
+inline constexpr std::array<Season14HeroPowerBatch5Definition, 4>
+    SEASON14_HERO_POWER_BEHAVIORS_BATCH5 = {{
+        {"BG28_HERO_400p", 105315, Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN, 1, false},
+        {"BG28_HERO_400p2", 105395, Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN, 0, false},
+        {"BG26_HERO_102p", 103501, Season14HeroPowerBatch5Kind::TARGET_TIER_ATTACK, 0, false},
+        {"BG26_HERO_102p2", 103503, Season14HeroPowerBatch5Kind::TARGET_TIER_ATTACK, 0, false},
+    }};
 
 constexpr const Season14HeroPowerBatch5Definition*
 FindSeason14HeroPowerBehaviorBatch5(std::int32_t dbfID) noexcept
@@ -74,6 +80,8 @@ FindSeason14HeroPowerBehaviorBatch5(std::string_view id) noexcept
 
 struct Season14HeroPowerBatch5State
 {
+    std::int32_t rollCooldown = 0;
+    std::int32_t usesThisTurn = 0;
     std::int32_t refreshesThisTurn = 0;
     std::int32_t sellsThisTurn = 0;
     std::int32_t battlecryPurchases = 0;
@@ -96,6 +104,8 @@ enum class Season14HeroPowerBatch5Event : std::uint8_t
 
 struct Season14HeroPowerBatch5Result
 {
+    std::int32_t amount = 0;
+    std::int32_t goldDelta = 0;
     std::int32_t extraDragonOffers = 0;
     std::int32_t tavernSlotsDelta = 0;
     std::int32_t attack = 0;
@@ -105,6 +115,42 @@ struct Season14HeroPowerBatch5Result
     bool trigger = false;
 };
 
+constexpr bool ResolveSeason14HeroPowerBatch5Activation(
+    std::int32_t dbfID, Season14HeroPowerBatch5State& state,
+    Season14HeroPowerBatch5Result& result, std::int32_t roll = 1,
+    std::int32_t tier = 1) noexcept
+{
+    result = {};
+    const auto* definition = FindSeason14HeroPowerBehaviorBatch5(dbfID);
+    if (definition == nullptr || definition->passive) return false;
+    if (definition->kind == Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN)
+    {
+        if (state.rollCooldown != 0 || roll < 1 || roll > 6) return false;
+        result.goldDelta = roll;
+        result.trigger = true;
+        state.rollCooldown = roll;
+        return true;
+    }
+    if (definition->kind == Season14HeroPowerBatch5Kind::BATTLECRY_PURCHASE_COUNTER)
+    {
+        result.trigger = true;
+        result.amount = 1;
+        return true;
+    }
+    if (definition->kind == Season14HeroPowerBatch5Kind::TARGET_TIER_ATTACK)
+    {
+        if (state.usesThisTurn >= 2 || tier < 1) return false;
+        ++state.usesThisTurn;
+        if (dbfID == 103503)
+            result.health = tier;
+        else
+            result.attack = tier;
+        result.trigger = true;
+        return true;
+    }
+    return false;
+}
+
 //! Resolve deterministic lifecycle bookkeeping.  Random recipients and
 //! generated card creation remain the responsibility of the caller.
 constexpr void ResolveSeason14HeroPowerBatch5Event(
@@ -113,9 +159,6 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     Season14HeroPowerBatch5Result& result) noexcept
 {
     result = {};
-    // An empty registry is deliberate until a complete Player/bridge
-    // applicator is reviewed.  Keep even bookkeeping inert for unregistered
-    // IDs so this scaffolding cannot influence a live game accidentally.
     if (FindSeason14HeroPowerBehaviorBatch5(dbfID) == nullptr)
     {
         return;
@@ -124,6 +167,8 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     {
         state.refreshesThisTurn = 0;
         state.sellsThisTurn = 0;
+        if (state.rollCooldown > 0) --state.rollCooldown;
+        state.usesThisTurn = 0;
         return;
     }
     if (event == Season14HeroPowerBatch5Event::REFRESH_TAVERN)

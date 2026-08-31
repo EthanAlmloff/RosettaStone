@@ -8,7 +8,7 @@ using namespace RosettaStone::Battlegrounds;
 
 TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - exact unique registry")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH2.size() == 10);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH2.size() == 11);
     for (std::size_t i = 0; i < SEASON14_HERO_POWER_BEHAVIORS_BATCH2.size(); ++i)
     {
         const auto& entry = SEASON14_HERO_POWER_BEHAVIORS_BATCH2[i];
@@ -39,6 +39,19 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - passive modifiers are explicit")
     CHECK(golden.twoCopiesMakeGolden);
 
     CHECK(Season14HeroPowerBatch2Modifiers(57559).minionCost == 0);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - every third Tavern spell is free")
+{
+    Season14State state;
+    state.heroPowerDbfID = 105432;
+    CHECK(state.TavernSpellCost(1) == 1);
+    state.OnTavernSpellResolved(true);
+    CHECK(state.TavernSpellCost(1) == 1);
+    state.OnTavernSpellResolved(true);
+    CHECK(state.TavernSpellCost(1) == 0);
+    state.OnTavernSpellResolved(true);
+    CHECK(state.TavernSpellCost(1) == 1);
 }
 
 TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - lifecycle counters resolve")

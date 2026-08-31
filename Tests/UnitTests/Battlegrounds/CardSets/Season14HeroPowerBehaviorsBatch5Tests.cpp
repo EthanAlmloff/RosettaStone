@@ -4,37 +4,56 @@
 
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch5.hpp>
 
-#include <array>
-#include <string_view>
-
 using namespace RosettaStone::Battlegrounds;
 
-TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - unverified registry fails closed")
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - registry and target-free costs")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH5.empty());
-    CHECK(FindSeason14HeroPowerBehaviorBatch5("TB_BaconShop_HP_062") == nullptr);
-    CHECK(FindSeason14HeroPowerBehaviorBatch5(61408) == nullptr);
-}
-
-TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - unregistered lifecycle is inert")
-{
-    Season14HeroPowerBatch5State state{};
-    Season14HeroPowerBatch5Result result{};
-    ResolveSeason14HeroPowerBatch5Event(
-        61408, Season14HeroPowerBatch5Event::REFRESH_TAVERN, state, result);
-    CHECK(result.trigger == false);
-    CHECK(result.extraDragonOffers == 0);
-}
-
-TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - counters never expose guessed thresholds")
-{
-    Season14HeroPowerBatch5State state{};
-    Season14HeroPowerBatch5Result result{};
-    for (int i = 1; i <= 25; ++i)
+    constexpr std::array<std::int32_t, 4> ids = {105315, 105395, 103501, 103503};
+    constexpr std::array<std::int32_t, 4> costs = {1, 0, 0, 0};
+    REQUIRE(SEASON14_HERO_POWER_BEHAVIORS_BATCH5.size() == ids.size());
+    for (std::size_t i = 0; i < ids.size(); ++i)
     {
-        ResolveSeason14HeroPowerBatch5Event(
-            64424, Season14HeroPowerBatch5Event::ENEMY_MINION_KILLED, state,
-            result);
-        CHECK(result.trigger == false);
+        const auto* entry = FindSeason14HeroPowerBehaviorBatch5(ids[i]);
+        REQUIRE(entry != nullptr);
+        CHECK(entry->cost == costs[i]);
+        CHECK(!entry->passive);
     }
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - roll cooldown is bounded")
+{
+    Season14HeroPowerBatch5State state{};
+    Season14HeroPowerBatch5Result result{};
+    CHECK(ResolveSeason14HeroPowerBatch5Activation(105315, state, result, 6));
+    CHECK(result.goldDelta == 6);
+    CHECK(state.rollCooldown == 6);
+    CHECK(!ResolveSeason14HeroPowerBatch5Activation(105315, state, result, 1));
+    for (int i = 0; i < 6; ++i)
+        ResolveSeason14HeroPowerBatch5Event(
+            105315, Season14HeroPowerBatch5Event::BEGIN_TURN, state, result);
+    CHECK(state.rollCooldown == 0);
+    CHECK(ResolveSeason14HeroPowerBatch5Activation(105315, state, result, 1));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - unregistered powers stay closed")
+{
+    Season14HeroPowerBatch5State state{};
+    Season14HeroPowerBatch5Result result{};
+    CHECK(!ResolveSeason14HeroPowerBatch5Activation(116921, state, result));
+    CHECK(!ResolveSeason14HeroPowerBatch5Activation(999999, state, result));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - targeted tier attack is twice per turn")
+{
+    Season14HeroPowerBatch5State state{};
+    Season14HeroPowerBatch5Result result{};
+    CHECK(ResolveSeason14HeroPowerBatch5Activation(103501, state, result, 1, 4));
+    CHECK(result.attack == 4);
+    CHECK(ResolveSeason14HeroPowerBatch5Activation(103501, state, result, 1, 4));
+    CHECK(!ResolveSeason14HeroPowerBatch5Activation(103501, state, result, 1, 4));
+    ResolveSeason14HeroPowerBatch5Event(103501, Season14HeroPowerBatch5Event::BEGIN_TURN,
+                                        state, result);
+    CHECK(ResolveSeason14HeroPowerBatch5Activation(103503, state, result, 1, 4));
+    CHECK(result.health == 4);
+    CHECK(result.attack == 0);
 }

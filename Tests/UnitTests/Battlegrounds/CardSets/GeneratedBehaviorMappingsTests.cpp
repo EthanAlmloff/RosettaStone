@@ -15,8 +15,50 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddCardTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeapfroggerDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSummonFromPoolTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastSpellBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellAttackBonusTask.hpp>
 
 using namespace RosettaStone::Battlegrounds;
+
+TEST_CASE("[Generated mappings] - reviewed Battlecry resource and Tavern buffs")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG20_100", "BG20_100_G"})
+    {
+        const auto& tasks = cards.at(id).power.GetBattlecryTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task =
+            std::get_if<SimpleTasks::GenerateBloodGemsTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->Amount() ==
+              (std::string_view(id) == "BG20_100_G" ? 4 : 2));
+    }
+    for (const auto id : {"BG26_162", "BG26_162_G", "BG27_016", "BG27_016_G"})
+    {
+        const auto& power = cards.at(id).power;
+        REQUIRE(power.GetBattlecryTask().size() == 1);
+        REQUIRE(power.GetDeathrattleTask().size() == 1);
+        CHECK(std::holds_alternative<SimpleTasks::CastSpellBuffTask>(
+            power.GetBattlecryTask().front()));
+        CHECK(std::holds_alternative<SimpleTasks::CastSpellBuffTask>(
+            power.GetDeathrattleTask().front()));
+    }
+    for (const auto id : {"BG34_683", "BG34_683_G"})
+    {
+        const auto& tasks = cards.at(id).power.GetBattlecryTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task =
+            std::get_if<SimpleTasks::AddCardTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->CardID() == "BG34_689");
+        CHECK(task->Amount() ==
+              (std::string_view(id) == "BG34_683_G" ? 2 : 1));
+    }
+}
 
 TEST_CASE("[Generated mappings] - every reviewed row has a live CardDef")
 {
@@ -197,6 +239,85 @@ TEST_CASE("[Generated mappings] - migrated deathrattles keep token and hand payl
     checkCard("BG36_854_G", "BG36_624", 2, false);
 }
 
+TEST_CASE("[Generated mappings] - Leapfrogger copies its combat deathrattle")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG34_Giant_031", "BG34_Giant_031_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task = std::get_if<SimpleTasks::LeapfroggerDeathrattleTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->GetAttack() == (std::string_view(id) == "BG34_Giant_031_G" ? 2 : 1));
+        CHECK(task->GetHealth() == (std::string_view(id) == "BG34_Giant_031_G" ? 2 : 1));
+    }
+}
+
+TEST_CASE("[Generated mappings] - random Deathrattles preserve exact pools")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG26_360", "BG26_360_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task = std::get_if<SimpleTasks::RandomHandMinionBuffTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->GetAttack() == (std::string_view(id) == "BG26_360_G" ? 14 : 7));
+        CHECK(task->GetHealth() == (std::string_view(id) == "BG26_360_G" ? 14 : 7));
+    }
+    for (const auto id : {"BG26_ICC_027", "BG26_ICC_027_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task = std::get_if<SimpleTasks::RandomCardToHandTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->GetRace() == Race::DRAGON);
+        CHECK(task->GetAmount() == (std::string_view(id) == "BG26_ICC_027_G" ? 2 : 1));
+    }
+    for (const auto id : {"BG30_105", "BG30_105_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        CHECK(std::holds_alternative<SimpleTasks::RandomSummonFromPoolTask>(tasks.front()));
+    }
+}
+
+TEST_CASE("[Generated mappings] - active random Deathrattle families preserve golden counts")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG25_806", "BG25_806_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        CHECK(std::holds_alternative<SimpleTasks::RandomSummonFromPoolTask>(tasks.front()));
+    }
+    for (const auto id : {"BG26_148", "BG26_148_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task = std::get_if<SimpleTasks::RandomCardToHandTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->IsMagneticOnly());
+        CHECK(task->GetAmount() == (std::string_view(id) == "BG26_148_G" ? 2 : 1));
+    }
+    for (const auto id : {"BG34_319", "BG34_319_G"})
+    {
+        REQUIRE(cards.contains(id));
+        CHECK(cards.at(id).power.GetBattlecryTask().size() == 1);
+        CHECK(cards.at(id).power.GetDeathrattleTask().size() == 1);
+        CHECK(cards.at(id).power.GetRallyTask().size() == 1);
+    }
+}
+
 TEST_CASE("[Generated mappings] - Lurking Leviathan grows summoned Beast attack bonus")
 {
     std::map<std::string, CardDef> cards;
@@ -357,5 +478,51 @@ TEST_CASE("[Generated mappings] - Last One Standing selects one minion per type"
         CHECK(task->GetHealth() == 15);
         CHECK(task->GetRepeats() ==
               (std::string_view(id) == "BG34_320_G" ? 2 : 1));
+    }
+}
+
+TEST_CASE("[Generated mappings] - Electric Synthesizer buffs other Dragons twice")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG26_963", "BG26_963_G"})
+    {
+        const auto repeats = std::string_view(id) == "BG26_963_G" ? 2 : 1;
+        REQUIRE(cards.contains(id));
+        const auto& power = cards.at(id).power;
+        REQUIRE(power.GetBattlecryTask().size() == repeats);
+        REQUIRE(power.GetStartCombatTask().size() == repeats);
+        for (const auto* tasks : {&power.GetBattlecryTask(),
+                                  &power.GetStartCombatTask()})
+        {
+            for (const auto& value : *tasks)
+            {
+                const auto* task =
+                    std::get_if<SimpleTasks::FriendlyRaceEnchantmentTask>(
+                        &value);
+                REQUIRE(task != nullptr);
+                CHECK(task->CardID() == "BG26_963e");
+                CHECK(task->GetRace() == Race::DRAGON);
+                CHECK(task->ExcludesSource());
+            }
+        }
+    }
+}
+
+TEST_CASE("[Generated mappings] - Blue Whelp adds future Tavern spell attack")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG33_830", "BG33_830_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetBattlecryTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task =
+            std::get_if<SimpleTasks::BattlecryTavernSpellAttackBonusTask>(
+                &tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->GetAttack() ==
+              (std::string_view(id) == "BG33_830_G" ? 2 : 1));
     }
 }

@@ -53,6 +53,7 @@ class Player
     void ApplyPersistentRaceStats(Race race, int attack, int health);
     void ApplySpellRaceBuff(Race race, int attack, int health, bool includeHand);
     void ApplySpellSpecialBuff(int mode, int attack, int health);
+    void ApplyTavernRaceBuff(Race race, int attack, int health);
 
     //! Purchases a minion from Tavern's field.
     //! \param idx The index of a list of minions in Tavern's field.
@@ -93,12 +94,23 @@ class Player
 
     //! Creates up to `count` canonical Tavern Coin spells in hand.
     int AddTavernCoins(int count);
+    //! Acquires a Trinket and applies any deterministic acquisition-time grant.
+    //! This is the sole player-owned entry point for generated Trinket cards.
+    bool AcquireTrinket(Season14PersistentEffect effect);
+    int GrantTrinketStartTurnCards();
 
     //! Resolves a pending public Choice/Discover offering into the player's
     //! hand.  Only concrete minion and spell cards are accepted; unsupported
     //! modal effects remain pending and fail closed.
     bool ApplyChoice(std::size_t offeringIdx);
     bool ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx);
+    //! Resolves a pending Tavern-spell modal without re-paying the spell.
+    bool ApplySpellChoice(std::size_t offeringIdx);
+    //! Resolves persistent Trinket effects after any successful Tavern spell,
+    //! including modal/Choose-One completion paths.
+    void ApplyTavernSpellTrinkets();
+    void ApplyAfterPlayCardTrinkets();
+    void ApplyDeferredTavernSpellStats();
 
     //! Applies a fully resolved target-free Season 14 hero-power activation.
     //! Random recipient selection uses RosettaStone's shared RNG stream.
@@ -131,6 +143,9 @@ class Player
 
     //! Completes recruit phase.
     void CompleteRecruit() const;
+    void ResolveDarkGiftEndTurnTriggers();
+    //! Advances all per-minion Dark Gift counters after a matching event.
+    void AdvanceDarkGiftCounters(int kind);
 
     //! Processes the tasks related to defeat.
     void ProcessDefeat();

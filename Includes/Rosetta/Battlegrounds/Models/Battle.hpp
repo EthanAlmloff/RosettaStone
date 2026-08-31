@@ -12,6 +12,16 @@
 
 namespace RosettaStone::Battlegrounds
 {
+struct CombatResult
+{
+    BattleResult outcome = BattleResult::DRAW;
+    int damage = 0;
+    int player1Index = -1;
+    int player2Index = -1;
+
+    BattleResult GetResult() const noexcept { return outcome; }
+    bool IsDraw() const noexcept { return outcome == BattleResult::DRAW; }
+};
 //!
 //! \brief Battle class.
 //!
@@ -32,7 +42,7 @@ class Battle
     void Initialize();
 
     //! Simulates a battle.
-    void Run();
+    CombatResult Run();
 
     //! Attacks one of the opponent minions.
     //! \return The flag that indicates the attacker does attack.

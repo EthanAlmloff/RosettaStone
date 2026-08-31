@@ -22,6 +22,30 @@ TEST_CASE("[Season14] - Public decisions validate and clear")
     CHECK(state.pendingOfferings.empty());
 }
 
+TEST_CASE("[Season14] - Tavern spell modal retains source and branches")
+{
+    Season14State state;
+    state.BeginSpellTargetChoice(12345, 2, 99, 3, 1, 1, 3,
+                                 "friendly_minion_target");
+
+    CHECK(state.pendingDecision == Season14Decision::CHOOSE_ONE);
+    CHECK(state.spellModal.kind == Season14SpellModalKind::TARGET_STATS);
+    CHECK(state.spellModal.sourceCardDbfID == 12345);
+    CHECK(state.spellModal.targetIndex == 2);
+    CHECK(state.spellModal.offeringFilter == "friendly_minion_target");
+
+    int attack = 0;
+    int health = 0;
+    CHECK(!state.SelectSpellTargetChoice(2, attack, health));
+    CHECK(state.spellModal.kind == Season14SpellModalKind::TARGET_STATS);
+    CHECK(state.SelectSpellTargetChoice(0, attack, health));
+    CHECK(attack == 3);
+    CHECK(health == 1);
+    CHECK(state.pendingDecision == Season14Decision::NONE);
+    CHECK(state.spellModal.kind == Season14SpellModalKind::NONE);
+    CHECK(!state.SelectSpellTargetChoice(1, attack, health));
+}
+
 TEST_CASE("[Season14] - concrete choice offerings resolve into hand")
 {
     Player player;
@@ -99,6 +123,38 @@ TEST_CASE("[Season14] - Bob's Tip Jar grants immediate gold and raises cap")
     CHECK(state.TakeImmediateGold() == 4);
     CHECK(state.TakeImmediateGold() == 0);
     CHECK(state.EffectiveMaxGold(10) == 14);
+}
+
+TEST_CASE("[Season14] - Bob-blehead grants immediate gold without raising cap")
+{
+    Season14State state;
+    state.AddTrinket({113101, 1, true}); // BG30_MagicItem_998
+
+    CHECK(state.TakeImmediateGold() == 2);
+    CHECK(state.EffectiveMaxGold(10) == 10);
+}
+
+TEST_CASE("[Season14] - Trinket slots reject duplicate and invalid acquisition")
+{
+    Player player;
+
+    // BG30_MagicItem_996 is a known Trinket and occupies one slot exactly
+    // once, even if an acquisition event is delivered twice.
+    CHECK(player.AcquireTrinket({112988, 1, true}));
+    CHECK(!player.AcquireTrinket({112988, 1, true}));
+    CHECK(player.season14.trinkets.size() == 1);
+
+    // Unknown/non-Trinket DBF ids must fail before persistent state changes.
+    CHECK(!player.AcquireTrinket({999999, 1, true}));
+    CHECK(player.season14.trinkets.size() == 1);
+}
+
+TEST_CASE("[Season14] - inactive start-turn Trinkets do not grant")
+{
+    Player player;
+    player.season14.trinkets.push_back({113103, 1, false}); // Pagle's Fishing Rod
+    CHECK(player.GrantTrinketStartTurnCards() == 0);
+    CHECK(player.hand.GetCount() == 0);
 }
 
 TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")
@@ -196,6 +252,23 @@ TEST_CASE("[Season14] - simple Tavern spell economy state is deterministic")
     state.AddPersistentShopStats(2, 2);
     CHECK(state.persistentShopAttack == 2);
     CHECK(state.persistentShopHealth == 2);
+}
+
+TEST_CASE("[Season14] - next-combat reward is owner-relative and one-shot")
+{
+    Season14State state;
+    state.ArmNextCombatReward(105267);
+    state.ResolveNextCombatReward(BattleResult::PLAYER1_WIN, true);
+    CHECK(state.TakeNextTurnGold() == 3);
+    CHECK(state.TakeNextTurnGold() == 0);
+
+    state.ArmNextCombatReward(105267);
+    state.ResolveNextCombatReward(BattleResult::DRAW, false);
+    CHECK(state.TakeNextTurnGold() == 1);
+
+    state.ArmNextCombatReward(105267);
+    state.ResolveNextCombatReward(BattleResult::PLAYER1_WIN, false);
+    CHECK(state.TakeNextTurnGold() == 0);
 }
 
 TEST_CASE("[Season14] - spend-gold thresholds roll over and reset per recruit turn")

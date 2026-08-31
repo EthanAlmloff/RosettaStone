@@ -18,6 +18,8 @@ void Season14State::BeginDecision(
         pendingSourceEntityID = 0;
         pendingSourceCardDbfID = 0;
         chooseOne = {};
+        spellModal = {};
+        pendingHandLock = false;
         return;
     }
 
@@ -26,6 +28,8 @@ void Season14State::BeginDecision(
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
     chooseOne = {};
+    spellModal = {};
+    pendingHandLock = false;
     if (decision == Season14Decision::CHOICE ||
         decision == Season14Decision::DISCOVER)
     {
@@ -47,6 +51,72 @@ void Season14State::BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t t
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
     chooseOne = { true, sourceEntityID, targetMask, sourceCardDbfID };
+    spellModal = {};
+    pendingHandLock = false;
+}
+
+void Season14State::BeginSpellTargetChoice(
+    std::int32_t sourceCardDbfID, std::int32_t targetIndex,
+    std::uint64_t targetEntityID,
+    std::int32_t firstAttack, std::int32_t firstHealth,
+    std::int32_t secondAttack, std::int32_t secondHealth,
+    std::string offeringFilter, Season14SpellModalKind kind)
+{
+    pendingDecision = Season14Decision::CHOOSE_ONE;
+    // Branches are not discoverable cards. Keep two opaque slots so the
+    // bridge can expose a deterministic two-way action while the branch
+    // payload remains in spellModal.
+    pendingOfferings = { Season14Offering{}, Season14Offering{} };
+    choiceOfferings = pendingOfferings;
+    pendingSourceEntityID = 0;
+    pendingSourceCardDbfID = sourceCardDbfID;
+    chooseOne = {};
+    spellModal = { kind, sourceCardDbfID,
+                   targetIndex, targetEntityID, firstAttack, firstHealth, secondAttack,
+                   secondHealth, false, std::move(offeringFilter) };
+}
+
+void Season14State::BeginSpellAllMinionChoice(
+    Season14SpellModalKind kind, std::int32_t sourceCardDbfID,
+    std::int32_t firstAttack, std::int32_t firstHealth,
+    std::int32_t secondAttack, std::int32_t secondHealth,
+    bool secondBranchDelayed)
+{
+    pendingDecision = Season14Decision::CHOOSE_ONE;
+    pendingOfferings = { Season14Offering{}, Season14Offering{} };
+    choiceOfferings = pendingOfferings;
+    pendingSourceEntityID = 0;
+    pendingSourceCardDbfID = sourceCardDbfID;
+    chooseOne = {};
+    spellModal = { kind, sourceCardDbfID, -1, 0, firstAttack, firstHealth,
+                   secondAttack, secondHealth, secondBranchDelayed, {} };
+    pendingHandLock = false;
+}
+
+bool Season14State::SelectSpellTargetChoice(std::size_t offeringIndex,
+                                            std::int32_t& attack,
+                                            std::int32_t& health)
+{
+    if ((spellModal.kind != Season14SpellModalKind::TARGET_STATS &&
+         spellModal.kind != Season14SpellModalKind::ALL_MINION_STATS &&
+         spellModal.kind != Season14SpellModalKind::TARGET_OR_ALL_STATS) ||
+        offeringIndex > 1)
+        return false;
+    if (offeringIndex == 0) {
+        attack = spellModal.firstAttack;
+        health = spellModal.firstHealth;
+    } else {
+        attack = spellModal.secondAttack;
+        health = spellModal.secondHealth;
+    }
+    spellModal = {};
+    pendingDecision = Season14Decision::NONE;
+    pendingSourceCardDbfID = 0;
+    pendingSourceEntityID = 0;
+    pendingOfferings.clear();
+    choiceOfferings.clear();
+    pendingHandLock = false;
+    return true;
 }
 
 void Season14State::BeginOfferingDecision(
@@ -72,6 +142,7 @@ bool Season14State::SelectDecision(std::size_t offeringIndex)
     pendingSourceCardDbfID = 0;
     pendingDecision = Season14Decision::NONE;
     chooseOne = {};
+    spellModal = {};
     return true;
 }
 
@@ -85,6 +156,8 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     heroPowerBatch1 = Season14HeroPowerBatch1Modifiers(dbfID);
     heroPowerBatch2 = {};
     heroPowerBatch4 = {};
+    heroPowerBatch3State = 0;
+    heroPowerBatch5 = {};
 }
 
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
@@ -99,6 +172,7 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
         heroPowerDbfID, Season14HeroPowerBatch2Event::BEGIN_TURN,
         heroPowerBatch2, result);
     BeginRecruitTurnBatch4();
+    BeginRecruitTurnBatch5();
     return result;
 }
 
@@ -116,6 +190,14 @@ void Season14State::BeginRecruitTurnBatch4()
     ResolveSeason14HeroPowerBatch4Event(
         heroPowerDbfID, Season14HeroPowerBatch4Event::BEGIN_TURN,
         heroPowerBatch4, result);
+}
+
+void Season14State::BeginRecruitTurnBatch5()
+{
+    Season14HeroPowerBatch5Result result{};
+    ResolveSeason14HeroPowerBatch5Event(
+        heroPowerDbfID, Season14HeroPowerBatch5Event::BEGIN_TURN,
+        heroPowerBatch5, result);
 }
 
 void Season14State::BeginCombatBatch4()
@@ -244,6 +326,22 @@ bool Season14State::ApplyHeroPowerBatch4Activation(
         heroPowerDbfID, heroPowerBatch4, result);
 }
 
+bool Season14State::ResolveHeroPowerBatch5Activation(
+    Season14HeroPowerBatch5Result& result, std::int32_t tier) const noexcept
+{
+    auto candidateState = heroPowerBatch5;
+    return ResolveSeason14HeroPowerBatch5Activation(
+        heroPowerDbfID, candidateState, result, 1, tier);
+}
+
+bool Season14State::ApplyHeroPowerBatch5Activation(
+    Season14HeroPowerBatch5Result& result, std::int32_t tier) noexcept
+{
+    const auto roll = result.goldDelta > 0 ? result.goldDelta : 1;
+    return ResolveSeason14HeroPowerBatch5Activation(
+        heroPowerDbfID, heroPowerBatch5, result, roll, tier);
+}
+
 void Season14State::ArmHigherTierRefresh(std::int32_t count)
 {
     heroPowerBatch2.higherTierRefreshMinions =
@@ -269,6 +367,13 @@ std::int32_t Season14State::TavernSpellCost(std::int32_t baseCost) const
     return heroPowerBatch2.TavernSpellCost(withBatch1);
 }
 
+std::int32_t Season14State::ConsumeTavernSpellDiscount() noexcept
+{
+    const auto result = nextTavernSpellDiscount;
+    nextTavernSpellDiscount = 0;
+    return result;
+}
+
 std::pair<std::int32_t, std::int32_t> Season14State::BloodGemStats() const noexcept
 {
     return { 1 + bloodGemAttackBonus, 1 + bloodGemHealthBonus };
@@ -278,6 +383,11 @@ void Season14State::AddTavernSpellHealthBonus(std::int32_t health) noexcept
 {
     tavernSpellHealthBonus = std::max<std::int32_t>(
         0, tavernSpellHealthBonus + health);
+}
+
+void Season14State::AddTavernSpellAttackBonus(std::int32_t attack) noexcept
+{
+    tavernSpellAttackBonus = std::max<std::int32_t>(0, tavernSpellAttackBonus + attack);
 }
 
 std::int32_t Season14State::TakeGrowingSummonAttack(
@@ -370,12 +480,46 @@ void Season14State::OnRefreshTavern(bool refreshSucceeded)
 
 void Season14State::OnTavernSpellResolved(bool spellResolved)
 {
-    heroPowerBatch2.ConsumeTavernSpellDiscount(spellResolved);
+    if (!spellResolved)
+        return;
+    if (heroPowerDbfID == 105432)
+    {
+        // Aranna's passive makes every third Tavern spell free.  Arm the
+        // discount after the second successful purchase so cost inspection
+        // for the third purchase sees zero, then consume it on resolution.
+        if (heroPowerBatch2.tavernSpellDiscount > 0)
+            heroPowerBatch2.ConsumeTavernSpellDiscount(true);
+        ++heroPowerBatch2.tavernSpellPurchases;
+        if (heroPowerBatch2.tavernSpellPurchases % 3 == 2)
+            heroPowerBatch2.tavernSpellDiscount = 1;
+        return;
+    }
+    heroPowerBatch2.ConsumeTavernSpellDiscount(true);
 }
 
 void Season14State::AddNextTurnGold(std::int32_t amount) noexcept
 {
     nextTurnGold = std::max<std::int32_t>(0, nextTurnGold + amount);
+}
+
+void Season14State::ArmNextCombatReward(std::int32_t sourceCardDbfID) noexcept
+{
+    pendingCombatRewardDbfID = sourceCardDbfID == 105267 ? sourceCardDbfID : 0;
+}
+
+void Season14State::ResolveNextCombatReward(BattleResult result,
+                                             bool playerOne) noexcept
+{
+    if (pendingCombatRewardDbfID == 0)
+        return;
+    const bool won = (playerOne && result == BattleResult::PLAYER1_WIN) ||
+                     (!playerOne && result == BattleResult::PLAYER2_WIN);
+    const bool tied = result == BattleResult::DRAW;
+    pendingCombatRewardDbfID = 0;
+    if (won)
+        AddNextTurnGold(3);
+    else if (tied)
+        AddNextTurnGold(1);
 }
 
 std::int32_t Season14State::TakeNextTurnGold() noexcept
@@ -503,9 +647,12 @@ void Season14State::ArmRefreshRandomShopStats(std::int32_t attack,
 }
 
 std::pair<std::int32_t, std::int32_t>
-Season14State::RefreshRandomShopStats() const noexcept
+Season14State::RefreshRandomShopStats() noexcept
 {
-    return { refreshRandomShopAttack, refreshRandomShopHealth };
+    const auto result = std::make_pair(refreshRandomShopAttack, refreshRandomShopHealth);
+    refreshRandomShopAttack = 0;
+    refreshRandomShopHealth = 0;
+    return result;
 }
 
 bool Season14State::ResolveHeroPowerBatch3Activation(
@@ -571,7 +718,12 @@ bool Season14State::CanAddDarkGift() const
 void Season14State::AddTrinket(Season14PersistentEffect effect)
 {
     if (CanAddTrinket() && effect.dbfID > 0 && effect.remainingUses > 0 &&
-        effect.active)
+        effect.active &&
+        std::none_of(trinkets.begin(), trinkets.end(),
+                     [dbfID = effect.dbfID](
+                         const Season14PersistentEffect& existing) {
+                         return existing.dbfID == dbfID;
+                     }))
     {
         trinkets.push_back(effect);
         const auto card = Cards::FindCardByDbfID(effect.dbfID);
@@ -594,9 +746,23 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 trinketImmediateGold += behavior.value;
                 trinketMaxGoldDelta += behavior.value;
                 break;
+            case TrinketEffect::IMMEDIATE_GOLD:
+                trinketImmediateGold += behavior.value;
+                break;
             case TrinketEffect::SHOP_STATS_AND_EXTRA_SLOT:
                 AddPersistentShopStats(behavior.attack, behavior.health);
                 trinketExtraShopSlots += behavior.value;
+                break;
+            case TrinketEffect::START_TURN_GOLD_PER_MINION_TYPE:
+                // Resolved at recruit start after the board's distinct types
+                // are known; acquisition itself has no immediate delta.
+                break;
+            case TrinketEffect::END_TURN_MAX_GOLD:
+                ++trinketEndTurnMaxGold;
+                break;
+            case TrinketEffect::END_TURN_GOLDEN_STATS:
+                // Applied to the concrete board at recruit end; no global
+                // aura is installed because only Golden minions qualify.
                 break;
             case TrinketEffect::NONE:
                 break;

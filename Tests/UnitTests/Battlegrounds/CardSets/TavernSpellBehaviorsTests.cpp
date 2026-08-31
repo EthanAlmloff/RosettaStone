@@ -73,10 +73,20 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Patch 36.4 batch")
     CHECK(apples.effect == TavernSpellEffect::SHOP_STATS);
     CHECK(apples.attack == 1);
     CHECK(apples.health == 2);
+
+    const auto combatReward = FindTavernSpellBehavior("BG28_884");
+    CHECK(combatReward.effect == TavernSpellEffect::NEXT_COMBAT_REWARD);
+    CHECK(!TavernSpellRequiresTarget(combatReward.effect));
 }
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - targeted stat batch")
 {
+    const auto allianceFlag = FindTavernSpellBehavior("BG31_880");
+    CHECK(allianceFlag.effect == TavernSpellEffect::TARGET_CHOOSE_ONE_STATS);
+    CHECK(allianceFlag.attack == 0);
+    CHECK(allianceFlag.health == 0);
+    CHECK(TavernSpellRequiresTarget(allianceFlag.effect));
+
     const auto vision = FindTavernSpellBehavior("BG28_838");
     CHECK(vision.effect == TavernSpellEffect::SET_TARGET_STATS);
     CHECK(vision.attack == 20);

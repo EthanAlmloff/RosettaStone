@@ -10,12 +10,14 @@ namespace RosettaStone::Battlegrounds
 {
 namespace
 {
-void Enchant(std::map<std::string, CardDef>& cards, const char* id, int attack, int health)
+void AddEnchant(std::map<std::string, CardDef>& cards, const char* id, int attack, int health)
 {
     std::vector<Effect> effects;
     if (attack) effects.emplace_back(Effects::AttackN(attack));
     if (health) effects.emplace_back(Effects::HealthN(health));
-    cards.emplace(id, CardDef{ RosettaStone::Battlegrounds::Enchant{ std::move(effects) } });
+    Power power;
+    power.AddEnchant(RosettaStone::Battlegrounds::Enchant{ std::move(effects) });
+    cards.emplace(id, CardDef{ std::move(power) });
 }
 void AddFrenzyBuff(std::map<std::string, CardDef>& cards, const char* id,
                    const char* enchant, EntityType target)
@@ -39,11 +41,11 @@ void AddShieldFrenzy(std::map<std::string, CardDef>& cards, const char* id, int 
 void ModernMinionBehaviorsBatch29::AddAll(std::map<std::string, CardDef>& cards)
 {
     AddShieldFrenzy(cards, "BG20_204", 1); AddShieldFrenzy(cards, "BG20_204_G", 2);
-    Enchant(cards, "BG29_800e", 1, 0); AddFrenzyBuff(cards, "BG29_800", "BG29_800e", EntityType::SOURCE);
-    Enchant(cards, "BG29_800Ge", 2, 0); AddFrenzyBuff(cards, "BG29_800_G", "BG29_800Ge", EntityType::SOURCE);
-    Enchant(cards, "BG29_846e", 2, 0); AddFrenzyBuff(cards, "BG29_846", "BG29_846e", EntityType::MINIONS);
-    Enchant(cards, "BG29_846Ge", 4, 0); AddFrenzyBuff(cards, "BG29_846_G", "BG29_846Ge", EntityType::MINIONS);
-    Enchant(cards, "BG34_312e", 1, 1); AddFrenzyBuff(cards, "BG34_312", "BG34_312e", EntityType::MINIONS_NOSOURCE);
-    Enchant(cards, "BG34_312Ge", 2, 2); AddFrenzyBuff(cards, "BG34_312_G", "BG34_312Ge", EntityType::MINIONS_NOSOURCE);
+    AddEnchant(cards, "BG29_800e", 1, 0); AddFrenzyBuff(cards, "BG29_800", "BG29_800e", EntityType::SOURCE);
+    AddEnchant(cards, "BG29_800Ge", 2, 0); AddFrenzyBuff(cards, "BG29_800_G", "BG29_800Ge", EntityType::SOURCE);
+    AddEnchant(cards, "BG29_846e", 2, 0); AddFrenzyBuff(cards, "BG29_846", "BG29_846e", EntityType::MINIONS);
+    AddEnchant(cards, "BG29_846Ge", 4, 0); AddFrenzyBuff(cards, "BG29_846_G", "BG29_846Ge", EntityType::MINIONS);
+    AddEnchant(cards, "BG34_312e", 1, 1); AddFrenzyBuff(cards, "BG34_312", "BG34_312e", EntityType::MINIONS_NOSOURCE);
+    AddEnchant(cards, "BG34_312Ge", 2, 2); AddFrenzyBuff(cards, "BG34_312_G", "BG34_312Ge", EntityType::MINIONS_NOSOURCE);
 }
 }

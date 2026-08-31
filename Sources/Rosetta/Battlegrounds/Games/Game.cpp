@@ -6,6 +6,7 @@
 
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Games/Game.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Managers/GameManager.hpp>
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
 
@@ -13,6 +14,7 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <unordered_set>
 #include <utility>
 
 using Random = effolkronium::random_thread_local;
@@ -305,6 +307,7 @@ void Game::Recruit()
         player.isInCombat = false;
 
         player.season14.Emit(Season14Event::RECRUIT_START);
+        player.ApplyDeferredTavernSpellStats();
         player.season14.minionsPlayedThisTurn = 0;
         player.season14.heroPowerUsed = false;
         player.recruitField.ForEach([](MinionData& minion) {
@@ -324,7 +327,32 @@ void Game::Recruit()
                             player.season14.TakeNextTurnGold();
         player.remainCoin += player.season14.TakeImmediateGold();
 
+        // Glowing Crystal grants one Gold per distinct friendly minion type
+        // at the start of each recruit turn.  Count only concrete types; an
+        // ALL/multi-type minion contributes once for each type it has.
+        for (const auto& trinket : player.season14.trinkets)
+        {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto card = Cards::FindCardByDbfID(trinket.dbfID);
+            if (FindTrinketBehavior(card.id).effect !=
+                TrinketEffect::START_TURN_GOLD_PER_MINION_TYPE)
+                continue;
+            std::unordered_set<Race> types;
+            player.recruitField.ForEachAlive([&](const MinionData& data) {
+                for (const Race race : RACES_IN_BATTLEGROUNDS)
+                    if (data.value().HasRace(race)) types.insert(race);
+            });
+            player.remainCoin += static_cast<int>(types.size());
+        }
+        // Start-turn random Trinket grants use the same seeded pool and
+        // hand-capacity path as acquisition-time grants.
+        player.GrantTrinketStartTurnCards();
+
         player.RefreshSpellcraft();
+        player.hand.ForEach([](std::optional<CardData>& card) {
+            if (card.has_value() && std::holds_alternative<Minion>(card.value()))
+                std::get<Minion>(card.value()).SetHandLocked(false);
+        });
 
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.remainCoin += heroPowerResult.goldDelta;
@@ -385,6 +413,36 @@ void Game::CompleteRecruitPhase()
                         minion.value().SetFrozen(true);
                     });
             }
+            // End-of-turn Trinkets resolve after the final recruit action.
+            // Wallet increases the cap for subsequent turns, while Gilded
+            // Anchor buffs only Golden minions currently in the warband.
+            if (player.season14.trinketEndTurnMaxGold > 0)
+                player.season14.trinketMaxGoldDelta +=
+                    player.season14.trinketEndTurnMaxGold;
+            for (const auto& trinket : player.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(
+                    Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect != TrinketEffect::END_TURN_GOLDEN_STATS)
+                {
+                    if (behavior.effect != TrinketEffect::END_TURN_DIVINE_SHIELD_ATTACK)
+                        continue;
+                    player.recruitField.ForEachAlive([&](MinionData& data) {
+                        auto& minion = data.value();
+                        if (minion.HasDivineShield())
+                            minion.SetAttack(minion.GetAttack() + behavior.attack);
+                    });
+                    continue;
+                }
+                player.recruitField.ForEachAlive([&](MinionData& data) {
+                    auto& minion = data.value();
+                    if (minion.IsGolden()) {
+                        minion.SetAttack(minion.GetAttack() + behavior.attack);
+                        minion.SetHealth(minion.GetHealth() + behavior.health);
+                    }
+                });
+            }
             player.season14.Emit(Season14Event::RECRUIT_END);
         }
     }
@@ -417,7 +475,9 @@ void Game::Combat()
         player1.getBattleCallback = [&battle]() -> Battle& { return battle; };
         player2.getBattleCallback = [&battle]() -> Battle& { return battle; };
 
-        battle.Run();
+        const CombatResult result = battle.Run();
+        player1.season14.ResolveNextCombatReward(result.outcome, true);
+        player2.season14.ResolveNextCombatReward(result.outcome, false);
 
         if (player1.playState == PlayState::PLAYING)
         {

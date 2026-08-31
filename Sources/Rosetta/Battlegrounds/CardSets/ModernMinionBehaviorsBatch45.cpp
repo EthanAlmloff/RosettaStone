@@ -1,0 +1,3 @@
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch45.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTrackedAvengeCardsTask.hpp>
+namespace RosettaStone::Battlegrounds { void ModernMinionBehaviorsBatch45::AddAll(std::map<std::string,CardDef>& cards) { Power p; p.AddAvenge({AvengeEffect::ADD_RANDOM_UNDEAD,4,0,0,Race::INVALID,false,"",1}); p.AddDeathrattleTask(SimpleTasks::SummonTrackedAvengeCardsTask{}); cards.emplace("BG31_835",CardDef{std::move(p)}); Power g; g.AddAvenge({AvengeEffect::ADD_RANDOM_UNDEAD,4,0,0,Race::INVALID,false,"",2}); g.AddDeathrattleTask(SimpleTasks::SummonTrackedAvengeCardsTask{}); cards.emplace("BG31_835_G",CardDef{std::move(g)}); } }

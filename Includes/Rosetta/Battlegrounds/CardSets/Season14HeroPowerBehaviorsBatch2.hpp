@@ -38,7 +38,7 @@ struct Season14HeroPowerBatch2Definition
 };
 
 //! Exact Patch 36.4 IDs covered by this batch.
-inline constexpr std::array<Season14HeroPowerBatch2Definition, 10>
+inline constexpr std::array<Season14HeroPowerBatch2Definition, 11>
     SEASON14_HERO_POWER_BEHAVIORS_BATCH2 = {{
         {"TB_BaconShop_HP_008", 57559,
          Season14HeroPowerBatch2Kind::DEFERRED_SELL_GOLD, 1, true},
@@ -57,6 +57,8 @@ inline constexpr std::array<Season14HeroPowerBatch2Definition, 10>
         {"BG34_HERO_001p", 126538,
          Season14HeroPowerBatch2Kind::TAVERN_SPELL_REFRESH, 0, true},
         {"BG31_HERO_006p", 117426,
+         Season14HeroPowerBatch2Kind::TAVERN_SPELL_DISCOUNT, 0, true},
+        {"BG28_HERO_800p", 105432,
          Season14HeroPowerBatch2Kind::TAVERN_SPELL_DISCOUNT, 0, true},
         {"BG34_HERO_002p", 126533,
          Season14HeroPowerBatch2Kind::TWO_COPY_GOLDEN, 0, true},
@@ -97,6 +99,8 @@ struct Season14HeroPowerBatch2State
     std::int32_t elementalPlays = 0;
     std::int32_t upgradeCostReduction = 0;
     std::int32_t tavernSpellDiscount = 0;
+    //! Number of Tavern spells bought by Aranna's passive this game.
+    std::int32_t tavernSpellPurchases = 0;
     //! One-shot count armed by Temporal Tavern for the next shop fill.
     std::int32_t higherTierRefreshMinions = 0;
     bool arcaneKnowledgeUnlocked = false;

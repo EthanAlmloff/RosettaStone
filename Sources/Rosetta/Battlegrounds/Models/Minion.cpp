@@ -10,6 +10,7 @@
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 
 #include <utility>
+#include <map>
 #include <type_traits>
 #include <vector>
 
@@ -176,6 +177,25 @@ void Minion::MagnetizeOnto(Minion& target) const
     }
 }
 
+void Minion::CopyDeathrattleTo(Minion& target) const
+{
+    if (!HasDeathrattle()) return;
+    for (const auto& task : m_card.power.GetDeathrattleTask())
+        target.m_card.power.AddDeathrattleTask(TaskType{ task });
+    target.m_hasDeathrattle = true;
+}
+
+void Minion::AddDarkGiftRallyTask(TaskType&& task)
+{
+    m_card.power.AddRallyTask(std::move(task));
+}
+
+void Minion::AddDarkGiftDeathrattleTask(TaskType&& task)
+{
+    m_card.power.AddDeathrattleTask(std::move(task));
+    m_hasDeathrattle = true;
+}
+
 ZoneType Minion::GetZoneType() const
 {
     return m_zoneType;
@@ -243,6 +263,8 @@ bool Minion::MakeGolden()
     const auto persistentRaceHealth = m_persistentRaceHealth;
     const int bloodGemCount = m_bloodGemCount;
     const int bloodGemCountThisTurn = m_bloodGemCountThisTurn;
+    const int bloodGemAttack = m_bloodGemAttack;
+    const int bloodGemHealth = m_bloodGemHealth;
     // The premium card supplies the new identity and its static keywords,
     // but conversion must not erase state accumulated by this particular
     // instance.  Dark Gifts and other recruit effects mutate these fields
@@ -281,6 +303,8 @@ bool Minion::MakeGolden()
     m_persistentRaceHealth = persistentRaceHealth;
     m_bloodGemCount = bloodGemCount;
     m_bloodGemCountThisTurn = bloodGemCountThisTurn;
+    m_bloodGemAttack = bloodGemAttack;
+    m_bloodGemHealth = bloodGemHealth;
 
     m_hasDeathrattle = false;
     m_hasTaunt = false;
@@ -373,6 +397,29 @@ void Minion::SetAttack(int val)
     m_attack = val;
 }
 
+bool Minion::TransformTo(Card replacement)
+{
+    if (replacement.dbfID == 0 || replacement.GetCardType() != CardType::MINION)
+        return false;
+    m_card = std::move(replacement);
+    m_card.Initialize();
+    for (const auto& tag : m_card.gameTags) {
+        switch (tag.first) {
+            case GameTag::DEATHRATTLE: m_hasDeathrattle = true; break;
+            case GameTag::TAUNT: m_hasTaunt = true; break;
+            case GameTag::DIVINE_SHIELD: m_hasDivineShield = true; break;
+            case GameTag::REBORN: m_hasReborn = true; break;
+            case GameTag::WINDFURY: m_hasWindfury = true; break;
+            case GameTag::MEGA_WINDFURY: m_hasMegaWindfury = true; break;
+            case GameTag::POISONOUS:
+            case GameTag::VENOMOUS: m_hasVenomous = true; break;
+            case GameTag::STEALTH: m_hasStealth = true; break;
+            default: break;
+        }
+    }
+    return true;
+}
+
 void Minion::ApplyGlobalMinionAttack(int attack)
 {
     if (attack <= m_globalMinionAttack)
@@ -443,6 +490,18 @@ void Minion::ApplyBloodGem(int attack, int health)
     m_health += health;
     ++m_bloodGemCount;
     ++m_bloodGemCountThisTurn;
+    m_bloodGemAttack += attack;
+    m_bloodGemHealth += health;
+}
+
+std::pair<int, int> Minion::RemoveBloodGems()
+{
+    const auto result = std::make_pair(m_bloodGemAttack, m_bloodGemHealth);
+    m_attack -= m_bloodGemAttack;
+    m_health -= m_bloodGemHealth;
+    m_bloodGemAttack = m_bloodGemHealth = 0;
+    m_bloodGemCount = m_bloodGemCountThisTurn = 0;
+    return result;
 }
 
 int Minion::GetBloodGemCount() const
@@ -792,6 +851,7 @@ void Minion::ActivateTask(PowerType type, Player& player)
     if (type == PowerType::POWER)
     {
         player.season14.RecordBattlecry();
+        player.AdvanceDarkGiftCounters(1);
     }
 
     for (auto& task : tasks)
@@ -820,6 +880,7 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
     if (type == PowerType::POWER)
     {
         player.season14.RecordBattlecry();
+        player.AdvanceDarkGiftCounters(1);
     }
 
     for (auto& task : tasks)
@@ -836,6 +897,72 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
                        task);
         }
     }
+}
+
+void Minion::SetPlayCardStatBonus(int attack, int health)
+{
+    m_playCardAttackBonus = attack;
+    m_playCardHealthBonus = health;
+}
+
+void Minion::ApplyPlayCardStatBonus()
+{
+    SetAttack(GetAttack() + m_playCardAttackBonus);
+    SetHealth(GetHealth() + m_playCardHealthBonus);
+}
+
+void Minion::SetEndTurnBattlecryTrigger(bool enabled)
+{
+    m_endTurnBattlecryTrigger = enabled;
+}
+
+bool Minion::HasEndTurnBattlecryTrigger() const
+{
+    return m_endTurnBattlecryTrigger;
+}
+
+void Minion::SetDeathrattleStatTransfer(int attack, int health)
+{
+    m_deathrattleAttackTransfer = attack;
+    m_deathrattleHealthTransfer = health;
+}
+
+int Minion::DeathrattleAttackTransfer() const
+{
+    return m_deathrattleAttackTransfer;
+}
+
+int Minion::DeathrattleHealthTransfer() const
+{
+    return m_deathrattleHealthTransfer;
+}
+
+void Minion::SetDarkGiftCounter(int attack, int health, int kind,
+                                int currentCount)
+{
+    if (m_darkGiftCounterKind == kind && kind != 0)
+    {
+        m_darkGiftCounterAttack += attack;
+        m_darkGiftCounterHealth += health;
+        m_attack += attack * currentCount;
+        m_health += health * currentCount;
+        return;
+    }
+    m_darkGiftCounterAttack = attack;
+    m_darkGiftCounterHealth = health;
+    m_darkGiftCounterKind = kind;
+    if (currentCount > 0)
+    {
+        m_attack += attack * currentCount;
+        m_health += health * currentCount;
+    }
+}
+
+void Minion::ApplyDarkGiftCounterStep(int kind)
+{
+    if (m_darkGiftCounterKind != kind) return;
+    m_attack += m_darkGiftCounterAttack;
+    m_health += m_darkGiftCounterHealth;
 }
 
 void Minion::ActivateHeroDamageTrigger()
@@ -934,6 +1061,8 @@ bool Minion::CanActivate(const Player& player, int targetIdx) const
              card.GetCardType() != CardType::BATTLEGROUND_SPELL))
             return false;
     }
+    if (definition->effect == ActivateEffect::RANDOM_CARD)
+        return !player.hand.IsFull() && targetIdx < 0;
     return targetIdx < 0;
 }
 
@@ -964,6 +1093,27 @@ int Minion::TriggerAvenge(Player& player)
                     data.value().SetHealth(data.value().GetHealth() + definition->health);
                 }
             });
+        }
+        else if (definition->effect == AvengeEffect::ADD_CARD && !definition->cardID.empty())
+        {
+            const Card card = Cards::FindCardByID(definition->cardID);
+            for (int i = 0; !card.id.empty() && i < definition->cardCount && !player.hand.IsFull(); ++i)
+            {
+                Minion generated{ card };
+                player.hand.Add(CardData{ std::move(generated) });
+            }
+        }
+        else if (definition->effect == AvengeEffect::ADD_RANDOM_UNDEAD)
+        {
+            std::map<std::string, int> before;
+            player.hand.ForEach([&before](const std::optional<CardData>& card) { if (card.has_value() && std::holds_alternative<Minion>(*card) && std::get<Minion>(*card).HasRace(Race::UNDEAD)) ++before[std::string(std::get<Minion>(*card).GetCardID())]; });
+            SimpleTasks::RandomCardToHandTask task{Race::UNDEAD, 0, definition->cardCount};
+            task.Run(player, *this);
+            std::map<std::string, int> after;
+            for (int i = 0; i < player.hand.GetCount(); ++i)
+                if (std::holds_alternative<Minion>(player.hand[i]) && std::get<Minion>(player.hand[i]).HasRace(Race::UNDEAD))
+                    ++after[std::string(std::get<Minion>(player.hand[i]).GetCardID())];
+            for (const auto& [id, count] : after) for (int n = 0; n < count - before[id]; ++n) player.season14.TrackCombatAvengeCard(id);
         }
     }
     if (definition->permanent && activations > 0)
@@ -1020,6 +1170,11 @@ bool Minion::Activate(Player& player, int targetIdx)
     else if (definition.effect == ActivateEffect::ADD_CARD)
     {
         SimpleTasks::AddCardTask task{ definition.cardID, definition.amount };
+        task.Run(player, *this);
+    }
+    else if (definition.effect == ActivateEffect::RANDOM_CARD)
+    {
+        SimpleTasks::RandomCardToHandTask task{definition.race, 0, definition.amount};
         task.Run(player, *this);
     }
     --m_activateUses;

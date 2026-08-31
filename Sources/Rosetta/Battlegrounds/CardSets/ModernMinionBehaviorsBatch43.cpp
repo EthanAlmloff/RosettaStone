@@ -1,0 +1,3 @@
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch43.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerLeftmostDeathrattleTask.hpp>
+namespace RosettaStone::Battlegrounds { void ModernMinionBehaviorsBatch43::AddAll(std::map<std::string,CardDef>& cards) { Power normal; normal.AddRallyTask(SimpleTasks::TriggerLeftmostDeathrattleTask{}); cards.emplace("BG36_208", CardDef{std::move(normal)}); Power golden; golden.AddRallyTask(SimpleTasks::TriggerLeftmostDeathrattleTask{}); golden.AddRallyTask(SimpleTasks::TriggerLeftmostDeathrattleTask{}); cards.emplace("BG36_208_G", CardDef{std::move(golden)}); } }

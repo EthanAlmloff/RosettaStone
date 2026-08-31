@@ -19,6 +19,8 @@ TaskStatus RandomCardToHandTask::Run(Player& player, Minion&) {
     if (card.normalDbfID != 0) continue;
     if (m_race != Race::INVALID && m_race != Race::ALL && !card.HasRace(m_race)) continue;
     if (m_tier > 0 && card.GetTier() != m_tier) continue;
+    if (m_magneticOnly && (!card.gameTags.contains(GameTag::MAGNETIC) || card.gameTags.at(GameTag::MAGNETIC) == 0)) continue;
+    if (m_battlecryOnly && (!card.gameTags.contains(GameTag::BATTLECRY) || card.gameTags.at(GameTag::BATTLECRY) == 0)) continue;
     if (!seen.insert(card.id).second) continue;
     candidates.push_back(&card);
   }
@@ -27,6 +29,26 @@ TaskStatus RandomCardToHandTask::Run(Player& player, Minion&) {
     const auto index = Random::get<std::size_t>(0, candidates.size() - 1);
     Minion generated{*candidates[index]};
     player.ApplyFreshMinionModifiers(generated);
+    player.hand.Add(CardData{std::move(generated)});
+  }
+  return TaskStatus::COMPLETE;
+}
+TaskStatus RandomCardToHandTask::Run(Player& player) {
+  if (m_amount <= 0 || player.hand.IsFull()) return TaskStatus::STOP;
+  std::vector<const Card*> candidates;
+  std::unordered_set<std::string_view> seen;
+  for (const auto& card : Cards::GetAllCards()) {
+    if (!card.isBattlegroundsPoolMinion || card.GetCardType() != CardType::MINION || card.normalDbfID != 0) continue;
+    if (m_race != Race::INVALID && m_race != Race::ALL && !card.HasRace(m_race)) continue;
+    if (m_tier > 0 && card.GetTier() != m_tier) continue;
+    if (m_magneticOnly && (!card.gameTags.contains(GameTag::MAGNETIC) || card.gameTags.at(GameTag::MAGNETIC) == 0)) continue;
+    if (m_battlecryOnly && (!card.gameTags.contains(GameTag::BATTLECRY) || card.gameTags.at(GameTag::BATTLECRY) == 0)) continue;
+    if (seen.insert(card.id).second) candidates.push_back(&card);
+  }
+  if (candidates.empty()) return TaskStatus::STOP;
+  for (int i = 0; i < m_amount && !player.hand.IsFull(); ++i) {
+    const auto index = Random::get<std::size_t>(0, candidates.size() - 1);
+    Minion generated{*candidates[index]}; player.ApplyFreshMinionModifiers(generated);
     player.hand.Add(CardData{std::move(generated)});
   }
   return TaskStatus::COMPLETE;

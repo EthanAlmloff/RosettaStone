@@ -12,6 +12,7 @@
 namespace RosettaStone::Battlegrounds
 {
 class Minion;
+namespace SimpleTasks { class DarkGiftRandomPoolTask; }
 
 //! Small, explicitly verified behavior families for Patch 36.4 Dark Gifts.
 //! Metadata flags alone never make a gift executable; callers must use this
@@ -25,6 +26,11 @@ enum class DarkGiftEffect
     TARGET_REBORN,
     TARGET_STEALTH,
     START_COMBAT_STATS,
+    PLAY_CARD_STATS,
+    END_TURN_BATTLECRY,
+    DEATHRATTLE_STATS,
+    COUNTER_STATS,
+    RANDOM_POOL_TASK,
 };
 
 struct DarkGiftBehavior
@@ -41,6 +47,12 @@ struct DarkGiftBehavior
     bool stealth = false;
     int startCombatAttackMultiplier = 1;
     int startCombatHealthMultiplier = 1;
+    int playCardAttack = 0;
+    int playCardHealth = 0;
+    //! Counter family: 1=battlecries, 2=deathrattles, 3=Tavern spells.
+    int counterKind = 0;
+    //! Random-pool family: 1=most-common-race Rally, 2=Tavern-spell Deathrattle.
+    int randomPoolKind = 0;
 };
 
 //! Returns the complete behavior for a supported gift, or NONE when the
@@ -55,7 +67,8 @@ bool DarkGiftTargetIsLegal(const Minion& target,
 
 //! Applies a previously validated gift to one friendly board minion.
 //! Returns false for an unsupported behavior and performs no mutation then.
-bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior);
+bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
+                   int currentCount = 0);
 
 //! Registers behavior definitions so CardLoader's behavior marker and the
 //! coverage tooling agree with the executable lookup above.

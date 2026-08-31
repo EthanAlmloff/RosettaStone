@@ -12,6 +12,7 @@
 
 #include <initializer_list>
 #include <array>
+#include <utility>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -133,6 +134,9 @@ class Minion
     //! Returns whether this instance can be converted to a supported premium
     //! entity without mutating it.
     bool CanMakeGolden() const;
+    //! Replaces card identity while preserving this instance's zone, stats,
+    //! callbacks, and mutable keyword state.
+    bool TransformTo(Card replacement);
 
     //! Returns the value of attack.
     //! \return The value of attack.
@@ -166,6 +170,7 @@ class Minion
 
     //! Returns the number of Blood Gems applied since the last recruit start.
     int GetBloodGemsThisTurn() const;
+    std::pair<int, int> RemoveBloodGems();
 
     //! Returns the value of health.
     //! \return The value of health.
@@ -183,6 +188,12 @@ class Minion
     //! Returns the flag that indicates whether it has deathrattle.
     //! \return The flag that indicates whether it has deathrattle.
     bool HasDeathrattle() const;
+    //! Copies the currently configured deathrattle tasks to another instance.
+    //! Used by recursive combat deathrattle effects such as Leapfrogger.
+    void CopyDeathrattleTo(Minion& target) const;
+    //! Attaches a Dark Gift-owned task to this instance's persistent power.
+    void AddDarkGiftRallyTask(TaskType&& task);
+    void AddDarkGiftDeathrattleTask(TaskType&& task);
 
     //! Returns the flag that indicates whether it has taunt.
     //! \return The flag that indicates whether it has taunt.
@@ -218,6 +229,18 @@ class Minion
     //! Applies and consumes the combat-start stat multipliers.
     void ApplyStartCombatStatMultipliers();
 
+    //! Configures a persistent Dark Gift bonus applied whenever a card is played.
+    void SetPlayCardStatBonus(int attack, int health);
+    void ApplyPlayCardStatBonus();
+    void SetEndTurnBattlecryTrigger(bool enabled);
+    bool HasEndTurnBattlecryTrigger() const;
+    void SetDeathrattleStatTransfer(int attack, int health);
+    int DeathrattleAttackTransfer() const;
+    int DeathrattleHealthTransfer() const;
+    void SetDarkGiftCounter(int attack, int health, int kind,
+                            int currentCount = 0);
+    void ApplyDarkGiftCounterStep(int kind);
+
     //! Returns the number of attacks this minion may make in one combat turn.
     //! \return One, two, or four for normal, Windfury, or Mega Windfury.
     int GetAttackCount() const;
@@ -229,6 +252,8 @@ class Minion
     //! Returns whether this Tavern entity is frozen.
     //! \return true if this entity is frozen, false otherwise.
     bool IsFrozen() const;
+    bool IsHandLocked() const { return m_handLocked; }
+    void SetHandLocked(bool locked) { m_handLocked = locked; }
 
     //! Sets whether this Tavern entity is frozen.
     //! \param frozen The new frozen state.
@@ -341,7 +366,17 @@ class Minion
     int m_buyTriggerUses = 0;
     int m_bloodGemCount = 0;
     int m_bloodGemCountThisTurn = 0;
+    int m_bloodGemAttack = 0;
+    int m_bloodGemHealth = 0;
     int m_avengeDeaths = 0;
+    int m_playCardAttackBonus = 0;
+    int m_playCardHealthBonus = 0;
+    bool m_endTurnBattlecryTrigger = false;
+    int m_deathrattleAttackTransfer = 0;
+    int m_deathrattleHealthTransfer = 0;
+    int m_darkGiftCounterAttack = 0;
+    int m_darkGiftCounterHealth = 0;
+    int m_darkGiftCounterKind = 0;
 
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
@@ -360,6 +395,7 @@ class Minion
     bool m_hasStealth = false;
     bool m_isFrozen = false;
     bool m_isDestroyed = false;
+    bool m_handLocked = false;
     int m_activateUses = 1;
     int m_startCombatAttackMultiplier = 1;
     int m_startCombatHealthMultiplier = 1;

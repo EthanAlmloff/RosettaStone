@@ -10,7 +10,7 @@ void BloodGemBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     // Canonical generated spell plus families whose complete effects are
     // resolved by Player or the shared gem generator task.
     for (const char* id : {
-             "BG20_GEM", "BG20_100", "BG20_100_G", "BG20_203",
+             "BG20_GEM", "BG20_203",
              "BG20_203_G", "BG20_205", "BG20_205_G", "BG20_207",
              "BG20_207_G", "BG20_301", "BG20_301_G", "BG20_103",
              "BG20_103_G", "BG20_102", "BG20_102_G", "BG20_105",

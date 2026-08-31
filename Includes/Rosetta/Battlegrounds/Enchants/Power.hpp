@@ -26,8 +26,9 @@ enum class ActivateEffect : unsigned char
     SET_TARGET_STATS,
     GAIN_GOLD,
     ADD_CARD,
+    RANDOM_CARD,
 };
-enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE };
+enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD };
 struct AvengeDefinition
 {
     AvengeEffect effect = AvengeEffect::NONE;
@@ -36,6 +37,8 @@ struct AvengeDefinition
     int health = 0;
     Race race = Race::INVALID;
     bool permanent = false;
+    std::string cardID;
+    int cardCount = 1;
 };
 
 struct ActivateDefinition
@@ -47,6 +50,7 @@ struct ActivateDefinition
     int amount = 0;
     bool nextTurn = false;
     std::string cardID;
+    Race race = Race::INVALID;
 };
 
 //!

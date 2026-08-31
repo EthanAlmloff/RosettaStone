@@ -1,0 +1,2 @@
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch44.hpp>
+namespace RosettaStone::Battlegrounds { void ModernMinionBehaviorsBatch44::AddAll(std::map<std::string,CardDef>& cards) { Power p; p.AddAvenge({AvengeEffect::ADD_CARD,4,0,0,Race::INVALID,false,"BG28_604",1}); cards.emplace("BG32_324",CardDef{p}); Power g; g.AddAvenge({AvengeEffect::ADD_CARD,4,0,0,Race::INVALID,false,"BG28_604",2}); cards.emplace("BG32_324_G",CardDef{std::move(g)}); } }

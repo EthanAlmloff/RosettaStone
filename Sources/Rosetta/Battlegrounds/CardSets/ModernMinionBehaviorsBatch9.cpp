@@ -50,21 +50,6 @@ void AddRaceStartBuff(std::map<std::string, CardDef>& cards, const char* id,
     cards.emplace(id, CardDef{ std::move(power) });
 }
 
-void AddElectricSynthesizer(std::map<std::string, CardDef>& cards,
-                            const char* id, const char* enchantmentID,
-                            int repetitions)
-{
-    Power power;
-    for (int i = 0; i < repetitions; ++i)
-    {
-        power.AddBattlecryTask(FriendlyRaceEnchantmentTask{
-            enchantmentID, Race::DRAGON, true });
-        power.AddStartCombatTask(FriendlyRaceEnchantmentTask{
-            enchantmentID, Race::DRAGON, true });
-    }
-    cards.emplace(id, CardDef{ std::move(power) });
-}
-
 void AddAmberGuardian(std::map<std::string, CardDef>& cards, const char* id,
                       int amount)
 {
@@ -110,12 +95,6 @@ void ModernMinionBehaviorsBatch9::AddAll(
     AddRaceStartBuff(cards, "BG26_805_G", "BG26_805e", Race::BEAST, 2,
                      false);
     AddStatEnchantment(cards, "BG26_805e", 1, 0);
-
-    // Electric Synthesizer: its Battlecry and Start of Combat each buff
-    // other Dragons.  A golden copy doubles both event effects.
-    AddElectricSynthesizer(cards, "BG26_963", "BG26_963e", 1);
-    AddElectricSynthesizer(cards, "BG26_963_G", "BG26_963e", 2);
-    AddStatEnchantment(cards, "BG26_963e", 1, 1);
 
     // Amber Guardian chooses one (two for golden) other friendly Dragon(s),
     // giving +2/+2 and Divine Shield.

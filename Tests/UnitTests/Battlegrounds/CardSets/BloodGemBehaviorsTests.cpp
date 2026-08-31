@@ -23,8 +23,8 @@ TEST_CASE("Blood Gem behavior registry covers exact modeled Quilboar set")
 {
     std::map<std::string, CardDef> cards;
     BloodGemBehaviors::AddAll(cards);
-    CHECK(cards.size() == 19);
-    for (const auto* id : { "BG20_GEM", "BG20_100", "BG20_100_G",
+    CHECK(cards.size() == 17);
+    for (const auto* id : { "BG20_GEM",
                             "BG20_203", "BG20_203_G",
                             "BG20_205", "BG20_205_G", "BG20_207",
                             "BG20_207_G", "BG20_301", "BG20_301_G",

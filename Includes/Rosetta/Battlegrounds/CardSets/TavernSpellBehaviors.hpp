@@ -29,6 +29,9 @@ enum class TavernSpellEffect
     ONE_PER_RACE_STATS,
     SHOP_STATS,
     TARGET_STATS,
+    TARGET_CHOOSE_ONE_STATS,
+    ALL_MINION_CHOOSE_ONE_STATS,
+    TARGET_OR_ALL_CHOOSE_ONE_STATS,
     SET_TARGET_STATS,
     TARGET_AND_RACE,
     TARGET_STATS_REPEAT,
@@ -40,6 +43,7 @@ enum class TavernSpellEffect
     TARGET_STATS_TOGGLE_TAUNT,
     SET_PLAYER_ARMOR,
     NEXT_TURN_GOLD,
+    NEXT_COMBAT_REWARD,
     INCREASE_MAX_GOLD,
     FREE_REFRESHES,
     SHOP_STATS_PERSISTENT,
@@ -56,6 +60,14 @@ enum class TavernSpellEffect
     TARGET_CONSUME_SHOP_STATS,
     SELL_TARGET_GIVE_LEFTMOST_RACE_STATS,
     BLOOD_GEM,
+    DISCOVER_MINION,
+    TRANSFORM_HIGHER_TIER,
+    DISCOVER_DIFFERENT_RACE,
+    RANDOM_MINION_AND_COPY,
+    FIXED_CARDS,
+    BLOOD_GEM_TRANSFER,
+    RANDOM_SPELLCRAFT,
+    DISCOVER_HERO_POWER,
 };
 
 struct TavernSpellBehavior
@@ -70,6 +82,10 @@ struct TavernSpellBehavior
     //! separate from attack/health makes table entries self-describing and
     //! prevents a future executor from confusing a gold value with a stat.
     int value = 0;
+    bool copyKeywords = false;
+    std::string_view cardA{};
+    std::string_view cardB{};
+    bool lockHand = false;
 };
 
 //! Menagerie Tableware applies its base buff once, then repeats it once for
@@ -88,6 +104,12 @@ constexpr std::size_t MenagerieTablewareRepeatCount(
 //! simulator support.  Every entry is covered by a focused behavior test.
 inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
 {
+    if (id == "BG31_880") // Alliance Flag: choose +3/+1 or +1/+3.
+        return { 0, 0, 0, TavernSpellEffect::TARGET_CHOOSE_ONE_STATS };
+    if (id == "BG31_881") // Time Management: immediate or next-turn minion stats.
+        return { 0, 0, 0, TavernSpellEffect::ALL_MINION_CHOOSE_ONE_STATS };
+    if (id == "BG31_886") // Forest's Bounty: target twice or all minions.
+        return { 0, 0, 0, TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS };
     if (id == "BG23_000t") return { 0, 2, 0, TavernSpellEffect::TARGET_STATS };
     if (id == "BG23_000_Gt") return { 0, 4, 0, TavernSpellEffect::TARGET_STATS };
     if (id == "BG23_004t") return { 0, 2, 6, TavernSpellEffect::TARGET_STATS_AND_TAUNT };
@@ -219,6 +241,10 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 0, 0, 0, TavernSpellEffect::NEXT_TURN_GOLD,
                  Race::INVALID, 0, 2 };
     }
+    if (id == "BG28_884") // Gain 3 Gold on a win, or 1 on a tie, next combat.
+    {
+        return { 0, 0, 0, TavernSpellEffect::NEXT_COMBAT_REWARD };
+    }
     if (id == "BG28_805") // Strike Oil: increase maximum Gold by 1.
     {
         return { 0, 0, 0, TavernSpellEffect::INCREASE_MAX_GOLD,
@@ -272,6 +298,40 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 0, 0, 0,
                  TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND };
     }
+    if (id == "BG33_101") // A New Sprout: Discover a Tier 1 minion.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_MINION,
+                 Race::INVALID, 3, 1 };
+    if (id == "BG31_896") // Hallowed Ritual: Discover a Tier 7 minion.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_MINION,
+                 Race::INVALID, 3, 7 };
+    if (id == "BG34_330") // Search Through Time: current-tier minion, locked one turn.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_MINION,
+                 Race::INVALID, 3, 0, false, {}, {}, true };
+    if (id == "BG28_882") // Contracted Corpse: Discover a Deathrattle minion.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_MINION,
+                 Race::INVALID, 3, 8 };
+    if (id == "EBG_Spell_037") // Unmasked Identity: Discover a new Hero Power.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_HERO_POWER };
+    if (id == "BG30_804") // Robust Evolution: random higher-Tier transform.
+        return { 0, 0, 0, TavernSpellEffect::TRANSFORM_HIGHER_TIER };
+    if (id == "BG28_518") // Chef's Choice: a different minion of its type.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_DIFFERENT_RACE };
+    if (id == "BG28_601") // Cloning Conch: a random Murloc and a copy.
+        return { 0, 0, 0, TavernSpellEffect::RANDOM_MINION_AND_COPY,
+                 Race::MURLOC, 2 };
+    if (id == "BG31_819") // Temperature Shift: Fire Baller and Snow Baller.
+        return { 0, 0, 0, TavernSpellEffect::FIXED_CARDS,
+                 Race::INVALID, 0, 0, false, "BG31_816", "BG31_818" };
+    if (id == "BG36_884") // Weapons Forge: three Pointy Arrows.
+        return { 0, 0, 0, TavernSpellEffect::FIXED_CARDS,
+                 Race::INVALID, 3, 0, false, "EBG_Spell_014" };
+    if (id == "BG28_698") // Gem Confiscation: apply two gems and steal neighbors.
+        return { 0, 0, 0, TavernSpellEffect::BLOOD_GEM_TRANSFER };
+    if (id == "BG28_606") // Spitescale Special: three random Spellcraft spells.
+        return { 0, 0, 0, TavernSpellEffect::RANDOM_SPELLCRAFT };
+    if (id == "BG28_521") // Planar Telescope: Discover a common-type minion.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_MINION,
+                 Race::INVALID, 3, 0 };
     if (id == "BG28_512") // Enchanted Lasso: steal a random Tavern minion.
     {
         return { 0, 0, 0, TavernSpellEffect::STEAL_RANDOM_SHOP_MINION };
@@ -289,6 +349,9 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 0, 0, 0, TavernSpellEffect::TARGET_CONSUME_SHOP_STATS,
                  Race::DEMON, 3 };
     }
+    if (id == "BG36_880") // Methodical Madness: Demon consumes two with keywords.
+        return { 0, 0, 0, TavernSpellEffect::TARGET_CONSUME_SHOP_STATS,
+                 Race::DEMON, 2, 0, true };
     if (id == "BG33_899") // Mounting Avalanche: sell into leftmost Elemental.
     {
         return { 0, 0, 0,
@@ -303,6 +366,8 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
 inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 {
     return effect == TavernSpellEffect::TARGET_STATS ||
+           effect == TavernSpellEffect::TARGET_CHOOSE_ONE_STATS ||
+           effect == TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::BLOOD_GEM ||
            effect == TavernSpellEffect::SET_TARGET_STATS ||
            effect == TavernSpellEffect::TARGET_AND_RACE ||
@@ -318,7 +383,10 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::TARGET_GOLDEN ||
            effect == TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS ||
            effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS ||
-           effect == TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS;
+           effect == TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS ||
+           effect == TavernSpellEffect::TRANSFORM_HIGHER_TIER ||
+           effect == TavernSpellEffect::DISCOVER_DIFFERENT_RACE ||
+           effect == TavernSpellEffect::BLOOD_GEM_TRANSFER;
 }
 
 //! Returns whether a target satisfies additional spell-specific constraints.
