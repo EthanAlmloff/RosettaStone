@@ -20,6 +20,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastSpellBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellAttackBonusTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomGoldenTierMinionToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmFodderRefreshTask.hpp>
 
 using namespace RosettaStone::Battlegrounds;
 
@@ -80,6 +82,47 @@ TEST_CASE("[Generated mappings] - every reviewed row has a live CardDef")
             CHECK(!power.GetRallyTask().empty());
         else
             CHECK(power.GetTrigger().has_value());
+    }
+}
+
+TEST_CASE("[Generated mappings] - Silent Deliverer golden pool counts")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG36_343", "BG36_343_G"})
+    {
+        const auto& tasks = cards.at(id).power.GetBattlecryTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task = std::get_if<SimpleTasks::RandomGoldenTierMinionToHandTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->Amount() == (std::string_view(id) == "BG36_343_G" ? 2 : 1));
+    }
+}
+
+TEST_CASE("[Generated mappings] - Laboratory Assistant arms three refreshes")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG35_150", "BG35_150_G"})
+    {
+        const auto& tasks = cards.at(id).power.GetBattlecryTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* task = std::get_if<SimpleTasks::ArmFodderRefreshTask>(&tasks.front());
+        REQUIRE(task != nullptr);
+        CHECK(task->Refreshes() == 3);
+        CHECK(task->Amount() == (std::string_view(id) == "BG35_150_G" ? 2 : 1));
+    }
+}
+
+TEST_CASE("[Generated mappings] - Twisted Wrathguard owns sell trigger")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG35_155", "BG35_155_G"})
+    {
+        REQUIRE(cards.at(id).power.GetTrigger().has_value());
+        CHECK(cards.at(id).power.GetTrigger()->GetTriggerType() ==
+              TriggerType::SELL_MINION);
     }
 }
 

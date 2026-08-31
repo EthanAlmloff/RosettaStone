@@ -371,6 +371,22 @@ void Game::Recruit()
 
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.remainCoin += heroPowerResult.goldDelta;
+        if (player.season14.imprisonedTurns == 0 &&
+            player.season14.imprisonedSlot >= 0 &&
+            player.season14.imprisonedSlot < player.tavern.fieldZone.GetCount())
+        {
+            player.tavern.fieldZone[static_cast<std::size_t>(
+                player.season14.imprisonedSlot)].SetFrozen(false);
+            player.season14.imprisonedSlot = -1;
+        }
+        // Power of the Storm presents two new public hero-power options at
+        // every recruit start; the modal remains pending until selected.
+        player.BeginPowerOfStormChoice();
+        // Dungar flightpaths advance once per recruit turn and resolve before
+        // the player receives the next decision.  Ironforge intentionally
+        // leaves its Discover modal pending for the policy to choose.
+        player.season14.AdvanceFlightpath();
+        player.ResolveFlightpathCompletion();
         if (player.season14.TakeVoidPowerDiscoverReady() &&
             !player.BeginVoidPowerDiscover())
             player.season14.RestoreVoidPowerDiscoverReady();
@@ -467,8 +483,16 @@ void Game::CompleteRecruitPhase()
                         minion.SetAttack(minion.GetAttack() + behavior.attack);
                         minion.SetHealth(minion.GetHealth() + behavior.health);
                     }
-                });
+                    });
             }
+            // Resolve ordinary minion end-of-turn triggers after the final
+            // recruit action and before combat.  Trigger dispatch is kept on
+            // the authoritative board instances so generated effects (such
+            // as Cataclysmic Harbinger's last-spell copy) cannot be skipped.
+            player.recruitField.ForEachAlive([](MinionData& data) {
+                auto& minion = data.value();
+                minion.ActivateTrigger(TriggerType::TURN_END, minion);
+            });
             // Upbeat Harmony resolves at the end of every third recruit turn.
             // Consume the schedule only after the copy is attempted; a full
             // hand still consumes the triggered reward, as in-game.
@@ -507,6 +531,9 @@ void Game::Combat()
         player2.getBattleCallback = [&battle]() -> Battle& { return battle; };
 
         const CombatResult result = battle.Run();
+        // Combat fields are copies.  Commit only deltas explicitly marked as
+        // permanent by combat effects before post-combat rewards resolve.
+        battle.CommitPersistentState();
         // Resolve the owner-side first-kill copy after combat, using the
         // canonical normal card definition so temporary/golden combat state
         // cannot leak into the plain hand copy.

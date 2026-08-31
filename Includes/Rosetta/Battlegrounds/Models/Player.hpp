@@ -53,6 +53,9 @@ class Player
     //! passive hero powers do not depend on the minion first appearing in the
     //! Tavern.
     void ApplyFreshMinionModifiers(Minion& minion) const;
+    //! Gives +2/+2 to one random friendly minion of every occupied Tavern
+    //! Tier, using the simulator RNG stream.
+    void ApplyNaturalBalance();
     void ApplyPersistentRaceStats(Race race, int attack, int health);
     //! Adds a cumulative race aura while excluding one triggering instance.
     //! This supports "other [race]" discover/event effects without losing
@@ -77,12 +80,18 @@ class Player
     //! powers that acquire a shop entity directly; pool ownership remains
     //! with the moved instance.
     bool TakeTavernMinionToHand(std::size_t idx, int attack, int health);
+    //! Each friendly Demon consumes one random Tavern minion for its stats.
+    bool DevourRandomTavernForDemons(int multiplier);
+    void UpdateSkyGolemsForDeathrattle();
     //! Summons an exact state copy of a friendly minion with a fresh entity
     //! identity. Used by Cloning Gallery; does not charge or consume hand.
     bool SummonExactMinionCopy(std::size_t idx);
     //! Adds a metadata-only (plain) copy of the left-most hand card.
     //! Dynamic buffs/enchantments are intentionally not copied.
     bool AddPlainCopyOfLeftmostHandCard();
+    //! Adds a card-definition copy of a friendly board minion to hand.
+    //! Dynamic instance state is intentionally not copied.
+    bool AddMinionCopyToHand(const Minion& source);
     //! Begins Void Power's one-time Tier-5 Discover when its unlock fires.
     bool BeginVoidPowerDiscover();
     bool CanPurchaseTavernSlot(std::size_t idx) const;
@@ -120,6 +129,10 @@ class Player
     //! generated card keeps the canonical BG20_GEM identity so replay and
     //! legality use the same path as a naturally generated gem.
     int AddBloodGems(int count);
+    //! Applies one canonical Blood Gem to an existing friendly minion.  This
+    //! keeps generated effects (such as Rally) on the same aura/keyword
+    //! path as a Blood Gem spell played from hand.
+    void ApplyBloodGemTo(Minion& target);
 
     //! Creates up to `count` canonical Tavern Coin spells in hand.
     int AddTavernCoins(int count);
@@ -132,6 +145,14 @@ class Player
     //! hand.  Only concrete minion and spell cards are accepted; unsupported
     //! modal effects remain pending and fail closed.
     bool ApplyChoice(std::size_t offeringIdx);
+    //! Resolve a completed Dungar flightpath at recruit start.
+    bool ResolveFlightpathCompletion();
+    //! Sell one friendly minion and transfer its current stats to another.
+    bool ApplyDevour(std::size_t sourceIdx, std::size_t targetIdx);
+    //! Begin I Spy's public Discover from the next opponent's visible warband.
+    bool BeginISpyDiscover();
+    //! Begin Power of the Storm's two-option hero-power choice.
+    bool BeginPowerOfStormChoice();
     //! Begin a seeded Discover offering of supported Tavern spells.
     bool BeginTavernSpellDiscover(int amount, std::uint64_t sourceEntityID,
                                   std::int32_t sourceCardDbfID);

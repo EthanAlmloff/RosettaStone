@@ -44,6 +44,10 @@ class Battle
     //! Simulates a battle.
     CombatResult Run();
 
+    //! Commits explicitly permanent stat/keyword changes made to combat
+    //! copies back to their matching recruit-phase entities.
+    void CommitPersistentState();
+
     //! Attacks one of the opponent minions.
     //! \return The flag that indicates the attacker does attack.
     bool Attack();

@@ -12,6 +12,7 @@
 
 #include <initializer_list>
 #include <array>
+#include <cstdint>
 #include <utility>
 
 namespace RosettaStone::Battlegrounds
@@ -27,6 +28,11 @@ namespace RosettaStone::Battlegrounds
 class Minion
 {
  public:
+    //! Identity used when a recruit-phase entity is copied into combat.
+    //! Entity IDs are preferred; pool/zone identity keeps deterministic
+    //! hand-built fixtures usable without aliasing different cards.
+    bool IsSameInstance(const Minion& other) const noexcept;
+
     //! Default constructor.
     Minion() = default;
 
@@ -184,8 +190,21 @@ class Minion
 
     //! Applies recruit-turn-only Spellcraft stats/keywords.
     void ApplyTemporaryStats(int attack, int health, bool taunt = false);
+    //! Applies a combat-time stat change that is explicitly permanent.  The
+    //! delta is carried by combat copies and committed to the matching
+    //! recruit entity when the battle ends; ordinary SetAttack/SetHealth
+    //! calls remain combat-only.
+    void ApplyCombatPersistentStats(int attack, int health);
+    //! Applies a combat-time keyword that is explicitly permanent.
+    void ApplyCombatPersistentKeyword(GameTag tag);
+    //! Commits only explicitly persistent combat deltas from a matching copy.
+    void ReconcileCombatPersistentState(const Minion& combatCopy);
     void ApplyTemporaryKeyword(GameTag tag);
     void ExpireTemporaryEffects();
+    //! Resets the per-recruit-turn Lava Lurker Spellcraft allowance.
+    void ResetSpellcraftUses() noexcept;
+    bool ConsumeSpellcraftUse() noexcept;
+    bool IsLavaLurker() const noexcept;
 
     //! Returns the flag that indicates whether it has deathrattle.
     //! \return The flag that indicates whether it has deathrattle.
@@ -252,7 +271,12 @@ class Minion
     //! Configures a persistent Dark Gift bonus applied whenever a card is played.
     void SetPlayCardStatBonus(int attack, int health);
     void ApplyPlayCardStatBonus();
+    void SetAttackThresholdDivineShield(int threshold);
     void SetEndTurnBattlecryTrigger(bool enabled);
+    void SetSpendGoldThresholdFired(bool fired) noexcept { m_spendGoldThresholdFired = fired; }
+    bool SpendGoldThresholdFired() const noexcept { return m_spendGoldThresholdFired; }
+    void SetHeroDamageThresholdFired(bool fired) noexcept { m_heroDamageThresholdFired = fired; }
+    bool HeroDamageThresholdFired() const noexcept { return m_heroDamageThresholdFired; }
     bool HasEndTurnBattlecryTrigger() const;
     bool HasBattlecry() const;
     void SetDeathrattleStatTransfer(int attack, int health);
@@ -265,6 +289,9 @@ class Minion
     void SetIncubation(int turns = 2);
     void AdvanceIncubation();
     int IncubationTurnsRemaining() const;
+    //! Arms Replication and advances its two-turn recruit countdown.
+    void SetReplication(int turns = 2);
+    bool AdvanceReplication();
 
     //! Returns the number of attacks this minion may make in one combat turn.
     //! \return One, two, or four for normal, Windfury, or Mega Windfury.
@@ -351,6 +378,11 @@ class Minion
 
     //! Returns whether this instance has a legal manual Activate available.
     bool CanActivate(const Player& player, int targetIdx = -1) const;
+    //! Kelp Keeper cannot supply a second target while replaying a Battlecry.
+    bool RequiresPlayTarget() const noexcept
+    {
+        return m_card.mustHaveToTargetToPlay;
+    }
     int TriggerAvenge(Player& player);
     void ResetAvengeProgress();
     const AvengeDefinition* GetAvengeDefinition() const;
@@ -397,16 +429,24 @@ class Minion
     int m_bloodGemCountThisTurn = 0;
     int m_bloodGemAttack = 0;
     int m_bloodGemHealth = 0;
+    int m_combatPersistentAttack = 0;
+    int m_combatPersistentHealth = 0;
+    std::uint32_t m_combatPersistentKeywords = 0;
     int m_avengeDeaths = 0;
     int m_playCardAttackBonus = 0;
     int m_playCardHealthBonus = 0;
+    int m_attackThresholdDivineShield = 0;
+    bool m_attackThresholdTriggered = false;
     bool m_endTurnBattlecryTrigger = false;
+    bool m_spendGoldThresholdFired = false;
+    bool m_heroDamageThresholdFired = false;
     int m_deathrattleAttackTransfer = 0;
     int m_deathrattleHealthTransfer = 0;
     int m_darkGiftCounterAttack = 0;
     int m_darkGiftCounterHealth = 0;
     int m_darkGiftCounterKind = 0;
     int m_incubationTurnsRemaining = 0;
+    int m_replicationTurnsRemaining = 0;
 
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
@@ -422,6 +462,7 @@ class Minion
     bool m_temporaryReborn = false;
     bool m_temporaryWindfury = false;
     bool m_temporaryMegaWindfury = false;
+    int m_spellcraftUsesRemaining = 0;
     bool m_hasVenomous = false;
     bool m_hasStealth = false;
     bool m_isFrozen = false;

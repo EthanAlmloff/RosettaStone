@@ -44,6 +44,19 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG36_MagicItem_215") return {TrinketEffect::DUPLICATE_DRAGON_BATTLECRY};
     if (id == "BG36_MagicItem_811") return {TrinketEffect::FIRST_MINION_DIVINE_SHIELD};
     if (id == "BG36_MagicItem_202") return {TrinketEffect::BATTLECRY_BUY_DISCOUNT, 0, 0, 2};
+    if (id == "BG30_MagicItem_301") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG25_008"};
+    if (id == "BG30_MagicItem_303") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG_TTN_401"};
+    if (id == "BG30_MagicItem_310") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG25_354"};
+    if (id == "BG30_MagicItem_406") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, true, false, false, "BG28_604"};
+    if (id == "BG30_MagicItem_821") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "LT23_809H"};
+    if (id == "BG30_MagicItem_876") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG_EX1_564"};
+    if (id == "BG30_MagicItem_831") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, true, false, false, "BGS_115"};
+    if (id == "BG30_MagicItem_944") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, true, false, false, "BG28_169"};
+    if (id == "BG30_MagicItem_987") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, true, false, false, "BG26_814"};
+    if (id == "BG32_MagicItem_700") return {TrinketEffect::TAVERN_SPELL_STATS, 1, 1};
+    if (id == "BG32_MagicItem_801") return {TrinketEffect::TAVERN_SPELL_STATS, 1, 1};
+    if (id == "BG32_MagicItem_801t") return {TrinketEffect::TAVERN_SPELL_STATS, 1, 1};
+    if (id == "BG36_MagicItem_373") return {TrinketEffect::TAVERN_SPELL_STATS, 1, 2};
     return {};
 }
 
@@ -80,5 +93,18 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG36_MagicItem_215", CardDef{});
     cards.emplace("BG36_MagicItem_811", CardDef{});
     cards.emplace("BG36_MagicItem_202", CardDef{});
+    cards.emplace("BG30_MagicItem_301", CardDef{});
+    cards.emplace("BG30_MagicItem_303", CardDef{});
+    cards.emplace("BG30_MagicItem_310", CardDef{});
+    cards.emplace("BG30_MagicItem_406", CardDef{});
+    cards.emplace("BG30_MagicItem_821", CardDef{});
+    cards.emplace("BG30_MagicItem_876", CardDef{});
+    cards.emplace("BG30_MagicItem_831", CardDef{});
+    cards.emplace("BG30_MagicItem_944", CardDef{});
+    cards.emplace("BG30_MagicItem_987", CardDef{});
+    cards.emplace("BG32_MagicItem_700", CardDef{});
+    cards.emplace("BG32_MagicItem_801", CardDef{});
+    cards.emplace("BG32_MagicItem_801t", CardDef{});
+    cards.emplace("BG36_MagicItem_373", CardDef{});
 }
 }  // namespace RosettaStone::Battlegrounds

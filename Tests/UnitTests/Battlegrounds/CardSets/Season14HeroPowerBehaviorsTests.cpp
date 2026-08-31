@@ -62,7 +62,7 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Void Power has turn-seven Discover pay
 
 TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 19);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 24);
 
     const auto* boon = FindSeason14HeroPowerBehavior(57562);
     REQUIRE(boon != nullptr);
@@ -127,6 +127,134 @@ TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
             CHECK(entry.dbfID != SEASON14_HERO_POWER_BEHAVIORS[j].dbfID);
         }
     }
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - See the Light tavern target contract")
+{
+    CHECK(Season14HeroPowerUsesTavernTarget(70957));
+    CHECK(!Season14HeroPowerUsesTavernTarget(57562));
+    CHECK(Season14HeroPowerTavernTargetIsLegal(70957, true, 1));
+    CHECK(!Season14HeroPowerTavernTargetIsLegal(70957, false, 1));
+    CHECK(!Season14HeroPowerTavernTargetIsLegal(70957, true, 0));
+    CHECK(!Season14HeroPowerTavernTargetIsLegal(57562, true, 3));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - See the Light registry metadata is exact")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(70957);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->id == "BG20_HERO_101p");
+    CHECK(entry->kind == Season14HeroPowerKind::SEE_THE_LIGHT);
+    CHECK(entry->cost == 2);
+    CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Natural Balance is a typed active family")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(68130);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->kind == Season14HeroPowerKind::NATURAL_BALANCE);
+    CHECK(entry->cost == 2);
+    CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Spirit Swap is a two-target family")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(71464);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->kind == Season14HeroPowerKind::SPIRIT_SWAP);
+    CHECK(entry->cost == 0);
+    CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Galakrond Greed is a Tavern discover")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(57555);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->kind == Season14HeroPowerKind::GALAKROND_GREED);
+    CHECK(entry->cost == 1);
+    CHECK(!entry->passive);
+    CHECK(Season14HeroPowerUsesGalakrondGreed(57555));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Naga Conquest is a three-card Discover")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(80007);
+    REQUIRE(entry != nullptr);
+    CHECK(FindSeason14HeroPowerBehavior("BG22_HERO_007p2") == entry);
+    CHECK(entry->kind == Season14HeroPowerKind::NAGA_CONQUEST);
+    CHECK(entry->cost == 1);
+    CHECK(!entry->passive);
+    CHECK(Season14HeroPowerUsesNagaConquest(80007));
+    CHECK(!Season14HeroPowerUsesNagaConquest(57555));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Reclaimed Souls registry")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(89294);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->id == "BG23_HERO_306p");
+    CHECK(entry->kind == Season14HeroPowerKind::RECLAIMED_SOULS);
+    CHECK(entry->cost == 2);
+    CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Reborn Rites registry")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(58040);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->id == "TB_BaconShop_HP_024");
+    CHECK(entry->kind == Season14HeroPowerKind::REBORN_RITES);
+    CHECK(entry->cost == 0);
+    CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Imprison registry")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(61919);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->id == "TB_BaconShop_HP_068");
+    CHECK(entry->kind == Season14HeroPowerKind::IMPRISON);
+    CHECK(entry->cost == 1);
+    CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Sign a New Artist registry")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(101346);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->id == "BG25_HERO_105p");
+    CHECK(entry->kind == Season14HeroPowerKind::SIGN_NEW_ARTIST);
+    CHECK(entry->cost == 3);
+    CHECK(entry->buddyDbfID == 101349);
+    CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Devour uses two distinct friendly targets")
+{
+    const auto* entry = FindSeason14HeroPowerBehavior(71914);
+    REQUIRE(entry != nullptr);
+    CHECK(entry->kind == Season14HeroPowerKind::DEVOUR);
+    CHECK(entry->cost == 0);
+    CHECK(!entry->passive);
+    CHECK(Season14HeroPowerUsesDevour(71914));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Dungar flightpath countdowns")
+{
+    Season14State state{};
+    CHECK(state.SelectFlightpath(75705));
+    CHECK(state.flightpath.turnsRemaining == 2);
+    CHECK(!state.AdvanceFlightpath());
+    CHECK(state.AdvanceFlightpath());
+    CHECK(state.flightpath.pathDbfID == 0);
+    CHECK(state.flightpath.completedDbfID == 75705);
+    CHECK(state.TakeCompletedFlightpath() == 75705);
+    CHECK(state.TakeCompletedFlightpath() == 0);
+    CHECK(state.SelectFlightpath(75706));
+    for (int i = 0; i < 3; ++i) state.AdvanceFlightpath();
+    CHECK(state.TakeCompletedFlightpath() == 75706);
+    CHECK(!state.SelectFlightpath(999999));
 }
 
 TEST_CASE("[Season14HeroPowerBehaviors] - Buried Treasure has four digs")

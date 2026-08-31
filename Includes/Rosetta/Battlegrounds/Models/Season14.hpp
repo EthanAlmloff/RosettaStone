@@ -108,6 +108,34 @@ inline constexpr std::size_t SEASON14_DARK_GIFT_SLOTS = 16;
 class Season14State
 {
  public:
+    struct FlightpathState {
+        std::int32_t pathDbfID = 0;
+        std::int32_t turnsRemaining = 0;
+        std::int32_t completedDbfID = 0;
+    };
+    FlightpathState flightpath;
+    bool SelectFlightpath(std::int32_t dbfID) noexcept {
+        switch (dbfID) {
+            case 75704: flightpath = {dbfID, 1, 0}; return true;
+            case 75705: flightpath = {dbfID, 2, 0}; return true;
+            case 75706: flightpath = {dbfID, 3, 0}; return true;
+            default: return false;
+        }
+    }
+    bool AdvanceFlightpath() noexcept {
+        if (flightpath.pathDbfID == 0 || flightpath.turnsRemaining <= 0) return false;
+        --flightpath.turnsRemaining;
+        if (flightpath.turnsRemaining != 0) return false;
+        flightpath.completedDbfID = flightpath.pathDbfID;
+        flightpath.pathDbfID = 0;
+        flightpath.turnsRemaining = 0;
+        return flightpath.completedDbfID != 0;
+    }
+    std::int32_t TakeCompletedFlightpath() noexcept {
+        const auto completed = flightpath.completedDbfID;
+        flightpath.completedDbfID = 0;
+        return completed;
+    }
     Season14Decision pendingDecision = Season14Decision::NONE;
     std::vector<Season14Offering> choiceOfferings;
     std::vector<Season14Offering> pendingOfferings;
@@ -116,15 +144,25 @@ class Season14State
     //! offering as an anonymous global random result.
     std::uint64_t pendingSourceEntityID = 0;
     std::int32_t pendingSourceCardDbfID = 0;
+    //! Tavern slot selected by Galakrond's Greed while its replacement
+    //! Discover modal is pending; -1 means no Tavern replacement is active.
+    std::int32_t pendingTavernReplacementSlot = -1;
+    std::int32_t pendingTavernReplacementTier = 0;
     Season14ChooseOneState chooseOne;
     Season14SpellModalState spellModal;
     std::vector<Season14PersistentEffect> trinkets;
     std::vector<Season14PersistentEffect> darkGifts;
+    //! Generated quest-reward choices selected from a public modal. The
+    //! reward DBF is retained until its effect family is resolved by the
+    //! corresponding reward subsystem, making replay state explicit.
+    std::vector<std::int32_t> generatedQuestRewards;
 
     std::int32_t heroPowerDbfID = 0;
     std::int32_t heroPowerCost = 0;
     bool heroPowerAvailable = false;
     bool heroPowerUsed = false;
+    bool powerOfStormActive = false;
+    std::int32_t luckyRollCooldown = 0;
 
     //! State for the currently implemented modern hero-power families.
     //! Keeping this with the player-owned Season 14 state makes discounts and
@@ -135,6 +173,12 @@ class Season14State
     Season14HeroPowerBatch4State heroPowerBatch4;
     Season14HeroPowerBatch5State heroPowerBatch5;
     Season14HeroPowerBatch6State heroPowerBatch6;
+    std::array<Race, 3> stirPotRaces{};
+    std::int32_t stirPotCount = 0;
+    std::int32_t imprisonedSlot = -1;
+    std::int32_t imprisonedTurns = 0;
+    std::vector<std::string> reclaimedSoulsDeaths;
+    void RecordReclaimedSoulsDeath(const Minion& minion);
 
     //! Batch 3 currently contains stateless combat/activation families.  It
     //! is kept as an explicit state member for schema clarity and future
@@ -230,6 +274,7 @@ class Season14State
     std::int32_t bloodGemHealthBonus = 0;
     std::vector<Season14RaceShopStats> bloodGemRaceBonuses;
     std::int32_t goldSpentThisTurn = 0;
+    std::int32_t heroDamageThisTurn = 0;
     //! Number of minions bought this recruit turn for Sharpen Blades.
     std::int32_t sharpenBladesPurchases = 0;
     //! Cloning Gallery is a once-per-game exact board-copy activation.

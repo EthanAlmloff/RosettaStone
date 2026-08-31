@@ -31,6 +31,43 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - complete immediate gold batch")
     CHECK(!music.magneticOnly);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - portrait acquisitions")
+{
+    CHECK(FindTrinketBehavior("BG30_MagicItem_301").cardID == "BG25_008");
+    CHECK(FindTrinketBehavior("BG30_MagicItem_303").cardID == "BG_TTN_401");
+    CHECK(FindTrinketBehavior("BG30_MagicItem_310").cardID == "BG25_354");
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - recurring fixed acquisition")
+{
+    const auto behavior = FindTrinketBehavior("BG30_MagicItem_406");
+    CHECK(behavior.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+    CHECK(behavior.cardID == "BG28_604");
+    CHECK(behavior.repeatAtStartTurn);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - portrait fixed acquisitions")
+{
+    CHECK(FindTrinketBehavior("BG30_MagicItem_821").cardID == "LT23_809H");
+    CHECK(FindTrinketBehavior("BG30_MagicItem_876").cardID == "BG_EX1_564");
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - recurring portrait acquisitions")
+{
+    CHECK(FindTrinketBehavior("BG30_MagicItem_831").cardID == "BGS_115");
+    CHECK(FindTrinketBehavior("BG30_MagicItem_831").repeatAtStartTurn);
+    CHECK(FindTrinketBehavior("BG30_MagicItem_944").cardID == "BG28_169");
+    CHECK(FindTrinketBehavior("BG30_MagicItem_944").repeatAtStartTurn);
+    CHECK(FindTrinketBehavior("BG30_MagicItem_987").cardID == "BG26_814");
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - tavern spell stat aura family")
+{
+    for (const auto* id : {"BG32_MagicItem_700", "BG32_MagicItem_801",
+                           "BG32_MagicItem_801t", "BG36_MagicItem_373"})
+        CHECK(FindTrinketBehavior(id).effect == TrinketEffect::TAVERN_SPELL_STATS);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - trigger effects fail closed")
 {
     for (const auto* id : {"BG30_MagicItem_541", "BG30_MagicItem_879",

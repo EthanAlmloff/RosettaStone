@@ -142,12 +142,20 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
 {
+    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t28t").effect ==
+          DarkGiftEffect::COUNTER_STATS);
+    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t64t").effect ==
+          DarkGiftEffect::PLAY_CARD_STATS);
+    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t29t").effect ==
+          DarkGiftEffect::COUNTER_STATS);
+    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t30t").effect ==
+          DarkGiftEffect::COUNTER_STATS);
     CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t11").effect ==
           DarkGiftEffect::NONE);
 
     std::map<std::string, CardDef> cards;
     DarkGiftBehaviors::AddAll(cards);
-    CHECK(cards.size() == 29);
+    CHECK(cards.size() == 31);
     CHECK(cards.contains("BG36_MidGameEffect_000t73"));
     CHECK(cards.contains("BG36_MidGameEffect_000t72"));
     CHECK(cards.contains("BG36_MidGameEffect_000t13"));
@@ -168,6 +176,8 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
     CHECK(cards.contains("BG36_MidGameEffect_000t"));
     CHECK(cards.contains("BG36_MidGameEffect_000t2"));
     CHECK(cards.contains("BG36_MidGameEffect_000t4"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t66"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t66e"));
     CHECK(cards.contains("BG36_MidGameEffect_000t52"));
     CHECK(cards.contains("BG36_MidGameEffect_000t15"));
     CHECK(cards.contains("BG36_MidGameEffect_000t15e"));
@@ -254,6 +264,22 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Incubation doubles after two re
     CHECK(target.GetHealth() == health * 2);
 }
 
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Replication rearms after two turns")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion target(base);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t18");
+    CHECK(behavior.effect == DarkGiftEffect::REPLICATION);
+    REQUIRE(ApplyDarkGift(target, behavior));
+    CHECK_FALSE(target.AdvanceReplication());
+    CHECK(target.AdvanceReplication());
+    // The effect is recurring: the next pair of recruit-end advances fires
+    // again, while a full hand simply causes the caller to skip the copy.
+    CHECK_FALSE(target.AdvanceReplication());
+    CHECK(target.AdvanceReplication());
+}
+
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Toreth shield absorbs three hits")
 {
     const Card base = Cards::FindCardByID("BGS_039");
@@ -303,6 +329,34 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Fresh Perspective arms free ref
     CHECK(owner.season14.ConsumeFreeRefresh());
     CHECK(owner.season14.ConsumeFreeRefresh());
     CHECK_FALSE(owner.season14.HasFreeRefresh());
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Demonology arms three fodder refreshes")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Player owner;
+    Minion target(base);
+
+    const auto normal = FindDarkGiftBehavior("BG36_MidGameEffect_000t66");
+    const auto golden = FindDarkGiftBehavior("BG36_MidGameEffect_000t66e");
+    CHECK(normal.effect == DarkGiftEffect::FODDER_REFRESH);
+    CHECK(normal.fodderRefreshes == 3);
+    CHECK(golden.effect == DarkGiftEffect::FODDER_REFRESH);
+    CHECK(golden.fodderRefreshes == 3);
+    REQUIRE(DarkGiftTargetIsLegal(target, normal));
+    REQUIRE(ApplyDarkGift(target, normal));
+    // A second application composes with the first; each gift independently
+    // arms the next three refreshes and the state consumes one per refresh.
+    REQUIRE(ApplyDarkGift(target, golden));
+    target.ActivateRally(owner, target, target);
+    CHECK(owner.season14.ConsumeFodderRefresh() == 1);
+    CHECK(owner.season14.ConsumeFodderRefresh() == 1);
+    CHECK(owner.season14.ConsumeFodderRefresh() == 1);
+    CHECK(owner.season14.ConsumeFodderRefresh() == 1);
+    CHECK(owner.season14.ConsumeFodderRefresh() == 1);
+    CHECK(owner.season14.ConsumeFodderRefresh() == 1);
+    CHECK(owner.season14.ConsumeFodderRefresh() == 0);
 }
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - play card stat gifts persist")

@@ -44,9 +44,8 @@ struct Season14HeroPowerBatch5Definition
 // do not expose any row as implemented until its Player lifecycle and bridge
 // application are complete.  An empty registry is intentional fail-closed
 // behavior and prevents coverage tooling from crediting partial effects.
-inline constexpr std::array<Season14HeroPowerBatch5Definition, 4>
+inline constexpr std::array<Season14HeroPowerBatch5Definition, 3>
     SEASON14_HERO_POWER_BEHAVIORS_BATCH5 = {{
-        {"BG28_HERO_400p", 105315, Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN, 1, false},
         {"BG28_HERO_400p2", 105395, Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN, 0, false},
         {"BG26_HERO_102p", 103501, Season14HeroPowerBatch5Kind::TARGET_TIER_ATTACK, 0, false},
         {"BG26_HERO_102p2", 103503, Season14HeroPowerBatch5Kind::TARGET_TIER_ATTACK, 0, false},

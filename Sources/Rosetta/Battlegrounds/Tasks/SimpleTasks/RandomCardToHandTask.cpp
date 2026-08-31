@@ -12,7 +12,9 @@ TaskStatus RandomCardToHandTask::Run(Player& player, Minion&) {
   std::vector<const Card*> candidates;
   std::unordered_set<std::string_view> seen;
   for (const auto& card : Cards::GetAllCards()) {
-    if (!card.isBattlegroundsPoolMinion || card.GetCardType() != CardType::MINION) continue;
+    if (!card.isBattlegroundsPoolMinion || !card.hasBehavior ||
+        card.GetCardType() != CardType::MINION)
+        continue;
     // Generated cards come from the normal Battlegrounds pool.  Keep golden
     // entities out even if a future pool loader marks them as pool members;
     // golden creation is handled by the simulator's normal triple path.
@@ -38,7 +40,9 @@ TaskStatus RandomCardToHandTask::Run(Player& player) {
   std::vector<const Card*> candidates;
   std::unordered_set<std::string_view> seen;
   for (const auto& card : Cards::GetAllCards()) {
-    if (!card.isBattlegroundsPoolMinion || card.GetCardType() != CardType::MINION || card.normalDbfID != 0) continue;
+    if (!card.isBattlegroundsPoolMinion || !card.hasBehavior ||
+        card.GetCardType() != CardType::MINION || card.normalDbfID != 0)
+        continue;
     if (m_race != Race::INVALID && m_race != Race::ALL && !card.HasRace(m_race)) continue;
     if (m_tier > 0 && card.GetTier() != m_tier) continue;
     if (m_magneticOnly && (!card.gameTags.contains(GameTag::MAGNETIC) || card.gameTags.at(GameTag::MAGNETIC) == 0)) continue;

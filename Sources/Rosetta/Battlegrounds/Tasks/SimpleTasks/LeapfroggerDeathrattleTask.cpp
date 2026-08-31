@@ -18,8 +18,7 @@ TaskStatus LeapfroggerDeathrattleTask::Run(Player& player, Minion& owner, Minion
   if (candidates.empty()) return TaskStatus::STOP;
   const auto index = Random::get<std::size_t>(0, candidates.size() - 1);
   Minion& target = *candidates[index];
-  target.SetAttack(target.GetAttack() + m_attack);
-  target.SetHealth(target.GetHealth() + m_health);
+  target.ApplyCombatPersistentStats(m_attack, m_health);
   owner.CopyDeathrattleTo(target);
   return TaskStatus::COMPLETE;
 }

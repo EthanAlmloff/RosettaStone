@@ -17,6 +17,8 @@ void Season14State::BeginDecision(
         pendingOfferings.clear();
         pendingSourceEntityID = 0;
         pendingSourceCardDbfID = 0;
+        pendingTavernReplacementSlot = -1;
+        pendingTavernReplacementTier = 0;
         chooseOne = {};
         spellModal = {};
         pendingHandLock = false;
@@ -27,6 +29,8 @@ void Season14State::BeginDecision(
     pendingOfferings = std::move(offerings);
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
+    pendingTavernReplacementSlot = -1;
+    pendingTavernReplacementTier = 0;
     chooseOne = {};
     spellModal = {};
     pendingHandLock = false;
@@ -50,6 +54,8 @@ void Season14State::BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t t
     choiceOfferings = pendingOfferings;
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
+    pendingTavernReplacementSlot = -1;
+    pendingTavernReplacementTier = 0;
     chooseOne = { true, sourceEntityID, targetMask, sourceCardDbfID };
     spellModal = {};
     pendingHandLock = false;
@@ -112,6 +118,8 @@ bool Season14State::SelectSpellTargetChoice(std::size_t offeringIndex,
     spellModal = {};
     pendingDecision = Season14Decision::NONE;
     pendingSourceCardDbfID = 0;
+    pendingTavernReplacementSlot = -1;
+    pendingTavernReplacementTier = 0;
     pendingSourceEntityID = 0;
     pendingOfferings.clear();
     choiceOfferings.clear();
@@ -149,10 +157,12 @@ bool Season14State::SelectDecision(std::size_t offeringIndex)
 void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
                                  bool available)
 {
+    if (dbfID == 71909) powerOfStormActive = true;
     heroPowerDbfID = dbfID;
     heroPowerCost = std::max<std::int32_t>(0, cost);
     heroPowerAvailable = available;
     heroPowerUsed = false;
+    luckyRollCooldown = 0;
     heroPowerBatch1 = Season14HeroPowerBatch1Modifiers(dbfID);
     heroPowerBatch2 = {};
     heroPowerBatch4 = {};
@@ -167,9 +177,19 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     lastTavernSpellDbfID = 0;
 }
 
+void Season14State::RecordReclaimedSoulsDeath(const Minion& minion)
+{
+    reclaimedSoulsDeaths.push_back(std::string(minion.GetCardID()));
+}
+
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
 {
+    if (luckyRollCooldown > 0) --luckyRollCooldown;
     goldSpentThisTurn = 0;
+    if (imprisonedTurns > 0) --imprisonedTurns;
+    // Reclaimed Souls' preceding-combat records remain available until its
+    // Discover is committed during this recruit phase.
+    heroDamageThisTurn = 0;
     if (heroPowerDbfID == 57567)
         sharpenBladesPurchases = 0;
     ResolveSeason14HeroPowerBatch1Event(
@@ -854,6 +874,12 @@ std::int32_t Season14State::HeroPowerBatch3CombatKillAttackBonus() const noexcep
 
 bool Season14State::CanUseHeroPower(std::int32_t availableGold) const
 {
+    // Lucky Roll has a variable cooldown (the die result).  Keep the
+    // cooldown in the shared availability predicate so callers that build
+    // legal-action metadata cannot advertise an action that execution will
+    // reject.  The bridge and the public snapshot both use this predicate.
+    if (heroPowerDbfID == 105315 && luckyRollCooldown != 0)
+        return false;
     const bool bloodboundSecondUse =
         heroPowerDbfID == 71459 && heroPowerBatch2.bloodboundUsesThisTurn < 2;
     return heroPowerAvailable && (bloodboundSecondUse || !heroPowerUsed) &&

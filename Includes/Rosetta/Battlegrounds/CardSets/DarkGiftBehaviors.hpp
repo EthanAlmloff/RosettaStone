@@ -12,6 +12,7 @@
 namespace RosettaStone::Battlegrounds
 {
 class Minion;
+class Player;
 namespace SimpleTasks { class DarkGiftRandomPoolTask; }
 
 //! Small, explicitly verified behavior families for Patch 36.4 Dark Gifts.
@@ -37,6 +38,10 @@ enum class DarkGiftEffect
     COUNTER_STATS,
     INCUBATION,
     RANDOM_POOL_TASK,
+    RALLY_BLOOD_GEMS,
+    HAND_COPY,
+    REPLICATION,
+    FODDER_REFRESH,
 };
 
 struct DarkGiftBehavior
@@ -63,6 +68,8 @@ struct DarkGiftBehavior
     int freeRefreshes = 0;
     int divineShieldHits = 0;
     int incubationTurns = 0;
+    //! Fodders added to the next refreshes by Demonology.
+    int fodderRefreshes = 0;
 };
 
 //! Returns the complete behavior for a supported gift, or NONE when the
@@ -79,6 +86,10 @@ bool DarkGiftTargetIsLegal(const Minion& target,
 //! Returns false for an unsupported behavior and performs no mutation then.
 bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
                    int currentCount = 0);
+
+//! Applies a gift when its effect also needs the owning player's hand.
+bool ApplyDarkGift(Player& player, Minion& target,
+                   const DarkGiftBehavior& behavior, int currentCount = 0);
 
 //! Registers behavior definitions so CardLoader's behavior marker and the
 //! coverage tooling agree with the executable lookup above.

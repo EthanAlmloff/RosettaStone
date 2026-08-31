@@ -72,26 +72,6 @@ void ConsumeRebornInRecruitField(Player& owner,
         });
 }
 
-bool SameMinionInstance(const Minion& combatMinion,
-                        const Minion& recruitMinion)
-{
-    // Normal game entities receive a stable index when they are bought,
-    // played, or summoned.  Pool indices are a useful fallback for direct
-    // deterministic fixtures; the final fallback keeps hand-built fixtures
-    // usable without confusing a different card with the source.
-    if (combatMinion.GetIndex() >= 0 && recruitMinion.GetIndex() >= 0)
-    {
-        return combatMinion.GetIndex() == recruitMinion.GetIndex();
-    }
-    if (combatMinion.GetPoolIndex() >= 0 &&
-        recruitMinion.GetPoolIndex() >= 0)
-    {
-        return combatMinion.GetPoolIndex() == recruitMinion.GetPoolIndex();
-    }
-    return combatMinion.GetCardID() == recruitMinion.GetCardID() &&
-           combatMinion.GetZonePosition() == recruitMinion.GetZonePosition();
-}
-
 void ApplyPermanentAvengeBonus(Player& owner, FieldZone& combatField,
                               int attack, int health)
 {
@@ -119,7 +99,7 @@ void ApplyPermanentAvengeBonus(Player& owner, FieldZone& combatField,
             const auto source = std::find_if(
                 combatSources.begin(), combatSources.end(),
                 [&recruitMinion](const Minion& combatMinion) {
-                    return SameMinionInstance(combatMinion, recruitMinion);
+                    return combatMinion.IsSameInstance(recruitMinion);
                 });
             if (source != combatSources.end())
             {
@@ -258,6 +238,25 @@ Battle::Battle(Player& player1, Player& player2)
     };
     summonBeetles(m_player1, m_p1Field);
     summonBeetles(m_player2, m_p2Field);
+}
+
+void Battle::CommitPersistentState()
+{
+    const auto commit = [](Player& owner, const FieldZone& combatField) {
+        owner.recruitField.ForEachAlive([&](MinionData& recruitData) {
+            Minion& recruit = recruitData.value();
+            const Minion* combat = nullptr;
+            combatField.ForEachAlive([&](const MinionData& combatData) {
+                if (combat == nullptr &&
+                    combatData.value().IsSameInstance(recruit))
+                    combat = &combatData.value();
+            });
+            if (combat != nullptr)
+                recruit.ReconcileCombatPersistentState(*combat);
+        });
+    };
+    commit(m_player1, m_p1Field);
+    commit(m_player2, m_p2Field);
 }
 
 void Battle::Initialize()
@@ -753,6 +752,10 @@ void Battle::ProcessDestroy(bool beforeAttack)
     {
         Minion& minion = std::get<1>(deadMinion);
         Minion removedMinion;
+        if (std::get<0>(deadMinion) == 1)
+            m_player1.season14.RecordReclaimedSoulsDeath(minion);
+        else
+            m_player2.season14.RecordReclaimedSoulsDeath(minion);
 
         // I'll Take That! records the first enemy minion killed by the
         // attacking player. Restrict capture to the attack-resolution pass;
@@ -835,6 +838,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 std::get<0>(deadMinion) == 1 ? m_player1 : m_player2);
             Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
             ++owner.season14.deathrattlesTriggered;
+            owner.UpdateSkyGolemsForDeathrattle();
             owner.AdvanceDarkGiftCounters(2);
         }
 

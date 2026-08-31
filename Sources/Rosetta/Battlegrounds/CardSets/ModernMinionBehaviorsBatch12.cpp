@@ -27,7 +27,5 @@ void AddLobsterDeathrattle(std::map<std::string, CardDef>& cards,
 void ModernMinionBehaviorsBatch12::AddAll(
     std::map<std::string, CardDef>& cards)
 {
-    AddLobsterDeathrattle(cards, "BG36_202", 1, 1);
-    AddLobsterDeathrattle(cards, "BG36_202_G", 2, 2);
 }
 }  // namespace RosettaStone::Battlegrounds

@@ -9,6 +9,7 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemAttackerTask.hpp>
 #include <effolkronium/random.hpp>
 
 #include <utility>
@@ -21,12 +22,25 @@ using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds
 {
+bool Minion::IsSameInstance(const Minion& other) const noexcept
+{
+    if (m_index >= 0 && other.m_index >= 0)
+        return m_index == other.m_index;
+    if (m_poolIdx >= 0 && other.m_poolIdx >= 0)
+        return m_poolIdx == other.m_poolIdx;
+    return m_card.id == other.m_card.id && m_zonePos == other.m_zonePos;
+}
+
 Minion::Minion(Card card, int poolIdx)
     : m_card(std::move(card)),
       m_poolIdx(poolIdx),
       m_attack(m_card.GetAttack()),
       m_health(m_card.GetHealth())
 {
+    if (GetCardID() == "BG23_009_G")
+        m_spellcraftUsesRemaining = 2;
+    else if (GetCardID() == "BG23_009")
+        m_spellcraftUsesRemaining = 1;
     for (const auto& tag : m_card.gameTags)
     {
         switch (tag.first)
@@ -422,6 +436,12 @@ int Minion::GetAttack() const
 void Minion::SetAttack(int val)
 {
     m_attack = val;
+    if (m_attackThresholdDivineShield > 0 && !m_attackThresholdTriggered &&
+        m_attack >= m_attackThresholdDivineShield)
+    {
+        m_attackThresholdTriggered = true;
+        SetGameTag(GameTag::DIVINE_SHIELD, 1);
+    }
 }
 
 bool Minion::TransformTo(Card replacement)
@@ -564,6 +584,64 @@ void Minion::ApplyTemporaryStats(int attack, int health, bool taunt)
     }
 }
 
+void Minion::ApplyCombatPersistentStats(int attack, int health)
+{
+    if (attack == 0 && health == 0) return;
+    SetAttack(GetAttack() + attack);
+    SetHealth(GetHealth() + health);
+    m_combatPersistentAttack += attack;
+    m_combatPersistentHealth += health;
+}
+
+void Minion::ApplyCombatPersistentKeyword(GameTag tag)
+{
+    const auto bit = [tag]() -> std::uint32_t {
+        switch (tag)
+        {
+            case GameTag::TAUNT: return 1u << 0;
+            case GameTag::DIVINE_SHIELD: return 1u << 1;
+            case GameTag::REBORN: return 1u << 2;
+            case GameTag::WINDFURY: return 1u << 3;
+            case GameTag::MEGA_WINDFURY: return 1u << 4;
+            case GameTag::POISONOUS:
+            case GameTag::VENOMOUS: return 1u << 5;
+            default: return 0;
+        }
+    }();
+    if (bit == 0 || (m_combatPersistentKeywords & bit) != 0) return;
+    m_combatPersistentKeywords |= bit;
+    SetGameTag(tag, 1);
+}
+
+void Minion::ReconcileCombatPersistentState(const Minion& combatCopy)
+{
+    // The copy starts with this entity's counters.  Only increments made via
+    // the explicit persistent API are committed; combat damage, start-combat
+    // multipliers, temporary effects, and summoned entities never leak.
+    const int attack = combatCopy.m_combatPersistentAttack -
+                       m_combatPersistentAttack;
+    const int health = combatCopy.m_combatPersistentHealth -
+                       m_combatPersistentHealth;
+    if (attack != 0 || health != 0)
+    {
+        SetAttack(GetAttack() + attack);
+        SetHealth(GetHealth() + health);
+        m_combatPersistentAttack += attack;
+        m_combatPersistentHealth += health;
+    }
+    const auto newlyPersistent = combatCopy.m_combatPersistentKeywords &
+                                 ~m_combatPersistentKeywords;
+    constexpr std::array<std::pair<std::uint32_t, GameTag>, 6> tags{{
+        {1u << 0, GameTag::TAUNT}, {1u << 1, GameTag::DIVINE_SHIELD},
+        {1u << 2, GameTag::REBORN}, {1u << 3, GameTag::WINDFURY},
+        {1u << 4, GameTag::MEGA_WINDFURY}, {1u << 5, GameTag::POISONOUS}}};
+    for (const auto& [bit, tag] : tags)
+    {
+        if ((newlyPersistent & bit) != 0)
+            ApplyCombatPersistentKeyword(tag);
+    }
+}
+
 void Minion::ApplyTemporaryKeyword(GameTag tag)
 {
     switch (tag)
@@ -606,6 +684,24 @@ void Minion::ExpireTemporaryEffects()
     m_temporaryReborn = false;
     m_temporaryWindfury = false;
     m_temporaryMegaWindfury = false;
+}
+
+bool Minion::IsLavaLurker() const noexcept
+{
+    return GetCardID() == "BG23_009" || GetCardID() == "BG23_009_G";
+}
+
+void Minion::ResetSpellcraftUses() noexcept
+{
+    m_spellcraftUsesRemaining =
+        GetCardID() == "BG23_009_G" ? 2 : (GetCardID() == "BG23_009" ? 1 : 0);
+}
+
+bool Minion::ConsumeSpellcraftUse() noexcept
+{
+    if (m_spellcraftUsesRemaining <= 0) return false;
+    --m_spellcraftUsesRemaining;
+    return true;
 }
 
 bool Minion::HasDeathrattle() const
@@ -1023,14 +1119,30 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
 
 void Minion::SetPlayCardStatBonus(int attack, int health)
 {
-    m_playCardAttackBonus = attack;
-    m_playCardHealthBonus = health;
+    // Multiple persistent play-card gifts stack on the same minion.
+    m_playCardAttackBonus += attack;
+    m_playCardHealthBonus += health;
 }
 
 void Minion::ApplyPlayCardStatBonus()
 {
     SetAttack(GetAttack() + m_playCardAttackBonus);
     SetHealth(GetHealth() + m_playCardHealthBonus);
+}
+
+void Minion::SetAttackThresholdDivineShield(int threshold)
+{
+    m_attackThresholdDivineShield = threshold;
+    m_attackThresholdTriggered = false;
+    // A threshold aura can be attached after a stat buff (for example when
+    // the minion is created above the threshold).  Resolve that state
+    // immediately; waiting for a later SetAttack would make the result
+    // depend on mutation order.
+    if (threshold > 0 && m_attack >= threshold)
+    {
+        m_attackThresholdTriggered = true;
+        SetGameTag(GameTag::DIVINE_SHIELD, 1);
+    }
 }
 
 void Minion::SetEndTurnBattlecryTrigger(bool enabled)
@@ -1119,6 +1231,20 @@ int Minion::IncubationTurnsRemaining() const
     return m_incubationTurnsRemaining;
 }
 
+void Minion::SetReplication(int turns)
+{
+    if (turns > 0) m_replicationTurnsRemaining = turns;
+}
+
+bool Minion::AdvanceReplication()
+{
+    if (m_replicationTurnsRemaining <= 0) return false;
+    --m_replicationTurnsRemaining;
+    if (m_replicationTurnsRemaining != 0) return false;
+    m_replicationTurnsRemaining = 2;
+    return true;
+}
+
 void Minion::ActivateHeroDamageTrigger()
 {
     auto& trigger = m_card.power.GetTrigger();
@@ -1172,6 +1298,17 @@ void Minion::ActivateRally([[maybe_unused]] Player& player, Minion& source,
                 }
                 else if constexpr (std::is_same_v<
                                        std::decay_t<decltype(rallyTask)>,
+                                       SimpleTasks::RallyBloodGemAttackerTask>)
+                {
+                    const bool isAttacker =
+                        &source == this ||
+                        (source.GetIndex() >= 0 &&
+                         source.GetIndex() == this->GetIndex());
+                    if (!isAttacker)
+                        rallyTask.Run(player, source, source);
+                }
+                else if constexpr (std::is_same_v<
+                                       std::decay_t<decltype(rallyTask)>,
                                        SimpleTasks::RallyRaceBuffTask>)
                 {
                     // Race-gated attack triggers inspect the attacker, not
@@ -1199,11 +1336,35 @@ bool Minion::CanActivate(const Player& player, int targetIdx) const
     }
     if (definition->effect == ActivateEffect::BUFF_TARGET ||
         definition->effect == ActivateEffect::SET_TARGET_STATS ||
-        definition->effect == ActivateEffect::TRIGGER_RALLY)
+        definition->effect == ActivateEffect::TRIGGER_RALLY ||
+        definition->effect == ActivateEffect::TRIGGER_BATTLECRY)
     {
+        if (targetIdx < 0 || targetIdx >= player.recruitField.GetCount() ||
+            targetIdx == GetZonePosition() ||
+            player.recruitField[static_cast<std::size_t>(targetIdx)].IsDestroyed())
+            return false;
+        if (definition->effect == ActivateEffect::TRIGGER_BATTLECRY &&
+            (!player.recruitField[static_cast<std::size_t>(targetIdx)].HasBattlecry() ||
+             player.recruitField[static_cast<std::size_t>(targetIdx)].RequiresPlayTarget() ||
+             player.recruitField[static_cast<std::size_t>(targetIdx)]
+                     .GetTasks(PowerType::POWER)
+                     .empty()))
+            return false;
+            return true;
+    }
+    if (definition->effect == ActivateEffect::APPLY_REBORN)
         return targetIdx >= 0 && targetIdx < player.recruitField.GetCount() &&
                targetIdx != GetZonePosition() &&
                !player.recruitField[static_cast<std::size_t>(targetIdx)].IsDestroyed();
+    if (definition->effect == ActivateEffect::DESTROY_UNDEAD_BUFF_SELF)
+    {
+        if (targetIdx >= 0) return false;
+        bool hasTarget = false;
+        player.recruitField.ForEachAlive([&](const MinionData& data) {
+            if (&data.value() != this && data.value().HasRace(Race::UNDEAD))
+                hasTarget = true;
+        });
+        return hasTarget;
     }
     if (definition->effect == ActivateEffect::ADD_CARD)
     {
@@ -1219,6 +1380,30 @@ bool Minion::CanActivate(const Player& player, int targetIdx) const
     if (definition->effect == ActivateEffect::RANDOM_CARD ||
         definition->effect == ActivateEffect::RANDOM_CHROMADRAKE)
         return !player.hand.IsFull() && targetIdx < 0;
+    if (definition->effect == ActivateEffect::TAKE_HIGHEST_TAVERN)
+    {
+        if (player.hand.IsFull() || targetIdx >= 0)
+            return false;
+        bool hasCandidate = false;
+        player.tavern.fieldZone.ForEachAlive(
+            [&hasCandidate](MinionData&) { hasCandidate = true; });
+        return hasCandidate;
+    }
+    if (definition->effect == ActivateEffect::ACTIVATE_FISHBAIT)
+        return targetIdx >= 0 &&
+               targetIdx < player.tavern.fieldZone.GetCount() &&
+               !player.tavern.fieldZone[static_cast<std::size_t>(targetIdx)]
+                    .IsDestroyed();
+    if (definition->effect == ActivateEffect::DEVOUR_TAVERN_DEMONS)
+    {
+        if (targetIdx >= 0 || player.tavern.fieldZone.GetCount() <= 0)
+            return false;
+        bool hasDemon = false;
+        player.recruitField.ForEachAlive([&hasDemon](const MinionData& data) {
+            if (data.value().HasRace(Race::DEMON)) hasDemon = true;
+        });
+        return hasDemon;
+    }
     if (definition->effect == ActivateEffect::DISCOVER_TAVERN_SPELL) {
         if (player.hand.IsFull() || targetIdx >= 0) return false;
         return std::any_of(Cards::GetAllCards().begin(), Cards::GetAllCards().end(),
@@ -1381,6 +1566,71 @@ bool Minion::Activate(Player& player, int targetIdx)
         // Golden Sky-hatch explicitly triggers the selected Rally twice.
         for (int i = 0; i < std::max(1, definition.amount); ++i)
             target.ActivateRally(player, *this, target);
+    }
+    else if (definition.effect == ActivateEffect::TRIGGER_BATTLECRY)
+    {
+        auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
+        for (int i = 0; i < std::max(1, definition.amount); ++i)
+        {
+            target.ActivateTask(PowerType::POWER, player);
+            // A targeted Battlecry/Discover can leave a public modal pending.
+            // Do not invoke the golden copy a second time and overwrite the
+            // first offering; the pending choice must be committed first.
+            if (player.season14.pendingDecision != Season14Decision::NONE)
+                break;
+        }
+    }
+    else if (definition.effect == ActivateEffect::APPLY_REBORN)
+    {
+        auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
+        target.ApplyTemporaryKeyword(GameTag::REBORN);
+    }
+    else if (definition.effect == ActivateEffect::TAKE_HIGHEST_TAVERN)
+    {
+        for (int i = 0; i < std::max(1, definition.amount); ++i)
+        {
+            if (player.hand.IsFull()) break;
+            int best = -1;
+            player.tavern.fieldZone.ForEachAlive([&best](MinionData& data) {
+                if (best < 0 || data.value().GetAttack() > best)
+                    best = data.value().GetAttack();
+            });
+            if (best < 0) break;
+            int slot = -1;
+            int attack = 0;
+            int health = 0;
+            for (int j = 0; j < player.tavern.fieldZone.GetCount(); ++j)
+            {
+                auto& candidate = player.tavern.fieldZone[static_cast<std::size_t>(j)];
+                if (!candidate.IsDestroyed() && candidate.GetAttack() == best)
+                {
+                    slot = j;
+                    attack = candidate.GetAttack();
+                    health = candidate.GetHealth();
+                    break;
+                }
+            }
+            if (slot < 0 || !player.TakeTavernMinionToHand(
+                                  static_cast<std::size_t>(slot), attack, health))
+                break;
+        }
+    }
+    else if (definition.effect == ActivateEffect::DEVOUR_TAVERN_DEMONS)
+    {
+        player.DevourRandomTavernForDemons(std::max(1, definition.amount));
+    }
+    else if (definition.effect == ActivateEffect::DESTROY_UNDEAD_BUFF_SELF)
+    {
+        SimpleTasks::DestroyUndeadBuffSelfTask{definition.attack, definition.health}.Run(player, *this);
+    }
+    else if (definition.effect == ActivateEffect::ACTIVATE_FISHBAIT)
+    {
+        SimpleTasks::ActivateFishbaitTask{definition.cardID, definition.attack}
+            .RunAt(player, *this, static_cast<std::size_t>(targetIdx));
+    }
+    else if (definition.effect == ActivateEffect::ACTIVATE_RANDOM_TAVERN_SPELLS)
+    {
+        SimpleTasks::ActivateRandomTavernSpellsTask{definition.amount}.Run(player, *this);
     }
     else if (definition.effect == ActivateEffect::ARM_MAGNETIZATION)
     {

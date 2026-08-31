@@ -36,6 +36,22 @@ enum class Season14HeroPowerKind : std::uint8_t
     CLONING_GALLERY,
     KING_OF_DUALITY,
     UPBEAT_HARMONY,
+    NATURAL_BALANCE,
+    SPIRIT_SWAP,
+    GALAKROND_GREED,
+    DUNGARS_GRYPHON,
+    DEVOUR,
+    I_SPY,
+    POWER_OF_THE_STORM,
+    LUCKY_ROLL,
+    NAGA_CONQUEST,
+    REBORN_RITES,
+    SNICKER_SNACK,
+    STIR_THE_POT,
+    RECLAIMED_SOULS,
+    QUEEN_OF_DRAGONS,
+    IMPRISON,
+    SIGN_NEW_ARTIST,
 };
 
 struct Season14HeroPowerDefinition
@@ -45,10 +61,36 @@ struct Season14HeroPowerDefinition
     Season14HeroPowerKind kind;
     std::int32_t cost;
     bool passive;
+    // Optional linked Buddy DBF ID from the pinned hero metadata.
+    std::int32_t buddyDbfID = 0;
 };
 
+//! Generated quest-reward cards are modal options rather than ordinary
+//! minions/spells. Keep their pinned IDs in one typed pool so replayed choice
+//! payloads can be validated without trusting card text or UI labels.
+struct Season14GeneratedChoiceDefinition
+{
+    std::string_view id;
+    std::int32_t dbfID;
+};
+
+inline constexpr std::array<Season14GeneratedChoiceDefinition, 8>
+    SEASON14_GENERATED_QUEST_REWARDS = {{
+        {"BG24_Reward_107", 89449}, {"BG24_Reward_109", 89473},
+        {"BG24_Reward_111", 89481}, {"BG24_Reward_113", 89483},
+        {"BG24_Reward_115", 89947}, {"BG24_Reward_123", 90861},
+        {"BG24_Reward_125", 90865}, {"BG24_Reward_128", 90914},
+    }};
+
+constexpr bool IsSeason14GeneratedQuestReward(std::int32_t dbfID) noexcept
+{
+    for (const auto& definition : SEASON14_GENERATED_QUEST_REWARDS)
+        if (definition.dbfID == dbfID) return true;
+    return false;
+}
+
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 20>
+inline constexpr std::array<Season14HeroPowerDefinition, 36>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},
@@ -90,6 +132,38 @@ inline constexpr std::array<Season14HeroPowerDefinition, 20>
          Season14HeroPowerKind::KING_OF_DUALITY, 0, false},
         {"BG26_HERO_104p", 99034,
          Season14HeroPowerKind::UPBEAT_HARMONY, 0, false},
+        {"BG20_HERO_242p", 68130,
+         Season14HeroPowerKind::NATURAL_BALANCE, 2, false},
+        {"BG20_HERO_201p", 71464,
+         Season14HeroPowerKind::SPIRIT_SWAP, 0, false},
+        {"TB_BaconShop_HP_011", 57555,
+         Season14HeroPowerKind::GALAKROND_GREED, 1, false},
+        {"BG20_HERO_283p", 75703,
+         Season14HeroPowerKind::DUNGARS_GRYPHON, 0, false},
+        {"BG20_HERO_301p", 71914,
+         Season14HeroPowerKind::DEVOUR, 0, false},
+        {"BG21_HERO_010p", 76563,
+         Season14HeroPowerKind::I_SPY, 2, false},
+        {"BG20_HERO_202p", 71909,
+         Season14HeroPowerKind::POWER_OF_THE_STORM, 0, false},
+        {"BG28_HERO_400p", 105315,
+         Season14HeroPowerKind::LUCKY_ROLL, 1, false},
+        {"BG22_HERO_007p2", 80007,
+         Season14HeroPowerKind::NAGA_CONQUEST, 1, false},
+        {"TB_BaconShop_HP_024", 58040,
+         Season14HeroPowerKind::REBORN_RITES, 0, false},
+        {"TB_BaconShop_HP_022", 58028,
+         Season14HeroPowerKind::SNICKER_SNACK, 0, false},
+        {"BG21_HERO_020p", 77434,
+         Season14HeroPowerKind::STIR_THE_POT, 0, false},
+        {"BG23_HERO_306p", 89294,
+         Season14HeroPowerKind::RECLAIMED_SOULS, 2, false},
+        {"TB_BaconShop_HP_064", 61517,
+         Season14HeroPowerKind::QUEEN_OF_DRAGONS, 1, false},
+        {"TB_BaconShop_HP_068", 61919,
+         Season14HeroPowerKind::IMPRISON, 1, false},
+        {"BG25_HERO_105p", 101346,
+         Season14HeroPowerKind::SIGN_NEW_ARTIST, 3, false, 101349},
     }};
 
 constexpr const Season14HeroPowerDefinition* FindSeason14HeroPowerBehavior(
@@ -121,6 +195,68 @@ constexpr const Season14HeroPowerDefinition* FindSeason14HeroPowerBehavior(
 constexpr bool HasSeason14HeroPowerBehavior(std::int32_t dbfID) noexcept
 {
     return FindSeason14HeroPowerBehavior(dbfID) != nullptr;
+}
+
+//! Declarative target contract for the executable See the Light family.
+//! Keeping this beside the pinned registry prevents the bridge from growing
+//! another ID-only special case when the same lifecycle is reused by a
+//! generated hero-power variant.
+constexpr bool Season14HeroPowerUsesTavernTarget(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerKind::SEE_THE_LIGHT;
+}
+
+constexpr bool Season14HeroPowerTavernTargetIsLegal(
+    std::int32_t dbfID, bool handHasRoom, std::int32_t tavernMinionCount) noexcept
+{
+    return Season14HeroPowerUsesTavernTarget(dbfID) && handHasRoom &&
+           tavernMinionCount > 0;
+}
+
+//! Returns whether a hero power applies its effect to one minion per tier.
+constexpr bool Season14HeroPowerUsesNaturalBalance(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerKind::NATURAL_BALANCE;
+}
+
+//! Returns whether a hero power consumes two distinct friendly board targets.
+constexpr bool Season14HeroPowerUsesSpiritSwap(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerKind::SPIRIT_SWAP;
+}
+
+constexpr bool Season14HeroPowerUsesGalakrondGreed(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerKind::GALAKROND_GREED;
+}
+
+constexpr bool Season14HeroPowerUsesNagaConquest(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerKind::NAGA_CONQUEST;
+}
+
+constexpr bool Season14HeroPowerUsesDevour(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerKind::DEVOUR;
+}
+
+constexpr bool Season14HeroPowerUsesISpy(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerKind::I_SPY;
 }
 
 //! Deterministic player-owned modifiers for the supported passive families.

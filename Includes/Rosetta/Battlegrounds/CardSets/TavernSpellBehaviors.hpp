@@ -111,6 +111,12 @@ constexpr std::size_t MenagerieTablewareRepeatCount(
     return distinctFriendlyTypes + 1;
 }
 
+inline bool IsBountySpell(std::string_view id) noexcept
+{
+    return id == "BG33_811" || id == "BG33_812" || id == "BG33_813" ||
+           id == "BG33_814" || id == "BG33_815";
+}
+
 //! Returns the exact behavior implemented for a pinned Patch 36.4 spell ID.
 //!
 //! Keep this table conservative: metadata and card text do not establish

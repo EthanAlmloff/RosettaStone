@@ -6,6 +6,22 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemGolemTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemSelfTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnLastTavernSpellTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemOtherTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemAttackerTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastAdjacentBloodGemTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpendGoldThresholdSpellTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/HeroDamageThresholdSpellTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRemoveKeywordsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRandomRaceKeywordTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomBountyToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConfigureAttackThresholdTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmFodderRefreshTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyGainTargetAttackTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellDiscoverTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnConsumeHighestTavernTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomGoldenTierMinionToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackingMinionBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonedMinionStatMultiplierTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTavernSpellHealthBonusTask.hpp>
@@ -296,5 +312,71 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { cards.emplace("BG34_142_G", CardDef{}); }
   { Power p; p.AddRallyTask(SimpleTasks::RallyHighestHandMurlocBuffTask{1}); cards.emplace("BG34_143", CardDef{std::move(p)}); }
   { Power p; p.AddRallyTask(SimpleTasks::RallyHighestHandMurlocBuffTask{2}); cards.emplace("BG34_143_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemSelfTask{3}); cards.emplace("BG33_883", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemSelfTask{6}); cards.emplace("BG33_883_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemSelfTask{1}); cards.emplace("BG33_886", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemSelfTask{2}); cards.emplace("BG33_886_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::SELL_MINION}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::RandomCardToHandTask{Race::INVALID, 1, 1, false}}); p.AddTrigger(std::move(t)); cards.emplace("BG33_140", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::SELL_MINION}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::RandomCardToHandTask{Race::INVALID, 1, 2, false}}); p.AddTrigger(std::move(t)); cards.emplace("BG33_140_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnLastTavernSpellTask{1}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_123", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnLastTavernSpellTask{2}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_123_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemOtherTask{1}); cards.emplace("BG20_104", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemOtherTask{2}); cards.emplace("BG20_104_G", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::BattlecryTavernSpellDiscoverTask{1}); cards.emplace("BG28_550", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::BattlecryTavernSpellDiscoverTask{2}); cards.emplace("BG28_550_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnConsumeHighestTavernTask{1}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_500", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnConsumeHighestTavernTask{2}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_500_G", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::RandomGoldenTierMinionToHandTask{1}); cards.emplace("BG36_343", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::RandomGoldenTierMinionToHandTask{2}); cards.emplace("BG36_343_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyGainTargetAttackTask{1}); cards.emplace("BG34_604", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyGainTargetAttackTask{2}); cards.emplace("BG34_604_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyRemoveKeywordsTask{3}); cards.emplace("BG25_016", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyRemoveKeywordsTask{3}); cards.emplace("BG25_016_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyRandomRaceKeywordTask{Race::MURLOC, GameTag::VENOMOUS, 1}); cards.emplace("BG33_318", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyRandomRaceKeywordTask{Race::MURLOC, GameTag::VENOMOUS, 2}); cards.emplace("BG33_318_G", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::ArmFodderRefreshTask{3, 1}); cards.emplace("BG35_150", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::ArmFodderRefreshTask{3, 2}); cards.emplace("BG35_150_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::SELL_MINION}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::ArmFodderRefreshTask{1, 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_155", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::SELL_MINION}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::ArmFodderRefreshTask{1, 2}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_155_G", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::RandomBountyToHandTask{1}); p.AddDeathrattleTask(SimpleTasks::RandomBountyToHandTask{1}); cards.emplace("BG33_821", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::RandomBountyToHandTask{2}); p.AddDeathrattleTask(SimpleTasks::RandomBountyToHandTask{2}); cards.emplace("BG33_821_G", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::ConfigureAttackThresholdTask{6}); cards.emplace("BG35_814", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::ConfigureAttackThresholdTask{6}); cards.emplace("BG35_814_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RandomBountyToHandTask{1}); cards.emplace("BG33_822", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RandomBountyToHandTask{2}); cards.emplace("BG33_822_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemAttackerTask{1}); cards.emplace("BG33_430", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemAttackerTask{2}); cards.emplace("BG33_430_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::AFTER_CAST_SPELL}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::SpellCastAdjacentBloodGemTask{1}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_510", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::AFTER_CAST_SPELL}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::SpellCastAdjacentBloodGemTask{2}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_510_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::TRIGGER_BATTLECRY, 1, 0, 0, 1}); cards.emplace("BG36_701", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::TRIGGER_BATTLECRY, 1, 0, 0, 2}); cards.emplace("BG36_701_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::TAKE_HIGHEST_TAVERN, 2, 0, 0, 1}); cards.emplace("BG36_354", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::TAKE_HIGHEST_TAVERN, 2, 0, 0, 2}); cards.emplace("BG36_354_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::DEVOUR_TAVERN_DEMONS, 2, 0, 0, 1}); cards.emplace("BG36_503", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::DEVOUR_TAVERN_DEMONS, 2, 0, 0, 2}); cards.emplace("BG36_503_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::SPEND_GOLD}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::SpendGoldThresholdSpellTask{7, "BG34_444", 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_858", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::SPEND_GOLD}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::SpendGoldThresholdSpellTask{7, "BG34_444", 2}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_858_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::HERO_DAMAGE}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::HeroDamageThresholdSpellTask{3, "BG28_168", 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_733", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::HERO_DAMAGE}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::HeroDamageThresholdSpellTask{3, "BG28_168", 2}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_733_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::DESTROY_UNDEAD_BUFF_SELF, 1, 4, 4, 1}); cards.emplace("BG36_511", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::DESTROY_UNDEAD_BUFF_SELF, 1, 8, 8, 1}); cards.emplace("BG36_511_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_FISHBAIT, 2, 5, 0, 1, "BG36_205"}); cards.emplace("BG36_201", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_FISHBAIT, 2, 10, 0, 1, "BG36_205_G"}); cards.emplace("BG36_201_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_RANDOM_TAVERN_SPELLS, 1, 0, 0, 2}); cards.emplace("BG36_508", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_RANDOM_TAVERN_SPELLS, 1, 0, 0, 4}); cards.emplace("BG36_508_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::AddCardTask{"BG35_140", 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_142", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::AddCardTask{"BG35_140_G", 1}, SimpleTasks::AddCardTask{"BG35_141_G", 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_142_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::DEAL_DAMAGE}; t.SetTriggerSource(TriggerSource::FRIENDLY); t.SetCondition(SelfCondition{[](Minion& source) { return source.HasRace(Race::DEMON); }}); t.SetTasks({SimpleTasks::DealDamageSelfBuffTask{1, 2}}); p.AddTrigger(std::move(t)); cards.emplace("BG33_155", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::DEAL_DAMAGE}; t.SetTriggerSource(TriggerSource::FRIENDLY); t.SetCondition(SelfCondition{[](Minion& source) { return source.HasRace(Race::DEMON); }}); t.SetTasks({SimpleTasks::DealDamageSelfBuffTask{2, 4}}); p.AddTrigger(std::move(t)); cards.emplace("BG33_155_G", CardDef{std::move(p)}); }
+  { cards.emplace("BG35_342", CardDef{}); }
+  { cards.emplace("BG35_342_G", CardDef{}); }
+  { cards.emplace("BG33_319", CardDef{}); }
+  { cards.emplace("BG33_319_G", CardDef{}); }
+  { cards.emplace("BG33_825", CardDef{}); }
+  { cards.emplace("BG33_825_G", CardDef{}); }
+  { Power p; p.AddDeathrattleTask(SimpleTasks::RandomFriendlyRaceTask{Race::BEAST, 1, 1, 1, false, true}); cards.emplace("BG36_202", CardDef{std::move(p)}); }
+  { Power p; p.AddDeathrattleTask(SimpleTasks::RandomFriendlyRaceTask{Race::BEAST, 2, 2, 1, false, true}); cards.emplace("BG36_202_G", CardDef{std::move(p)}); }
+  { cards.emplace("BG36_206", CardDef{}); }
+  { cards.emplace("BG36_206_G", CardDef{}); }
 }
 }

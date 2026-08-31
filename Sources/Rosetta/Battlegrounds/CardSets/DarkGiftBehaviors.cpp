@@ -2,9 +2,12 @@
 
 #include <Rosetta/Battlegrounds/CardSets/DarkGiftBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
+#include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftRandomPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftGolemDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmFodderRefreshTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -93,6 +96,8 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
     {
         return { DarkGiftEffect::START_COMBAT_DEATHRATTLE };
     }
+    if (id == "BG36_MidGameEffect_000t18") // Replication: copy this every two turns.
+        return { DarkGiftEffect::REPLICATION };
     if (id == "BG36_MidGameEffect_000t9") // Admiration: gain the attack of the minion to the left.
     {
         return { DarkGiftEffect::START_COMBAT_LEFT_ATTACK };
@@ -111,6 +116,9 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
     if (id == "BG36_MidGameEffect_000t64") // Fervor: +2/+2 whenever you play a card.
         return { DarkGiftEffect::PLAY_CARD_STATS, 0, 0, false, false, false,
                  1, false, false, false, 1, 1, 2, 2 };
+    if (id == "BG36_MidGameEffect_000t64t") // Dexterity: +4/+4 whenever you play a card.
+        return { DarkGiftEffect::PLAY_CARD_STATS, 0, 0, false, false, false,
+                 1, false, false, false, 1, 1, 4, 4 };
     if (id == "BG36_MidGameEffect_000t74") // +3 Attack whenever you play a card.
         return { DarkGiftEffect::PLAY_CARD_STATS, 0, 0, false, false, false,
                  1, false, false, false, 1, 1, 3, 0 };
@@ -119,6 +127,8 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
                  1, false, false, false, 1, 1, 0, 3 };
     if (id == "BG36_MidGameEffect_000t10") // End of turn: trigger this minion's Battlecries.
         return { DarkGiftEffect::END_TURN_BATTLECRY };
+    if (id == "BG36_MidGameEffect_000t11") // Double Vision: get a plain copy in hand.
+        return { DarkGiftEffect::HAND_COPY };
     if (id == "BG36_MidGameEffect_000t") // +10 Attack; deathrattle transfers it.
         return { DarkGiftEffect::DEATHRATTLE_STATS, 10, 0 };
     if (id == "BG36_MidGameEffect_000t2") // +10 Health; deathrattle transfers it.
@@ -126,11 +136,20 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
     if (id == "BG36_MidGameEffect_000t28") // Battle Scars: +3/+3 per Battlecry.
         return { DarkGiftEffect::COUNTER_STATS, 3, 3, false, false, false,
                  1, false, false, false, 1, 1, 0, 0, 1 };
+    if (id == "BG36_MidGameEffect_000t28t") // Golden Battle Scars: +2/+2 per Battlecry.
+        return { DarkGiftEffect::COUNTER_STATS, 2, 2, false, false, false,
+                 1, false, false, false, 1, 1, 0, 0, 1 };
     if (id == "BG36_MidGameEffect_000t29") // Death's Embrace: +2/+2 per Deathrattle.
         return { DarkGiftEffect::COUNTER_STATS, 2, 2, false, false, false,
                  1, false, false, false, 1, 1, 0, 0, 2 };
+    if (id == "BG36_MidGameEffect_000t29t") // Golden Death's Embrace: +1/+1 per Deathrattle.
+        return { DarkGiftEffect::COUNTER_STATS, 1, 1, false, false, false,
+                 1, false, false, false, 1, 1, 0, 0, 2 };
     if (id == "BG36_MidGameEffect_000t30") // Spell Siphon: +3/+3 per Tavern spell.
         return { DarkGiftEffect::COUNTER_STATS, 3, 3, false, false, false,
+                 1, false, false, false, 1, 1, 0, 0, 3 };
+    if (id == "BG36_MidGameEffect_000t30t") // Golden Spell Siphon: +2/+2 per Tavern spell.
+        return { DarkGiftEffect::COUNTER_STATS, 2, 2, false, false, false,
                  1, false, false, false, 1, 1, 0, 0, 3 };
     if (id == "BG36_MidGameEffect_000t3") // Charisma: Rally, random minion of most common type.
         return { DarkGiftEffect::RANDOM_POOL_TASK, 0, 0, false, false, false, 1,
@@ -141,6 +160,26 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
     if (id == "BG36_MidGameEffect_000t61") // Golemancy: Deathrattle, matching-stat Golem.
         return { DarkGiftEffect::RANDOM_POOL_TASK, 0, 0, false, false, false, 1,
                  false, false, false, 1, 1, 0, 0, 0, 3 };
+    if (id == "BG36_MidGameEffect_000t66") // Demonology: Fodder on next 3 refreshes.
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::FODDER_REFRESH;
+        behavior.fodderRefreshes = 3;
+        return behavior;
+    }
+    if (id == "BG36_MidGameEffect_000t66e") // Golden Demonology: Fodder on next 3 refreshes.
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::FODDER_REFRESH;
+        behavior.fodderRefreshes = 3;
+        return behavior;
+    }
+    if (id == "BG36_MidGameEffect_000t80") // Consanguinity: Rally, get 2 Blood Gems.
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::RALLY_BLOOD_GEMS;
+        return behavior;
+    }
     return {};
 }
 
@@ -194,6 +233,14 @@ bool DarkGiftTargetIsLegal(const Minion& target,
             return behavior.incubationTurns > 0;
         case DarkGiftEffect::RANDOM_POOL_TASK:
             return behavior.randomPoolKind >= 1 && behavior.randomPoolKind <= 3;
+        case DarkGiftEffect::RALLY_BLOOD_GEMS:
+            return true;
+        case DarkGiftEffect::FODDER_REFRESH:
+            return behavior.fodderRefreshes > 0;
+        case DarkGiftEffect::HAND_COPY:
+            return true;
+        case DarkGiftEffect::REPLICATION:
+            return true;
         case DarkGiftEffect::NONE:
             return false;
     }
@@ -262,6 +309,19 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
             target.AddDarkGiftDeathrattleTask(SimpleTasks::DarkGiftGolemDeathrattleTask{});
         else
             return false;
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::RALLY_BLOOD_GEMS)
+    {
+        target.AddDarkGiftRallyTask(SimpleTasks::GenerateBloodGemsTask{2});
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::FODDER_REFRESH)
+    {
+        if (behavior.fodderRefreshes <= 0)
+            return false;
+        target.AddDarkGiftRallyTask(
+            SimpleTasks::ArmFodderRefreshTask{behavior.fodderRefreshes});
         return true;
     }
 
@@ -350,6 +410,23 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
     return true;
 }
 
+bool ApplyDarkGift(Player& player, Minion& target,
+                   const DarkGiftBehavior& behavior, int currentCount)
+{
+    if (behavior.effect == DarkGiftEffect::HAND_COPY)
+    {
+        if (!DarkGiftTargetIsLegal(target, behavior)) return false;
+        return player.AddMinionCopyToHand(target);
+    }
+    if (behavior.effect == DarkGiftEffect::REPLICATION)
+    {
+        if (!DarkGiftTargetIsLegal(target, behavior)) return false;
+        target.SetReplication(2);
+        return true;
+    }
+    return ApplyDarkGift(target, behavior, currentCount);
+}
+
 void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
 {
     // These entities are persistent effects, not ordinary playable cards.
@@ -368,12 +445,20 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
                             "BG36_MidGameEffect_000t12",
                             "BG36_MidGameEffect_000t79",
                             "BG36_MidGameEffect_000t64",
+                            "BG36_MidGameEffect_000t64t",
                             "BG36_MidGameEffect_000t74",
                             "BG36_MidGameEffect_000t75",
                             "BG36_MidGameEffect_000t10",
+                            "BG36_MidGameEffect_000t11",
                             "BG36_MidGameEffect_000t28",
+                            "BG36_MidGameEffect_000t28t",
                             "BG36_MidGameEffect_000t29",
+                            "BG36_MidGameEffect_000t29t",
                             "BG36_MidGameEffect_000t30",
+                            "BG36_MidGameEffect_000t30t",
+                            "BG36_MidGameEffect_000t80",
+                            "BG36_MidGameEffect_000t66",
+                            "BG36_MidGameEffect_000t66e",
                             "BG36_MidGameEffect_000t3",
                             "BG36_MidGameEffect_000t5",
                             "BG36_MidGameEffect_000t61",
@@ -381,6 +466,7 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
                             "BG36_MidGameEffect_000t71",
                             "BG36_MidGameEffect_000t81",
                             "BG36_MidGameEffect_000t16",
+                            "BG36_MidGameEffect_000t18",
                             "BG36_MidGameEffect_000t9",
                             "BG36_MidGameEffect_000t60",
                             "BG36_MidGameEffect_000t4" })

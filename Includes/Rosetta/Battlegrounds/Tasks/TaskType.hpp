@@ -62,10 +62,29 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonedMinionStatMultiplierTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTavernSpellHealthBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTavernSpellToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DestroyUndeadBuffSelfTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ActivateFishbaitTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ActivateRandomTavernSpellsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DealDamageSelfBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnStatTransferTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyHighestHandSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyHighestHandMurlocBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemGolemTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemSelfTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnLastTavernSpellTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemOtherTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemAttackerTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastAdjacentBloodGemTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpendGoldThresholdSpellTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/HeroDamageThresholdSpellTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyGainTargetAttackTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRemoveKeywordsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRandomRaceKeywordTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomBountyToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConfigureAttackThresholdTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellDiscoverTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnConsumeHighestTavernTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomGoldenTierMinionToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellAttackBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GrowingSummonAttackTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MinionOfferingTask.hpp>
@@ -112,11 +131,26 @@ using TaskType =
                  SimpleTasks::OnePerTypeRallyBuffTask,
                  SimpleTasks::SummonedMinionStatMultiplierTask,
                  SimpleTasks::RallyTavernSpellHealthBonusTask,
-                 SimpleTasks::RandomTavernSpellToHandTask,
+                 SimpleTasks::RandomTavernSpellToHandTask, SimpleTasks::DestroyUndeadBuffSelfTask, SimpleTasks::ActivateFishbaitTask, SimpleTasks::ActivateRandomTavernSpellsTask, SimpleTasks::DealDamageSelfBuffTask,
                  SimpleTasks::EndTurnStatTransferTask,
                  SimpleTasks::RallyHighestHandSummonTask,
                  SimpleTasks::RallyHighestHandMurlocBuffTask,
                  SimpleTasks::RallyBloodGemGolemTask,
+                 SimpleTasks::RallyBloodGemSelfTask,
+                 SimpleTasks::EndTurnLastTavernSpellTask,
+                 SimpleTasks::RallyBloodGemOtherTask,
+                 SimpleTasks::RallyBloodGemAttackerTask,
+                 SimpleTasks::SpellCastAdjacentBloodGemTask,
+                 SimpleTasks::SpendGoldThresholdSpellTask,
+                 SimpleTasks::HeroDamageThresholdSpellTask,
+                 SimpleTasks::RallyGainTargetAttackTask,
+                 SimpleTasks::RallyRemoveKeywordsTask,
+                 SimpleTasks::RallyRandomRaceKeywordTask,
+                 SimpleTasks::RandomBountyToHandTask,
+                 SimpleTasks::ConfigureAttackThresholdTask,
+                 SimpleTasks::BattlecryTavernSpellDiscoverTask,
+                 SimpleTasks::EndTurnConsumeHighestTavernTask,
+                 SimpleTasks::RandomGoldenTierMinionToHandTask,
                  SimpleTasks::BattlecryTavernSpellAttackBonusTask,
                  SimpleTasks::GrowingSummonAttackTask,
                  SimpleTasks::MinionOfferingTask, SimpleTasks::DarkGiftRandomPoolTask,

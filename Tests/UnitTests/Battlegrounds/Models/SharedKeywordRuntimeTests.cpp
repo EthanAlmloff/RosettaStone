@@ -44,6 +44,36 @@ void AddZeroAttackTarget(Player& player, int health)
 }
 }  // namespace
 
+TEST_CASE("[Battlegrounds : Combat] - persistent deltas reconcile by entity identity")
+{
+    Minion recruit{MakeKeywordCard("TEST_persistent", 3, 4, {})};
+    recruit.SetIndex(41);
+    Minion combat = recruit;
+    combat.ApplyCombatPersistentStats(5, 6);
+    combat.SetAttack(combat.GetAttack() + 100); // ordinary combat state
+    combat.ApplyCombatPersistentKeyword(GameTag::TAUNT);
+
+    recruit.ReconcileCombatPersistentState(combat);
+    CHECK_EQ(recruit.GetAttack(), 8);
+    CHECK_EQ(recruit.GetHealth(), 10);
+    CHECK(recruit.HasTaunt());
+
+    // Reconciliation is idempotent and does not copy temporary combat stats.
+    recruit.ReconcileCombatPersistentState(combat);
+    CHECK_EQ(recruit.GetAttack(), 8);
+    CHECK_EQ(recruit.GetHealth(), 10);
+}
+
+TEST_CASE("[Battlegrounds : Combat] - identity prefers entity index")
+{
+    Minion left{MakeKeywordCard("TEST_left", 1, 1, {})};
+    Minion right{MakeKeywordCard("TEST_right", 1, 1, {})};
+    left.SetIndex(7);
+    right.SetIndex(7);
+    right.SetZonePosition(3);
+    CHECK(left.IsSameInstance(right));
+}
+
 TEST_CASE("[Battlegrounds : Keywords] - Reborn revives normal minion once")
 {
     Player player1;
