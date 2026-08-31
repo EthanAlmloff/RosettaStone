@@ -12,6 +12,7 @@
 #include <Rosetta/Battlegrounds/CardSets/BattlegroundsCardsGen.hpp>
 #include <Rosetta/Battlegrounds/CardSets/BloodGemBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/DarkGiftBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/FishbaitBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 #include <Rosetta/Battlegrounds/CardSets/MagneticMinionBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviors.hpp>
@@ -56,6 +57,11 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch48.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch5.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch50.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch51.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch52.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch53.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch54.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch55.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch6.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch7.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch8.hpp>
@@ -67,6 +73,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch4.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch5.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch6.hpp>
 #include <Rosetta/Battlegrounds/CardSets/SpellcraftMinionBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
@@ -109,6 +116,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BloodGemRaceBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BuyMinionTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastSpellBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastTavernSpellTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CountTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CounterBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DamageHeroTask.hpp>
@@ -117,6 +125,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftRandomPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnStatTransferTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnTavernSpellStatsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ExactCopyDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FriendlyRaceEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GainGoldTask.hpp>
@@ -127,17 +136,20 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/IncludeTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeapfroggerDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeftmostFriendlyRaceTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MagnetizeSatelliteTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MinionOfferingTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/OnePerTypeRallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/PersistentBeetleBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/PersistentRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/PersistentTavernTierBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemGolemTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyHighestHandMurlocBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyHighestHandSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTavernSpellHealthBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomChooseOneCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomChromadrakeToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomEnemyDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomFriendlyRaceTask.hpp>
@@ -152,6 +164,10 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SetGameTagTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastOnSelfHealthTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastSelfScalingTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatDestroyAdjacentTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandSelfCopyTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandStatsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMurlocSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTrackedAvengeCardsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonedMinionStatMultiplierTask.hpp>

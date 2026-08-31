@@ -33,6 +33,12 @@ class CardDef
     //! \param _playReqs The play requirements data.
     explicit CardDef(Power _power, std::map<PlayReq, int> _playReqs);
 
+    //! Returns whether this definition supplies an executable Battlecry.
+    bool HasBattlecry() const noexcept
+    {
+        return !power.GetBattlecryTask().empty();
+    }
+
     Power power;
     std::map<PlayReq, int> playReqs;
 };

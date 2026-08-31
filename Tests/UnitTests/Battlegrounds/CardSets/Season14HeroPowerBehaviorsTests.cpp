@@ -3,6 +3,8 @@
 #include "doctest_proxy.hpp"
 
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch6.hpp>
+#include <Rosetta/Battlegrounds/Models/Season14.hpp>
 
 using namespace RosettaStone::Battlegrounds;
 
@@ -11,14 +13,106 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Nine Frogs is registered")
     const auto* entry = FindSeason14HeroPowerBehavior(110472);
     REQUIRE(entry != nullptr);
     REQUIRE(FindSeason14HeroPowerBehavior("BG28_HERO_801p") == entry);
-    CHECK(entry->kind == Season14HeroPowerKind::TAVERN_SPELL_DISCOVER);
+    CHECK(entry->kind == Season14HeroPowerKind::RANDOM_TAVERN_SPELL);
     CHECK(entry->cost == 1);
     CHECK(!entry->passive);
 }
 
+TEST_CASE("[Season14HeroPowerBehaviors] - Void Power has turn-seven Discover payload")
+{
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH6.size() == 1);
+    const auto* entry = FindSeason14HeroPowerBehaviorBatch6("BG36_HERO_101p");
+    REQUIRE(entry != nullptr);
+    CHECK(FindSeason14HeroPowerBehaviorBatch6(132581) == entry);
+    CHECK(entry->kind == Season14HeroPowerBatch6Kind::VOID_POWER);
+    CHECK(entry->cost == 0);
+    CHECK(!entry->passive);
+
+    Season14HeroPowerBatch6State state{};
+    for (int turn = 1; turn < 7; ++turn)
+        CHECK(!ResolveVoidPowerBeginTurn(132581, state));
+    CHECK(ResolveVoidPowerBeginTurn(132581, state));
+    CHECK(state.turnNumber == 7);
+    CHECK(state.discoverReady);
+    CHECK(ConsumeVoidPowerDiscover(state));
+    CHECK(!state.discoverReady);
+    CHECK(state.discoverOffered);
+    CHECK(!ResolveVoidPowerBeginTurn(132581, state));
+    CHECK(!ConsumeVoidPowerDiscover(state));
+
+    state = {};
+    state.discoverReady = true;
+    CHECK(!ConsumeVoidPowerDiscover(state));
+    RestoreVoidPowerDiscoverReady(state);
+    CHECK(state.discoverReady);
+
+    Season14State modal{};
+    modal.BeginOfferingDecision(
+        Season14Decision::DISCOVER, 0, 132581,
+        {{615, 0, 138879}, {616, 0, 138880}, {617, 0, 138881}});
+    CHECK(modal.pendingDecision == Season14Decision::DISCOVER);
+    CHECK(modal.pendingSourceCardDbfID == 132581);
+    REQUIRE(modal.pendingOfferings.size() == 3);
+    CHECK(modal.pendingOfferings[0].dbfID == 615);
+    CHECK(modal.pendingOfferings[0].darkGiftDbfID == 138879);
+    CHECK(modal.SelectDecision(1));
+    CHECK(modal.pendingDecision == Season14Decision::NONE);
+    CHECK(modal.pendingOfferings.empty());
+}
+
 TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 9);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 19);
+
+    const auto* boon = FindSeason14HeroPowerBehavior(57562);
+    REQUIRE(boon != nullptr);
+    CHECK(FindSeason14HeroPowerBehavior("TB_BaconShop_HP_010") == boon);
+    CHECK(boon->kind == Season14HeroPowerKind::BOON_OF_LIGHT);
+    CHECK(boon->cost == 2);
+    CHECK(!boon->passive);
+    const auto* sharpen = FindSeason14HeroPowerBehavior("TB_BaconShop_HP_001");
+    REQUIRE(sharpen != nullptr);
+    CHECK(sharpen->dbfID == 57567);
+    CHECK(sharpen->kind == Season14HeroPowerKind::SHARPEN_BLADES);
+    CHECK(sharpen->cost == 1);
+    const auto* buried = FindSeason14HeroPowerBehavior("TB_BaconShop_HP_074");
+    REQUIRE(buried != nullptr);
+    CHECK(buried->dbfID == 62250);
+    CHECK(buried->kind == Season14HeroPowerKind::BURIED_TREASURE);
+    const auto* firstKill = FindSeason14HeroPowerBehavior("TB_BaconShop_HP_053");
+    REQUIRE(firstKill != nullptr);
+    CHECK(firstKill->dbfID == 60381);
+    CHECK(firstKill->kind == Season14HeroPowerKind::FIRST_KILL_COPY);
+    const auto* seeLight = FindSeason14HeroPowerBehavior("BG20_HERO_101p");
+    REQUIRE(seeLight != nullptr);
+    CHECK(seeLight->dbfID == 70957);
+    CHECK(seeLight->kind == Season14HeroPowerKind::SEE_THE_LIGHT);
+    CHECK(seeLight->cost == 2);
+    CHECK(!seeLight->passive);
+    const auto* brick = FindSeason14HeroPowerBehavior("TB_BaconShop_HP_040");
+    REQUIRE(brick != nullptr);
+    CHECK(brick->dbfID == 59832);
+    CHECK(brick->kind == Season14HeroPowerKind::BRICK_BY_BRICK);
+    CHECK(brick->cost == 0);
+    CHECK(!brick->passive);
+    const auto* rich = FindSeason14HeroPowerBehavior("TB_BaconShop_HP_046");
+    REQUIRE(rich != nullptr);
+    CHECK(rich->dbfID == 60216);
+    CHECK(rich->kind == Season14HeroPowerKind::GONNA_BE_RICH);
+    CHECK(rich->cost == 0);
+    CHECK(!rich->passive);
+    const auto* explorer = FindSeason14HeroPowerBehavior("TB_BaconShop_HP_047");
+    REQUIRE(explorer != nullptr);
+    CHECK(explorer->dbfID == 60217);
+    CHECK(explorer->kind == Season14HeroPowerKind::LEAD_EXPLORER);
+    CHECK(explorer->cost == 1);
+    CHECK(!explorer->passive);
+    const auto* cloning = FindSeason14HeroPowerBehavior("BG31_HERO_005p");
+    REQUIRE(cloning != nullptr);
+    CHECK(cloning->dbfID == 117410);
+    CHECK(cloning->kind == Season14HeroPowerKind::CLONING_GALLERY);
+    CHECK(cloning->cost == 0);
+    CHECK(!cloning->passive);
 
     for (std::size_t i = 0; i < SEASON14_HERO_POWER_BEHAVIORS.size(); ++i)
     {
@@ -33,6 +127,31 @@ TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
             CHECK(entry.dbfID != SEASON14_HERO_POWER_BEHAVIORS[j].dbfID);
         }
     }
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Buried Treasure has four digs")
+{
+    Season14State state;
+    state.SetHeroPower(62250, 1, true);
+    for (int i = 0; i < 4; ++i) {
+        CHECK(state.CanBuriedTreasureDig());
+        state.RecordBuriedTreasureDig();
+    }
+    CHECK(!state.CanBuriedTreasureDig());
+    state.SetHeroPower(62250, 1, true);
+    CHECK(state.CanBuriedTreasureDig());
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - first kill copy expires after combat")
+{
+    Season14State state;
+    state.SetHeroPower(60381, 1, true);
+    state.ArmFirstKillCopy();
+    CHECK(state.firstKillCopyArmed);
+    state.ExpireFirstKillCopy();
+    CHECK(!state.firstKillCopyArmed);
+    Minion copy;
+    CHECK(!state.TakeFirstKillCopy(copy));
 }
 
 TEST_CASE("[Season14HeroPowerBehaviors] - passive families are explicit")
@@ -68,11 +187,19 @@ TEST_CASE("[Season14HeroPowerBehaviors] - no-target active effects are determini
     Season14HeroPowerActivation activation{};
 
     CHECK(ResolveSeason14HeroPowerActivation(62269, 1, activation));
-    CHECK(activation.goldDelta == 2);
+    CHECK(activation.goldDelta == 1);
     CHECK(activation.maxGoldDelta == 0);
 
     CHECK(ResolveSeason14HeroPowerActivation(62269, 4, activation));
-    CHECK(activation.goldDelta == 5);
+    CHECK(activation.goldDelta == 4);
+
+    Season14HeroPowerBatch1State piggyState{};
+    CHECK(ResolveSeason14HeroPowerActivation(62269, 1, piggyState,
+                                             activation));
+    CHECK(activation.goldDelta == 1);
+    CHECK(piggyState.piggyBankUsed);
+    CHECK(!ResolveSeason14HeroPowerActivation(62269, 2, piggyState,
+                                              activation));
 
     CHECK(ResolveSeason14HeroPowerActivation(116921, 1, activation));
     CHECK(activation.goldDelta == 0);
@@ -80,4 +207,106 @@ TEST_CASE("[Season14HeroPowerBehaviors] - no-target active effects are determini
 
     CHECK(!ResolveSeason14HeroPowerActivation(59399, 1, activation));
     CHECK(!ResolveSeason14HeroPowerActivation(0, 1, activation));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Sharpen Blades scales with current-turn buys")
+{
+    Season14State state;
+    state.SetHeroPower(57567, 1, true);
+    CHECK(state.SharpenBladesStats() == std::pair{0, 0});
+    state.OnBuyMinionSharpenBlades();
+    CHECK(state.SharpenBladesStats() == std::pair{2, 1});
+    state.OnBuyMinionSharpenBlades();
+    state.OnBuyMinionSharpenBlades();
+    CHECK(state.SharpenBladesStats() == std::pair{6, 3});
+    state.BeginRecruitTurn();
+    CHECK(state.SharpenBladesStats() == std::pair{0, 0});
+    state.SetHeroPower(57567, 1, true);
+    CHECK(state.SharpenBladesStats() == std::pair{0, 0});
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Brick by Brick grows only when unused")
+{
+    Season14HeroPowerBatch1State state{};
+    Season14HeroPowerActivation activation{};
+    ResolveSeason14HeroPowerBatch1Event(
+        59832, Season14HeroPowerBatch1Event::BEGIN_TURN, state);
+    ResolveSeason14HeroPowerBatch1Event(
+        59832, Season14HeroPowerBatch1Event::BEGIN_TURN, state);
+    CHECK(ResolveSeason14HeroPowerActivation(59832, 2, state, activation));
+    CHECK(activation.healthDelta == 3);
+    CHECK(!ResolveSeason14HeroPowerActivation(59832, 2, state, activation));
+    state = {};
+    CHECK(ResolveSeason14HeroPowerActivation(59832, 1, state, activation));
+    CHECK(activation.healthDelta == 2);
+    CHECK(!ResolveSeason14HeroPowerActivation(59832, 1, state, activation));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Gonna Be Rich is once per game")
+{
+    Season14HeroPowerBatch1State state{};
+    Season14HeroPowerActivation activation{};
+    CHECK(ResolveSeason14HeroPowerActivation(60216, 1, state, activation));
+    CHECK(activation.makeGolden);
+    CHECK(state.gonnaBeRichUsed);
+    CHECK(!ResolveSeason14HeroPowerActivation(60216, 2, state, activation));
+    state = {};
+    CHECK(ResolveSeason14HeroPowerActivation(60216, 2, state, activation));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Lead Explorer raises cost after use")
+{
+    Season14HeroPowerBatch1State state{};
+    Season14HeroPowerActivation activation{};
+    CHECK(ResolveSeason14HeroPowerActivation(60217, 1, state, activation));
+    CHECK(activation.beginDiscover);
+    CHECK(state.leadExplorerCostDelta == 1);
+    CHECK(ResolveSeason14HeroPowerActivation(60217, 2, state, activation));
+    CHECK(state.leadExplorerCostDelta == 2);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Cloning Gallery is once per game")
+{
+    Season14State state;
+    state.SetHeroPower(117410, 0, true);
+    CHECK(!state.cloningGalleryUsed);
+    state.cloningGalleryUsed = true;
+    CHECK(state.cloningGalleryUsed);
+    state.SetHeroPower(117410, 0, true);
+    CHECK(!state.cloningGalleryUsed);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - King of Duality unlocks once on turn four")
+{
+    Season14HeroPowerBatch1State state{};
+    Season14HeroPowerActivation activation{};
+    CHECK(!ResolveSeason14HeroPowerActivation(129685, 3, state, activation));
+    CHECK(ResolveSeason14HeroPowerActivation(129685, 4, state, activation));
+    CHECK(activation.beginDiscover);
+    CHECK(state.kingOfDualityOffered);
+    CHECK(!ResolveSeason14HeroPowerActivation(129685, 4, state, activation));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Brick by Brick preserves missed-turn growth")
+{
+    Season14HeroPowerBatch1State state{};
+    Season14HeroPowerActivation activation{};
+    ResolveSeason14HeroPowerBatch1Event(
+        59832, Season14HeroPowerBatch1Event::BEGIN_TURN, state);
+    CHECK(ResolveSeason14HeroPowerActivation(59832, 1, state, activation));
+    CHECK(activation.healthDelta == 2);
+
+    // Using the power prevents growth on the immediately following turn.
+    ResolveSeason14HeroPowerBatch1Event(
+        59832, Season14HeroPowerBatch1Event::BEGIN_TURN, state);
+    CHECK(ResolveSeason14HeroPowerActivation(59832, 2, state, activation));
+    CHECK(activation.healthDelta == 2);
+
+    // Two consecutive unused turns each add one to the next activation.
+    ResolveSeason14HeroPowerBatch1Event(
+        59832, Season14HeroPowerBatch1Event::BEGIN_TURN, state);
+    ResolveSeason14HeroPowerBatch1Event(
+        59832, Season14HeroPowerBatch1Event::BEGIN_TURN, state);
+    CHECK(ResolveSeason14HeroPowerActivation(59832, 4, state, activation));
+    CHECK(activation.healthDelta == 4);
 }

@@ -5,6 +5,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GainGoldTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemGolemTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackingMinionBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonedMinionStatMultiplierTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTavernSpellHealthBonusTask.hpp>
@@ -33,6 +34,10 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmRefreshRandomShopStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastSelfScalingTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastOnSelfHealthTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandStatsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMurlocSummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatDestroyAdjacentTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandSelfCopyTask.hpp>
 #include <Rosetta/Common/Enums/TaskEnums.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
@@ -55,6 +60,14 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddEnchant(Enchant{std::vector<Effect>{Effects::AttackN(15), Effects::HealthN(15)}}); cards.emplace("BG34_320e", CardDef{std::move(p)}); }
   { Power p; p.AddEnchant(Enchant{std::vector<Effect>{Effects::AttackN(1), Effects::HealthN(1)}}); cards.emplace("BG26_963e", CardDef{std::move(p)}); }
   { Power p; p.AddEnchant(Enchant{std::vector<Effect>{Effects::AttackN(4), Effects::HealthN(4)}}); cards.emplace("BG21_014e", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatDestroyAdjacentTask{false}); cards.emplace("BG31_999", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatDestroyAdjacentTask{true}); cards.emplace("BG31_999_G", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatHandSelfCopyTask{false}); cards.emplace("BG32_330", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatHandSelfCopyTask{true}); cards.emplace("BG32_330_G", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatHighestHandMurlocSummonTask{1}); cards.emplace("BG27_556", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatHighestHandMurlocSummonTask{2}); cards.emplace("BG27_556_G", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatHandStatsTask{1}); cards.emplace("BG26_354", CardDef{std::move(p)}); }
+  { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatHandStatsTask{2}); cards.emplace("BG26_354_G", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::RandomSummonFromPoolTask{Race::BEAST, 1, 7, 6, false}); cards.emplace("BG25_806", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::RandomSummonFromPoolTask{Race::BEAST, 1, 7, 12, true}); cards.emplace("BG25_806_G", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::RandomCardToHandTask{Race::MECHANICAL, 0, 1, true}); cards.emplace("BG26_148", CardDef{std::move(p)}); }
@@ -138,6 +151,14 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddRallyTask(SimpleTasks::RallyRaceBuffTask{Race::BEAST, 4, 2, Race::BEAST}); cards.emplace("BG36_211_G", CardDef{std::move(p)}); }
   { Power p; p.AddRallyTask(SimpleTasks::BloodGemRaceBonusTask{Race::ELEMENTAL, 2, 2}); cards.emplace("BG36_351", CardDef{std::move(p)}); }
   { Power p; p.AddRallyTask(SimpleTasks::BloodGemRaceBonusTask{Race::ELEMENTAL, 4, 4}); cards.emplace("BG36_351_G", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemGolemTask{1}); cards.emplace("BG36_333", CardDef{std::move(p)}); }
+  { Power p; p.AddRallyTask(SimpleTasks::RallyBloodGemGolemTask{2}); cards.emplace("BG36_333_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::DISCOVER_TAVERN_SPELL, 2, 0, 0, 1}); cards.emplace("BG36_342", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::DISCOVER_TAVERN_SPELL, 2, 0, 0, 2}); cards.emplace("BG36_342_G", CardDef{std::move(p)}); }
+  { cards.emplace("BG36_344", CardDef{}); }
+  { cards.emplace("BG36_344_G", CardDef{}); }
+  { cards.emplace("BG36_332", CardDef{}); }
+  { cards.emplace("BG36_332_G", CardDef{}); }
   { Power p; p.AddRallyTask(SimpleTasks::AttackingMinionBuffTask{3, 1, Race::DRAGON}); cards.emplace("BG29_816", CardDef{std::move(p)}); }
   { Power p; p.AddRallyTask(SimpleTasks::AttackingMinionBuffTask{6, 2, Race::DRAGON}); cards.emplace("BG29_816_G", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::SPEND_GOLD}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::FriendlyRaceEnchantmentTask{"BG26_810e", Race::PIRATE}}); p.AddTrigger(std::move(t)); cards.emplace("BG26_810", CardDef{std::move(p)}); }

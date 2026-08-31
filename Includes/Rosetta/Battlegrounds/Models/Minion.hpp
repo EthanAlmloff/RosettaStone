@@ -85,6 +85,8 @@ class Minion
 
     //! Returns whether this card has the Magnetic keyword.
     bool IsMagnetic() const;
+    void ArmMagnetization();
+    bool ConsumeMagnetizationArm();
 
     //! Returns whether this Magnetic card may attach to the target.
     bool CanMagnetizeTo(const Minion& target) const;
@@ -202,6 +204,8 @@ class Minion
     //! Returns the flag that indicates whether it has divine shield.
     //! \return The flag that indicates whether it has divine shield.
     bool HasDivineShield() const;
+    void SetDivineShieldHits(int hits);
+    int DivineShieldHitsRemaining() const;
 
     //! Returns whether this minion has the Reborn keyword available.
     //! \return true when the minion can be revived once after dying.
@@ -229,6 +233,22 @@ class Minion
     //! Applies and consumes the combat-start stat multipliers.
     void ApplyStartCombatStatMultipliers();
 
+    //! Configures a Dark Gift that triggers this minion's Deathrattles at
+    //! the beginning of combat.
+    void SetStartCombatDeathrattleTrigger(bool enabled);
+    bool HasStartCombatDeathrattleTrigger() const;
+    bool ConsumeStartCombatDeathrattleTrigger();
+    //! Configures a Dark Gift that copies the immediate left minion's attack
+    //! into this minion at combat start.
+    void SetStartCombatLeftAttack(bool enabled);
+    bool HasStartCombatLeftAttack() const;
+    bool ConsumeStartCombatLeftAttack();
+    void ApplyStartCombatLeftAttack(const Minion& left);
+    void SetImmuneWhileAttacking(bool enabled);
+    bool HasImmuneWhileAttacking() const;
+    void SetAttacking(bool attacking);
+    bool IsAttacking() const;
+
     //! Configures a persistent Dark Gift bonus applied whenever a card is played.
     void SetPlayCardStatBonus(int attack, int health);
     void ApplyPlayCardStatBonus();
@@ -241,6 +261,10 @@ class Minion
     void SetDarkGiftCounter(int attack, int health, int kind,
                             int currentCount = 0);
     void ApplyDarkGiftCounterStep(int kind);
+    //! Arms Incubation and advances its recruit-turn countdown.
+    void SetIncubation(int turns = 2);
+    void AdvanceIncubation();
+    int IncubationTurnsRemaining() const;
 
     //! Returns the number of attacks this minion may make in one combat turn.
     //! \return One, two, or four for normal, Windfury, or Mega Windfury.
@@ -255,6 +279,10 @@ class Minion
     bool IsFrozen() const;
     bool IsHandLocked() const { return m_handLocked; }
     void SetHandLocked(bool locked) { m_handLocked = locked; }
+    bool HasCombinedChooseOne() const { return m_combinedChooseOne; }
+    void SetCombinedChooseOne(bool enabled) { m_combinedChooseOne = enabled; }
+    bool DiesAtRecruitEnd() const { return m_diesAtRecruitEnd; }
+    void SetDiesAtRecruitEnd(bool enabled) { m_diesAtRecruitEnd = enabled; }
 
     //! Sets whether this Tavern entity is frozen.
     //! \param frozen The new frozen state.
@@ -378,10 +406,12 @@ class Minion
     int m_darkGiftCounterAttack = 0;
     int m_darkGiftCounterHealth = 0;
     int m_darkGiftCounterKind = 0;
+    int m_incubationTurnsRemaining = 0;
 
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
     bool m_hasDivineShield = false;
+    int m_divineShieldHitsRemaining = 0;
     bool m_hasReborn = false;
     bool m_hasWindfury = false;
     bool m_hasMegaWindfury = false;
@@ -396,11 +426,18 @@ class Minion
     bool m_hasStealth = false;
     bool m_isFrozen = false;
     bool m_isDestroyed = false;
+    bool m_magnetizationArmed = false;
     bool m_handLocked = false;
+    bool m_combinedChooseOne = false;
+    bool m_diesAtRecruitEnd = false;
     int m_activateUses = 1;
     int m_startCombatAttackMultiplier = 1;
     int m_startCombatHealthMultiplier = 1;
     bool m_startCombatStatsApplied = false;
+    std::uint8_t m_startCombatDeathrattleTriggers = 0;
+    std::uint8_t m_startCombatLeftAttackTriggers = 0;
+    bool m_immuneWhileAttacking = false;
+    bool m_isAttacking = false;
 };
 }  // namespace RosettaStone::Battlegrounds
 

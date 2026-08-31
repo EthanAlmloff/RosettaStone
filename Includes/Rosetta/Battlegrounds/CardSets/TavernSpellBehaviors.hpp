@@ -76,6 +76,11 @@ enum class TavernSpellEffect
     BLOOD_GEM_TRANSFER,
     RANDOM_SPELLCRAFT,
     DISCOVER_HERO_POWER,
+    DISCOVER_TIER_MINION_OR_SPELL,
+    REFRESH_RACE,
+    DISCOVER_CHOOSE_ONE_COMBINED,
+    DISCOVER_UNDEAD_DIES_THIS_TURN,
+    REFRESH_TAVERN_SPELLS,
 };
 
 struct TavernSpellBehavior
@@ -353,6 +358,16 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
                  Race::INVALID, 3, 8 };
     if (id == "BG28_GIL_836") // Battlecry: Discover a Battlecry minion.
         return { 0, 0, 0, TavernSpellEffect::DISCOVER_BATTLECRY_MINION };
+    if (id == "BG31_890") // Boundless Potential: choose a Tier minion or Tavern spell.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_TIER_MINION_OR_SPELL };
+    if (id == "EBG_Spell_038") // Lost Staff of Hamuul: refresh with a target tribe.
+        return { 0, 0, 0, TavernSpellEffect::REFRESH_RACE };
+    if (id == "BG31_892") // Fandral's Fortune: Discover a supported Choose One minion with both branches.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_CHOOSE_ONE_COMBINED };
+    if (id == "BG34_888") // Tomb Turning: Discover an Undead that dies at recruit end if played.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_UNDEAD_DIES_THIS_TURN };
+    if (id == "BG28_849") // Saloon's Finest: refresh the Tavern with Tavern spells.
+        return { 0, 0, 0, TavernSpellEffect::REFRESH_TAVERN_SPELLS };
     if (id == "EBG_Spell_037") // Unmasked Identity: Discover a new Hero Power.
         return { 0, 0, 0, TavernSpellEffect::DISCOVER_HERO_POWER };
     if (id == "BG30_804") // Robust Evolution: random higher-Tier transform.
@@ -431,7 +446,9 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS ||
            effect == TavernSpellEffect::TRANSFORM_HIGHER_TIER ||
            effect == TavernSpellEffect::DISCOVER_DIFFERENT_RACE ||
-           effect == TavernSpellEffect::BLOOD_GEM_TRANSFER;
+           effect == TavernSpellEffect::BLOOD_GEM_TRANSFER ||
+           effect == TavernSpellEffect::REFRESH_RACE;
+
 }
 
 //! Returns whether a target satisfies additional spell-specific constraints.

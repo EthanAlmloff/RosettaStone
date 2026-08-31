@@ -11,6 +11,7 @@
 #include <effolkronium/random.hpp>
 
 #include <stdexcept>
+#include <iterator>
 
 using Random = effolkronium::random_thread_local;
 
@@ -221,6 +222,12 @@ std::size_t MinionPool::GetCount() const
 
 void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern)
 {
+    AddMinionsToTavern(player, tavern, Race::INVALID);
+}
+
+void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern,
+                                    Race preferredRace)
+{
     const std::size_t targetCount = player.season14.TavernOfferCount(
         GetNumMinionsCanPurchase(player.currentTier));
     const std::size_t currentCount =
@@ -231,6 +238,22 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern)
     }
     const std::size_t numMinions = targetCount - currentCount;
     auto minions = GetMinions(1, player.currentTier, true);
+
+    // Lost Staff prefers the selected tribe, then fills any unavailable
+    // slots from the ordinary tier pool. This keeps the refresh bounded and
+    // never invents cards or removes unrelated pool entries.
+    if (preferredRace != Race::INVALID) {
+        std::vector<Minion> preferred;
+        std::vector<Minion> fallback;
+        for (auto& minion : minions)
+            (minion.HasRace(preferredRace) ? preferred : fallback)
+                .push_back(std::move(minion));
+        Random::shuffle(preferred.begin(), preferred.end());
+        Random::shuffle(fallback.begin(), fallback.end());
+        preferred.insert(preferred.end(), std::make_move_iterator(fallback.begin()),
+                         std::make_move_iterator(fallback.end()));
+        minions = std::move(preferred);
+    }
 
     Random::shuffle(minions.begin(), minions.end());
 

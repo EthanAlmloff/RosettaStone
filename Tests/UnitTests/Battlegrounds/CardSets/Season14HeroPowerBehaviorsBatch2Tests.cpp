@@ -8,7 +8,7 @@ using namespace RosettaStone::Battlegrounds;
 
 TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - exact unique registry")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH2.size() == 11);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH2.size() == 12);
     for (std::size_t i = 0; i < SEASON14_HERO_POWER_BEHAVIORS_BATCH2.size(); ++i)
     {
         const auto& entry = SEASON14_HERO_POWER_BEHAVIORS_BATCH2[i];
@@ -22,6 +22,20 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - exact unique registry")
             CHECK(entry.dbfID != SEASON14_HERO_POWER_BEHAVIORS_BATCH2[j].dbfID);
         }
     }
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - Growing Collection unlocks at turn eight")
+{
+    Season14HeroPowerBatch2State state{};
+    Season14HeroPowerBatch2Result result{};
+    for (int i = 0; i < 7; ++i)
+        ++state.turnNumber;
+    CHECK(!ResolveSeason14HeroPowerBatch2Activation(120650, state, false, result));
+    ++state.turnNumber;
+    CHECK(ResolveSeason14HeroPowerBatch2Activation(120650, state, false, result));
+    CHECK(result.beginGreaterTrinketOffer);
+    CHECK(state.growingCollectionOffered);
+    CHECK(!ResolveSeason14HeroPowerBatch2Activation(120650, state, false, result));
 }
 
 TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - passive modifiers are explicit")
@@ -107,6 +121,31 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - activations enforce lifecycle")
     CHECK(result.copyLastTavernSpell);
     CHECK(result.heroPowerCostDelta == -1);
     CHECK(state.nextHeroPowerDiscount);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - Bloodbound is exactly two uses and resets")
+{
+    Season14HeroPowerBatch2State state{};
+    Season14HeroPowerBatch2Result result{};
+
+    CHECK(ResolveSeason14HeroPowerBatch2Activation(71459, state, false,
+                                                   result));
+    CHECK(result.bloodGemDelta == 2);
+    CHECK(state.bloodboundUsesThisTurn == 1);
+    CHECK(ResolveSeason14HeroPowerBatch2Activation(71459, state, false,
+                                                   result));
+    CHECK(result.bloodGemDelta == 2);
+    CHECK(state.bloodboundUsesThisTurn == 2);
+    CHECK(!ResolveSeason14HeroPowerBatch2Activation(71459, state, false,
+                                                    result));
+
+    ResolveSeason14HeroPowerBatch2Event(
+        71459, Season14HeroPowerBatch2Event::BEGIN_TURN, state, result);
+    CHECK(state.turnNumber == 1);
+    CHECK(state.bloodboundUsesThisTurn == 0);
+    CHECK(ResolveSeason14HeroPowerBatch2Activation(71459, state, false,
+                                                   result));
+    CHECK(result.bloodGemDelta == 2);
 }
 
 TEST_CASE("[Season14HeroPowerBehaviorsBatch2] - Arcane Knowledge unlocks exactly on turn three")

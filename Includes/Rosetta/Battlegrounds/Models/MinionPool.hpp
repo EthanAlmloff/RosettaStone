@@ -45,6 +45,7 @@ class MinionPool
     //! \param player The player context.
     //! \param tavern The tavern to add minions.
     void AddMinionsToTavern(Player& player, Tavern& tavern);
+    void AddMinionsToTavern(Player& player, Tavern& tavern, Race preferredRace);
 
     //! Returns a minion to the pool.
     //! \param idx The pool index of a minion.

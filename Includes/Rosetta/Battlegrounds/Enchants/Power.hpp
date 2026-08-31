@@ -27,6 +27,12 @@ enum class ActivateEffect : unsigned char
     GAIN_GOLD,
     ADD_CARD,
     RANDOM_CARD,
+    RANDOM_CHROMADRAKE,
+    TAVERN_STATS_RANDOM_KEYWORD,
+    TRIGGER_RALLY,
+    ARM_MAGNETIZATION,
+    GAIN_NEXT_BOUGHT_STATS,
+    DISCOVER_TAVERN_SPELL,
 };
 enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD };
 struct AvengeDefinition

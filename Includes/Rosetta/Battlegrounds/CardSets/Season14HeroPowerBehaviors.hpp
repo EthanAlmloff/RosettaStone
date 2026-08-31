@@ -24,7 +24,18 @@ enum class Season14HeroPowerKind : std::uint8_t
     BUY_PIRATE_GOLD,
     TAVERN_SPELL_AURA,
     MAX_GOLD,
-    TAVERN_SPELL_DISCOVER,
+    RANDOM_TAVERN_SPELL,
+    BOON_OF_LIGHT,
+    SHARPEN_BLADES,
+    BURIED_TREASURE,
+    FIRST_KILL_COPY,
+    SEE_THE_LIGHT,
+    BRICK_BY_BRICK,
+    GONNA_BE_RICH,
+    LEAD_EXPLORER,
+    CLONING_GALLERY,
+    KING_OF_DUALITY,
+    UPBEAT_HARMONY,
 };
 
 struct Season14HeroPowerDefinition
@@ -37,7 +48,7 @@ struct Season14HeroPowerDefinition
 };
 
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 9>
+inline constexpr std::array<Season14HeroPowerDefinition, 20>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},
@@ -56,7 +67,29 @@ inline constexpr std::array<Season14HeroPowerDefinition, 9>
         {"BG32_HERO_001p", 116921,
          Season14HeroPowerKind::MAX_GOLD, 3, false},
         {"BG28_HERO_801p", 110472,
-         Season14HeroPowerKind::TAVERN_SPELL_DISCOVER, 1, false},
+         Season14HeroPowerKind::RANDOM_TAVERN_SPELL, 1, false},
+        {"TB_BaconShop_HP_010", 57562,
+         Season14HeroPowerKind::BOON_OF_LIGHT, 2, false},
+        {"TB_BaconShop_HP_001", 57567,
+         Season14HeroPowerKind::SHARPEN_BLADES, 1, false},
+        {"TB_BaconShop_HP_074", 62250,
+         Season14HeroPowerKind::BURIED_TREASURE, 1, false},
+        {"TB_BaconShop_HP_053", 60381,
+         Season14HeroPowerKind::FIRST_KILL_COPY, 1, false},
+        {"BG20_HERO_101p", 70957,
+         Season14HeroPowerKind::SEE_THE_LIGHT, 2, false},
+        {"TB_BaconShop_HP_040", 59832,
+         Season14HeroPowerKind::BRICK_BY_BRICK, 0, false},
+        {"TB_BaconShop_HP_046", 60216,
+         Season14HeroPowerKind::GONNA_BE_RICH, 0, false},
+        {"TB_BaconShop_HP_047", 60217,
+         Season14HeroPowerKind::LEAD_EXPLORER, 1, false},
+        {"BG31_HERO_005p", 117410,
+         Season14HeroPowerKind::CLONING_GALLERY, 0, false},
+        {"BG35_HERO_001p", 129685,
+         Season14HeroPowerKind::KING_OF_DUALITY, 0, false},
+        {"BG26_HERO_104p", 99034,
+         Season14HeroPowerKind::UPBEAT_HARMONY, 0, false},
     }};
 
 constexpr const Season14HeroPowerDefinition* FindSeason14HeroPowerBehavior(
@@ -97,6 +130,10 @@ constexpr bool HasSeason14HeroPowerBehavior(std::int32_t dbfID) noexcept
 //! target/random contract is implemented by the simulator.
 struct Season14HeroPowerBatch1State
 {
+    //! Recruit turns are one-based and scoped to the selected hero power.
+    std::int32_t turnNumber = 0;
+    //! Upbeat Harmony arms a plain left-most hand copy every third turn.
+    bool upbeatHarmonyCopyReady = false;
     //! Extra starting health applied to the hero's imported base health.
     //! Patch 36.4 describes All Patched Up as +30 Health, not an absolute
     //! floor; preserving this as a delta also handles future base-health
@@ -107,6 +144,15 @@ struct Season14HeroPowerBatch1State
     std::int32_t upgradeCostDelta = 0;
     std::int32_t tavernSpellCostDelta = 0;
     bool freeRefreshAvailable = false;
+    //! Piggy Bank is a once-per-game activation; unlike ordinary hero powers
+    //! its use must not be reopened by the next recruit turn.
+    bool piggyBankUsed = false;
+    std::int32_t brickByBrickHealth = 2;
+    std::int32_t brickByBrickTurn = 0;
+    bool brickByBrickUsedThisTurn = false;
+    bool gonnaBeRichUsed = false;
+    std::int32_t leadExplorerCostDelta = 0;
+    bool kingOfDualityOffered = false;
 
     constexpr std::int32_t MinionCost(std::int32_t baseCost) const noexcept
     {
@@ -198,6 +244,14 @@ constexpr bool ResolveSeason14HeroPowerBatch1Event(
 {
     if (event == Season14HeroPowerBatch1Event::BEGIN_TURN)
     {
+        if (dbfID == 59832)
+        {
+            if (state.brickByBrickTurn > 0 &&
+                !state.brickByBrickUsedThisTurn)
+                ++state.brickByBrickHealth;
+            ++state.brickByBrickTurn;
+            state.brickByBrickUsedThisTurn = false;
+        }
         if (dbfID == 61491) // Nozdormu: Clairvoyance.
         {
             state.freeRefreshAvailable = true;
@@ -217,23 +271,58 @@ struct Season14HeroPowerActivation
 {
     std::int32_t goldDelta = 0;
     std::int32_t maxGoldDelta = 0;
+    std::int32_t healthDelta = 0;
+    bool makeGolden = false;
+    bool beginDiscover = false;
     bool consumesTurnUse = true;
 };
 
+//! Resolve the three-turn lifecycle for Rock Master Voone's Upbeat Harmony.
+//! The copy itself is deliberately performed by Player, where hand card
+//! reconstruction and capacity are authoritative; this state only schedules
+//! the effect at the correct recruit boundary.
+constexpr bool ResolveUpbeatHarmonyBeginTurn(
+    std::int32_t dbfID, Season14HeroPowerBatch1State& state) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehavior(dbfID);
+    if (definition == nullptr ||
+        definition->kind != Season14HeroPowerKind::UPBEAT_HARMONY)
+        return false;
+    ++state.turnNumber;
+    state.upbeatHarmonyCopyReady = state.turnNumber % 3 == 0;
+    return state.upbeatHarmonyCopyReady;
+}
+
+constexpr bool TakeUpbeatHarmonyCopyReady(
+    Season14HeroPowerBatch1State& state) noexcept
+{
+    if (!state.upbeatHarmonyCopyReady) return false;
+    state.upbeatHarmonyCopyReady = false;
+    return true;
+}
+
 //! Resolve the two no-target active powers in this batch.
 //!
-//! `turnNumber` is one-based: the first recruit turn returns +2 for Piggy
-//! Bank, the second returns +3, and so on.  Passive and target-dependent
+//! `turnNumber` is one-based: the first recruit turn returns +1 for Piggy
+//! Bank, the second returns +2, and so on.  Passive and target-dependent
 //! powers return false so callers cannot accidentally claim an incomplete
 //! implementation.
 constexpr bool ResolveSeason14HeroPowerActivation(
     std::int32_t dbfID, std::int32_t turnNumber,
+    Season14HeroPowerBatch1State& state,
     Season14HeroPowerActivation& result) noexcept
 {
     result = {};
     if (dbfID == 62269) // TB_BaconShop_HP_076, Piggy Bank
     {
-        result.goldDelta = 1 + (turnNumber > 0 ? turnNumber : 1);
+        if (state.piggyBankUsed)
+        {
+            return false;
+        }
+        // The printed +1 is the first-turn amount. A skipped/legacy zero
+        // turn still receives the minimum printed amount, never zero.
+        result.goldDelta = turnNumber > 0 ? turnNumber : 1;
+        state.piggyBankUsed = true;
         return true;
     }
     if (dbfID == 116921) // BG32_HERO_001p, Wisdom of Ancients
@@ -241,7 +330,47 @@ constexpr bool ResolveSeason14HeroPowerActivation(
         result.maxGoldDelta = 1;
         return true;
     }
+    if (dbfID == 59832) // Brick by Brick, +2 Health; grows when unused.
+    {
+        if (state.brickByBrickUsedThisTurn)
+            return false;
+        result.healthDelta = state.brickByBrickHealth;
+        state.brickByBrickUsedThisTurn = true;
+        return true;
+    }
+    if (dbfID == 60216) // Gonna Be Rich!, once per game.
+    {
+        if (state.gonnaBeRichUsed)
+            return false;
+        state.gonnaBeRichUsed = true;
+        result.makeGolden = true;
+        return true;
+    }
+    if (dbfID == 60217) // Lead Explorer, cost rises after each use.
+    {
+        result.beginDiscover = true;
+        ++state.leadExplorerCostDelta;
+        return true;
+    }
+    if (dbfID == 129685 && turnNumber >= 4 &&
+        !state.kingOfDualityOffered)
+    {
+        state.kingOfDualityOffered = true;
+        result.beginDiscover = true;
+        return true;
+    }
     return false;
+}
+
+//! Compatibility resolver for callers that only need the pure activation
+//! payload. Player/bridge callers must use the stateful overload above so
+//! once-per-game effects cannot be replayed after a turn reset.
+constexpr bool ResolveSeason14HeroPowerActivation(
+    std::int32_t dbfID, std::int32_t turnNumber,
+    Season14HeroPowerActivation& result) noexcept
+{
+    Season14HeroPowerBatch1State state{};
+    return ResolveSeason14HeroPowerActivation(dbfID, turnNumber, state, result);
 }
 }  // namespace RosettaStone::Battlegrounds
 

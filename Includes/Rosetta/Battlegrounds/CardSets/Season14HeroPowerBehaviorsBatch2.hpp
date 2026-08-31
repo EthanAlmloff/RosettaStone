@@ -26,6 +26,7 @@ enum class Season14HeroPowerBatch2Kind : std::uint8_t
     TAVERN_SPELL_REFRESH,
     TAVERN_SPELL_DISCOUNT,
     TWO_COPY_GOLDEN,
+    GROWING_COLLECTION,
 };
 
 struct Season14HeroPowerBatch2Definition
@@ -38,7 +39,7 @@ struct Season14HeroPowerBatch2Definition
 };
 
 //! Exact Patch 36.4 IDs covered by this batch.
-inline constexpr std::array<Season14HeroPowerBatch2Definition, 11>
+inline constexpr std::array<Season14HeroPowerBatch2Definition, 12>
     SEASON14_HERO_POWER_BEHAVIORS_BATCH2 = {{
         {"TB_BaconShop_HP_008", 57559,
          Season14HeroPowerBatch2Kind::DEFERRED_SELL_GOLD, 1, true},
@@ -62,6 +63,8 @@ inline constexpr std::array<Season14HeroPowerBatch2Definition, 11>
          Season14HeroPowerBatch2Kind::TAVERN_SPELL_DISCOUNT, 0, true},
         {"BG34_HERO_002p", 126533,
          Season14HeroPowerBatch2Kind::TWO_COPY_GOLDEN, 0, true},
+        {"BG32_HERO_002p", 120650,
+         Season14HeroPowerBatch2Kind::GROWING_COLLECTION, 0, false},
     }};
 
 constexpr const Season14HeroPowerBatch2Definition*
@@ -105,6 +108,7 @@ struct Season14HeroPowerBatch2State
     std::int32_t higherTierRefreshMinions = 0;
     bool arcaneKnowledgeUnlocked = false;
     bool nextHeroPowerDiscount = false;
+    bool growingCollectionOffered = false;
 
     //! Returns the effective cost of a Tavern spell before it resolves.
     constexpr std::int32_t TavernSpellCost(std::int32_t baseCost) const noexcept
@@ -185,6 +189,7 @@ struct Season14HeroPowerBatch2Result
     bool copyLastTavernSpell = false;
     bool refreshWithTavernSpells = false;
     bool twoCopiesMakeGolden = false;
+    bool beginGreaterTrinketOffer = false;
 };
 
 //! Resolve a lifecycle event without silently implementing random/targeted
@@ -195,7 +200,6 @@ constexpr void ResolveSeason14HeroPowerBatch2Event(
     Season14HeroPowerBatch2Result& result) noexcept
 {
     result = {};
-
     // Recruit begins are one-based.  Advance the lifecycle before resolving
     // start-of-turn effects so Arcane Knowledge unlocks on the third begin,
     // not the fourth.
@@ -258,6 +262,13 @@ constexpr bool ResolveSeason14HeroPowerBatch2Activation(
     Season14HeroPowerBatch2Result& result) noexcept
 {
     result = {};
+    if (dbfID == 120650 && state.turnNumber >= 8 &&
+        !state.growingCollectionOffered)
+    {
+        state.growingCollectionOffered = true;
+        result.beginGreaterTrinketOffer = true;
+        return true;
+    }
     if (dbfID == 71459) // Bloodbound: twice per turn, +2 Blood Gems.
     {
         if (state.bloodboundUsesThisTurn >= 2)
@@ -282,7 +293,6 @@ constexpr bool ResolveSeason14HeroPowerBatch2Activation(
         }
         result.copyLastTavernSpell = true;
         result.heroPowerCostDelta = -1;
-        state.nextHeroPowerDiscount = true;
         return true;
     }
     return false;

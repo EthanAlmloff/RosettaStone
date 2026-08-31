@@ -3,9 +3,11 @@
 #include "doctest_proxy.hpp"
 
 #include <Rosetta/Battlegrounds/CardSets/DarkGiftBehaviors.hpp>
+#include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 
 #include <array>
 #include <map>
@@ -46,9 +48,20 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - verified Patch 36.4 batch")
     }
     const auto endTurn = FindDarkGiftBehavior("BG36_MidGameEffect_000t10");
     CHECK(endTurn.effect == DarkGiftEffect::END_TURN_BATTLECRY);
+    const auto jaws = FindDarkGiftBehavior("BG36_MidGameEffect_000t16");
+    CHECK(jaws.effect == DarkGiftEffect::START_COMBAT_DEATHRATTLE);
+    const auto admiration = FindDarkGiftBehavior("BG36_MidGameEffect_000t9");
+    CHECK(admiration.effect == DarkGiftEffect::START_COMBAT_LEFT_ATTACK);
+    const auto invulnerability = FindDarkGiftBehavior("BG36_MidGameEffect_000t60");
+    CHECK(invulnerability.effect == DarkGiftEffect::IMMUNE_WHILE_ATTACKING);
     CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t").effect ==
           DarkGiftEffect::DEATHRATTLE_STATS);
-    CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t2").health == 10);
+    const auto offensive = FindDarkGiftBehavior("BG36_MidGameEffect_000t");
+    CHECK(offensive.attack == 10);
+    const auto defensive = FindDarkGiftBehavior("BG36_MidGameEffect_000t2");
+    CHECK(defensive.effect == DarkGiftEffect::DEATHRATTLE_STATS);
+    CHECK(defensive.attack == 0);
+    CHECK(defensive.health == 10);
 }
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
@@ -134,7 +147,7 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
 
     std::map<std::string, CardDef> cards;
     DarkGiftBehaviors::AddAll(cards);
-    CHECK(cards.size() == 16);
+    CHECK(cards.size() == 29);
     CHECK(cards.contains("BG36_MidGameEffect_000t73"));
     CHECK(cards.contains("BG36_MidGameEffect_000t72"));
     CHECK(cards.contains("BG36_MidGameEffect_000t13"));
@@ -145,12 +158,151 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
     CHECK(cards.contains("BG36_MidGameEffect_000t7"));
     CHECK(cards.contains("BG36_MidGameEffect_000t71"));
     CHECK(cards.contains("BG36_MidGameEffect_000t81"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t16"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t9"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t60"));
     CHECK(cards.contains("BG36_MidGameEffect_000t64"));
     CHECK(cards.contains("BG36_MidGameEffect_000t74"));
     CHECK(cards.contains("BG36_MidGameEffect_000t75"));
     CHECK(cards.contains("BG36_MidGameEffect_000t10"));
     CHECK(cards.contains("BG36_MidGameEffect_000t"));
     CHECK(cards.contains("BG36_MidGameEffect_000t2"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t4"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t52"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t15"));
+    CHECK(cards.contains("BG36_MidGameEffect_000t15e"));
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Jaws arms only minions with deathrattles")
+{
+    const Card plain = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(plain.id.empty());
+    Minion minion(plain);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t16");
+    CHECK_FALSE(DarkGiftTargetIsLegal(minion, behavior));
+
+    minion.SetDeathrattleStatTransfer(1, 0);
+    // The transfer setter is state-only and does not make a deathrattle; use
+    // a real generated deathrattle definition for the positive target path.
+    const Card deathrattle = Cards::FindCardByID("BGS_039");
+    Minion armed(deathrattle);
+    armed.AddDarkGiftDeathrattleTask(SimpleTasks::FreeRefreshTask{1});
+    CHECK(armed.HasDeathrattle());
+    CHECK(DarkGiftTargetIsLegal(armed, behavior));
+    REQUIRE(ApplyDarkGift(armed, behavior));
+    CHECK(armed.HasStartCombatDeathrattleTrigger());
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Admiration copies immediate left attack once")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion left(base);
+    Minion target(base);
+    left.SetAttack(17);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t9");
+    REQUIRE(ApplyDarkGift(target, behavior));
+    CHECK(target.HasStartCombatLeftAttack());
+    const int before = target.GetAttack();
+    target.ApplyStartCombatLeftAttack(left);
+    CHECK(target.GetAttack() == before + 17);
+    CHECK_FALSE(target.HasStartCombatLeftAttack());
+    target.ApplyStartCombatLeftAttack(left);
+    CHECK(target.GetAttack() == before + 17);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Invulnerability blocks damage while attacking")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion target(base);
+    Minion source(base);
+    target.SetHealth(20);
+    source.SetAttack(7);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t60");
+    REQUIRE(ApplyDarkGift(target, behavior));
+    target.SetAttacking(true);
+    target.TakeDamage(source);
+    CHECK(target.GetHealth() == 20);
+    target.SetAttacking(false);
+    target.TakeDamage(source);
+    CHECK(target.GetHealth() == 13);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Incubation doubles after two recruit turns")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion target(base);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t4");
+    CHECK(behavior.effect == DarkGiftEffect::INCUBATION);
+    CHECK(behavior.incubationTurns == 2);
+    REQUIRE(ApplyDarkGift(target, behavior));
+    CHECK(target.IncubationTurnsRemaining() == 2);
+    const auto attack = target.GetAttack();
+    const auto health = target.GetHealth();
+    target.AdvanceIncubation();
+    CHECK(target.IncubationTurnsRemaining() == 1);
+    CHECK(target.GetAttack() == attack);
+    CHECK(target.GetHealth() == health);
+    target.AdvanceIncubation();
+    CHECK(target.IncubationTurnsRemaining() == 0);
+    CHECK(target.GetAttack() == attack * 2);
+    CHECK(target.GetHealth() == health * 2);
+    target.AdvanceIncubation();
+    CHECK(target.GetAttack() == attack * 2);
+    CHECK(target.GetHealth() == health * 2);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Toreth shield absorbs three hits")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion target(base);
+    Minion attacker(base);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t15");
+    CHECK(behavior.effect == DarkGiftEffect::TARGET_MULTI_HIT_DIVINE_SHIELD);
+    CHECK(DarkGiftTargetIsLegal(target, behavior));
+    REQUIRE(ApplyDarkGift(target, behavior));
+    CHECK(target.DivineShieldHitsRemaining() == 3);
+    const int health = target.GetHealth();
+    target.TakeDamage(attacker);
+    CHECK(target.DivineShieldHitsRemaining() == 2);
+    target.TakeDamage(attacker);
+    CHECK(target.DivineShieldHitsRemaining() == 1);
+    target.TakeDamage(attacker);
+    CHECK(target.DivineShieldHitsRemaining() == 0);
+    CHECK(target.GetHealth() == health);
+    CHECK_FALSE(target.IsDestroyed());
+
+    // Removing the shield must also discard the multi-hit counter; a later
+    // ordinary Divine Shield is only one hit.
+    target.SetGameTag(GameTag::DIVINE_SHIELD, 0);
+    target.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+    CHECK(target.DivineShieldHitsRemaining() == 1);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Fresh Perspective arms free refreshes")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion minion(base);
+    Minion second(base);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t52");
+    CHECK(behavior.effect == DarkGiftEffect::DEATHRATTLE_FREE_REFRESH);
+    CHECK(DarkGiftTargetIsLegal(minion, behavior));
+    REQUIRE(ApplyDarkGift(minion, behavior));
+    REQUIRE(ApplyDarkGift(second, behavior));
+
+    Player owner;
+    minion.ActivateTask(PowerType::DEATHRATTLE, owner);
+    second.ActivateTask(PowerType::DEATHRATTLE, owner);
+    CHECK(owner.season14.HasFreeRefresh());
+    CHECK(owner.season14.ConsumeFreeRefresh());
+    CHECK(owner.season14.ConsumeFreeRefresh());
+    CHECK(owner.season14.ConsumeFreeRefresh());
+    CHECK(owner.season14.ConsumeFreeRefresh());
+    CHECK_FALSE(owner.season14.HasFreeRefresh());
 }
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - play card stat gifts persist")
@@ -257,6 +409,23 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - start combat gifts compose")
 
     CHECK(minion.GetAttack() == base.GetAttack() * 2);
     CHECK(minion.GetHealth() == base.GetHealth() * 2);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - sacrifice gifts arm stat transfer")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion offensive(base);
+    Minion defensive(base);
+
+    REQUIRE(ApplyDarkGift(
+        offensive, FindDarkGiftBehavior("BG36_MidGameEffect_000t")));
+    REQUIRE(ApplyDarkGift(
+        defensive, FindDarkGiftBehavior("BG36_MidGameEffect_000t2")));
+    CHECK(offensive.DeathrattleAttackTransfer() == 10);
+    CHECK(offensive.DeathrattleHealthTransfer() == 0);
+    CHECK(defensive.DeathrattleAttackTransfer() == 0);
+    CHECK(defensive.DeathrattleHealthTransfer() == 10);
 }
 
 TEST_CASE(

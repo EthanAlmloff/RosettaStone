@@ -5,6 +5,7 @@
 // property of any third parties.
 
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
+#include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
 
 #include <effolkronium/random.hpp>
@@ -20,6 +21,20 @@ namespace RosettaStone::Battlegrounds
 {
 namespace
 {
+struct AttackingStateGuard
+{
+    Minion& minion;
+    const bool previous;
+
+    explicit AttackingStateGuard(Minion& value)
+        : minion(value), previous(value.IsAttacking())
+    {
+        minion.SetAttacking(true);
+    }
+
+    ~AttackingStateGuard() { minion.SetAttacking(previous); }
+};
+
 bool HasAttackableTarget(const FieldZone& field)
 {
     bool found = false;
@@ -121,15 +136,26 @@ Battle::Battle(Player& player1, Player& player2)
       m_p1Field(m_player1.battleField),
       m_p2Field(m_player2.battleField)
 {
+    m_player1.season14.ClearCombatExactCopySnapshots();
+    m_player2.season14.ClearCombatExactCopySnapshots();
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
     const auto summonHandSnapshot = [](Player& owner, FieldZone& field) {
-        auto [snapshot, count] = owner.season14.TakeCombatHandSummon();
-        if (!snapshot.has_value() || count <= 0) return;
-        for (int i = 0; i < count && !field.IsFull(); ++i) {
-            Minion copy{*snapshot};
-            owner.ApplyFreshMinionModifiers(copy);
-            field.Add(copy);
+        auto snapshots = owner.season14.TakeCombatHandSummons();
+        for (auto& [snapshot, count] : snapshots) {
+            for (int i = 0; i < count && !field.IsFull(); ++i) {
+                Minion copy{snapshot};
+                // A combat-only copy is a fresh entity.  Preserve the full
+                // card instance (stats, keywords, enchantments and tasks),
+                // but give it the owning player's callback and a new entity
+                // index so trigger/source identity cannot alias the hand
+                // instance or another summoned copy.
+                owner.ApplyFreshMinionModifiers(copy);
+                copy.getPlayerCallback = [&owner]() -> Player& { return owner; };
+                if (owner.getNextCardIndexCallback)
+                    copy.SetIndex(owner.getNextCardIndexCallback());
+                field.Add(copy);
+            }
         }
     };
     summonHandSnapshot(m_player1, m_p1Field);
@@ -280,6 +306,43 @@ void Battle::Initialize()
         minion.value().ApplyStartCombatStatMultipliers();
     });
 
+    // Jaws of Death is a Dark Gift state on the copied combat minion.  It
+    // triggers that minion's own Deathrattle once, before ordinary
+    // START_OF_COMBAT tasks, matching the card's timing and preserving the
+    // existing seat-order sequencing.
+    const auto triggerGiftDeathrattles = [](FieldZone& field, Player& owner) {
+        field.ForEach([&owner](MinionData& data) {
+            auto& minion = data.value();
+            while (minion.HasStartCombatDeathrattleTrigger() &&
+                   minion.HasDeathrattle()) {
+                minion.ActivateTask(PowerType::DEATHRATTLE, owner);
+                minion.ConsumeStartCombatDeathrattleTrigger();
+            }
+        });
+    };
+    if (m_turn == Turn::PLAYER1)
+    {
+        triggerGiftDeathrattles(m_p1Field, m_player1);
+        triggerGiftDeathrattles(m_p2Field, m_player2);
+    }
+    else
+    {
+        triggerGiftDeathrattles(m_p2Field, m_player2);
+        triggerGiftDeathrattles(m_p1Field, m_player1);
+    }
+
+    const auto applyGiftLeftAttack = [](FieldZone& field) {
+        std::vector<Minion*> alive;
+        field.ForEachAlive([&alive](MinionData& data) {
+            alive.push_back(&data.value());
+        });
+        for (std::size_t i = 1; i < alive.size(); ++i)
+            while (alive[i]->HasStartCombatLeftAttack())
+                alive[i]->ApplyStartCombatLeftAttack(*alive[i - 1]);
+    };
+    applyGiftLeftAttack(m_p1Field);
+    applyGiftLeftAttack(m_p2Field);
+
     if (m_turn == Turn::PLAYER1)
     {
         m_p1Field.ForEach([this](MinionData& minion) {
@@ -391,7 +454,7 @@ bool Battle::Attack()
     Minion& attacker = (m_turn == Turn::PLAYER1) ? m_p1Field[attackerIdx]
                                                  : m_p2Field[attackerIdx];
 
-    const FieldZone& defendingField =
+    FieldZone& defendingField =
         (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
     if (!HasAttackableTarget(defendingField))
     {
@@ -441,9 +504,59 @@ bool Battle::Attack()
             (m_turn == Turn::PLAYER1) ? m_player1 : m_player2, attacker,
             target);
     });
-    target.TakeDamage(attacker);
-    attacker.TakeDamage(target);
-    const bool targetWasDestroyed = target.IsDestroyed();
+    // Jailbird Juggernaut's Rally queues a Blood Gem Golem to attack the
+    // already-selected target first. Resolve it here, after all Rally tasks
+    // have run, so inserting the Golem cannot invalidate the active attacker
+    // or target references during task dispatch.
+    auto& attackerOwner = (m_turn == Turn::PLAYER1) ? m_player1 : m_player2;
+    for (const auto& pending : attackerOwner.season14.TakeBloodGemGolemAttacks()) {
+        const Card golemCard = Cards::FindCardByID("BG30_MagicItem_442t");
+        if (!golemCard.id.empty() && !attackerField.IsFull()) {
+            Minion golem{golemCard};
+            golem.SetAttack(pending.attack);
+            golem.SetHealth(pending.health);
+            attackerOwner.ApplyFreshMinionModifiers(golem);
+            golem.getPlayerCallback = [&attackerOwner]() -> Player& { return attackerOwner; };
+            if (attackerOwner.getNextCardIndexCallback)
+                golem.SetIndex(attackerOwner.getNextCardIndexCallback());
+            attackerField.Add(golem, attackerField.GetCount());
+            Minion& summoned = attackerField[attackerField.GetCount() - 1];
+            attackerField.ForEachAlive([&summoned](MinionData& data) {
+                data.value().ActivateTrigger(TriggerType::SUMMON, summoned);
+            });
+            Minion* queuedTarget = nullptr;
+            defendingField.ForEachAlive([&](MinionData& data) {
+                if (data.value().GetIndex() == pending.targetEntityID)
+                    queuedTarget = &data.value();
+            });
+            if (queuedTarget != nullptr) {
+                {
+                    AttackingStateGuard attacking(summoned);
+                    queuedTarget->TakeDamage(summoned);
+                    summoned.TakeDamage(*queuedTarget);
+                }
+                ProcessDestroy(false);
+            }
+        }
+    }
+    // Rally insertion may compact the attacker's field. Reacquire the source
+    // by its stable entity ID before the ordinary attack exchange.
+    Minion* currentAttacker = nullptr;
+    attackerField.ForEachAlive([&](MinionData& data) {
+        if (data.value().GetIndex() == attackerEntityIndex)
+            currentAttacker = &data.value();
+    });
+    if (currentAttacker == nullptr) return false;
+    Minion& attackerAfterRally = *currentAttacker;
+    // The first attacker may have killed the original target; choose the
+    // ordinary attack target only after that exchange and cleanup.
+    Minion& nextTarget = GetProperTarget(attackerAfterRally);
+    {
+        AttackingStateGuard attacking(attackerAfterRally);
+        nextTarget.TakeDamage(attackerAfterRally);
+        attackerAfterRally.TakeDamage(nextTarget);
+    }
+    const bool targetWasDestroyed = nextTarget.IsDestroyed();
 
     ProcessDestroy(false);
 
@@ -640,6 +753,16 @@ void Battle::ProcessDestroy(bool beforeAttack)
     {
         Minion& minion = std::get<1>(deadMinion);
         Minion removedMinion;
+
+        // I'll Take That! records the first enemy minion killed by the
+        // attacking player. Restrict capture to the attack-resolution pass;
+        // deathrattle/simultaneous cleanup must not create a later copy.
+        if (!beforeAttack) {
+            if (std::get<0>(deadMinion) == 2 && m_turn == Turn::PLAYER1)
+                m_player1.season14.RecordFirstKillCopy(minion);
+            else if (std::get<0>(deadMinion) == 1 && m_turn == Turn::PLAYER2)
+                m_player2.season14.RecordFirstKillCopy(minion);
+        }
 
         if (std::get<0>(deadMinion) == 1)
         {

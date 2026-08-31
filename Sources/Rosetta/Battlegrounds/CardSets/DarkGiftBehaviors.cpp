@@ -4,11 +4,27 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftRandomPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftGolemDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 
 namespace RosettaStone::Battlegrounds
 {
 DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
 {
+    if (id == "BG36_MidGameEffect_000t") // Offensive Sacrifice: +10 Attack; transfer on death.
+    {
+        return { DarkGiftEffect::DEATHRATTLE_STATS, 10, 0 };
+    }
+    if (id == "BG36_MidGameEffect_000t2") // Defensive Sacrifice: +10 Health; transfer on death.
+    {
+        return { DarkGiftEffect::DEATHRATTLE_STATS, 0, 10 };
+    }
+    if (id == "BG36_MidGameEffect_000t52") // Fresh Perspective: two free refreshes on death.
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::DEATHRATTLE_FREE_REFRESH;
+        behavior.freeRefreshes = 2;
+        return behavior;
+    }
     if (id == "BG36_MidGameEffect_000t73") // Fortitude: +5/+5.
     {
         return { DarkGiftEffect::TARGET_STATS, 5, 5, false, false, false,
@@ -23,6 +39,20 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
     {
         return { DarkGiftEffect::TARGET_KEYWORDS, 0, 0, true, true, false,
                  1 };
+    }
+    if (id == "BG36_MidGameEffect_000t15") // Toreth's Blessing: three-hit shield.
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::TARGET_MULTI_HIT_DIVINE_SHIELD;
+        behavior.divineShieldHits = 3;
+        return behavior;
+    }
+    if (id == "BG36_MidGameEffect_000t15e") // Golden Toreth's Blessing: three-hit shield.
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::TARGET_MULTI_HIT_DIVINE_SHIELD;
+        behavior.divineShieldHits = 3;
+        return behavior;
     }
     if (id == "BG36_MidGameEffect_000t69") // Toxicity: Venomous.
     {
@@ -58,6 +88,25 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
     {
         return { DarkGiftEffect::START_COMBAT_STATS, 0, 0, false, false,
                  false, 1, false, false, false, 3, 3 };
+    }
+    if (id == "BG36_MidGameEffect_000t16") // Jaws of Death: trigger Deathrattles at combat start.
+    {
+        return { DarkGiftEffect::START_COMBAT_DEATHRATTLE };
+    }
+    if (id == "BG36_MidGameEffect_000t9") // Admiration: gain the attack of the minion to the left.
+    {
+        return { DarkGiftEffect::START_COMBAT_LEFT_ATTACK };
+    }
+    if (id == "BG36_MidGameEffect_000t60") // Invulnerability: Immune while attacking.
+    {
+        return { DarkGiftEffect::IMMUNE_WHILE_ATTACKING };
+    }
+    if (id == "BG36_MidGameEffect_000t4") // Incubation: double stats after two turns.
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::INCUBATION;
+        behavior.incubationTurns = 2;
+        return behavior;
     }
     if (id == "BG36_MidGameEffect_000t64") // Fervor: +2/+2 whenever you play a card.
         return { DarkGiftEffect::PLAY_CARD_STATS, 0, 0, false, false, false,
@@ -117,20 +166,32 @@ bool DarkGiftTargetIsLegal(const Minion& target,
         case DarkGiftEffect::START_COMBAT_STATS:
             return behavior.startCombatAttackMultiplier >= 1 &&
                    behavior.startCombatHealthMultiplier >= 1;
+        case DarkGiftEffect::START_COMBAT_DEATHRATTLE:
+            return target.HasDeathrattle();
+        case DarkGiftEffect::START_COMBAT_LEFT_ATTACK:
+            return true;
+        case DarkGiftEffect::IMMUNE_WHILE_ATTACKING:
+            return true;
         case DarkGiftEffect::TARGET_STATS:
             return behavior.attack != 0 || behavior.health != 0;
         case DarkGiftEffect::TARGET_KEYWORDS:
             return behavior.divineShield || behavior.windfury ||
                    behavior.venomous;
+        case DarkGiftEffect::TARGET_MULTI_HIT_DIVINE_SHIELD:
+            return behavior.divineShieldHits > 0;
         case DarkGiftEffect::PLAY_CARD_STATS:
             return behavior.playCardAttack != 0 || behavior.playCardHealth != 0;
         case DarkGiftEffect::END_TURN_BATTLECRY:
             return true;
         case DarkGiftEffect::DEATHRATTLE_STATS:
             return behavior.attack != 0 || behavior.health != 0;
+        case DarkGiftEffect::DEATHRATTLE_FREE_REFRESH:
+            return behavior.freeRefreshes > 0;
         case DarkGiftEffect::COUNTER_STATS:
             return behavior.counterKind >= 1 && behavior.counterKind <= 3 &&
                    (behavior.attack != 0 || behavior.health != 0);
+        case DarkGiftEffect::INCUBATION:
+            return behavior.incubationTurns > 0;
         case DarkGiftEffect::RANDOM_POOL_TASK:
             return behavior.randomPoolKind >= 1 && behavior.randomPoolKind <= 3;
         case DarkGiftEffect::NONE:
@@ -169,10 +230,25 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
         target.SetDeathrattleStatTransfer(behavior.attack, behavior.health);
         return true;
     }
+    if (behavior.effect == DarkGiftEffect::DEATHRATTLE_FREE_REFRESH)
+    {
+        if (behavior.freeRefreshes <= 0)
+            return false;
+        target.AddDarkGiftDeathrattleTask(
+            SimpleTasks::FreeRefreshTask{behavior.freeRefreshes});
+        return true;
+    }
     if (behavior.effect == DarkGiftEffect::COUNTER_STATS)
     {
         target.SetDarkGiftCounter(behavior.attack, behavior.health,
                                   behavior.counterKind, currentCount);
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::INCUBATION)
+    {
+        if (behavior.incubationTurns <= 0)
+            return false;
+        target.SetIncubation(behavior.incubationTurns);
         return true;
     }
     if (behavior.effect == DarkGiftEffect::RANDOM_POOL_TASK)
@@ -203,6 +279,14 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
         {
             target.SetGameTag(GameTag::VENOMOUS, 1);
         }
+    }
+
+    if (behavior.effect == DarkGiftEffect::TARGET_MULTI_HIT_DIVINE_SHIELD)
+    {
+        if (behavior.divineShieldHits <= 0)
+            return false;
+        target.SetDivineShieldHits(behavior.divineShieldHits);
+        return true;
     }
 
     if (behavior.effect == DarkGiftEffect::TARGET_GOLDEN)
@@ -243,6 +327,26 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
         return true;
     }
 
+    if (behavior.effect == DarkGiftEffect::START_COMBAT_DEATHRATTLE)
+    {
+        if (!target.HasDeathrattle())
+            return false;
+        target.SetStartCombatDeathrattleTrigger(true);
+        return true;
+    }
+
+    if (behavior.effect == DarkGiftEffect::START_COMBAT_LEFT_ATTACK)
+    {
+        target.SetStartCombatLeftAttack(true);
+        return true;
+    }
+
+    if (behavior.effect == DarkGiftEffect::IMMUNE_WHILE_ATTACKING)
+    {
+        target.SetImmuneWhileAttacking(true);
+        return true;
+    }
+
     return true;
 }
 
@@ -253,9 +357,12 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     // the only executor and is reached through the semantic bridge action.
     for (const auto* id : { "BG36_MidGameEffect_000t",
                             "BG36_MidGameEffect_000t2",
+                            "BG36_MidGameEffect_000t52",
                             "BG36_MidGameEffect_000t73",
                             "BG36_MidGameEffect_000t72",
                             "BG36_MidGameEffect_000t13",
+                            "BG36_MidGameEffect_000t15",
+                            "BG36_MidGameEffect_000t15e",
                             "BG36_MidGameEffect_000t69",
                             "BG36_MidGameEffect_000t14",
                             "BG36_MidGameEffect_000t12",
@@ -272,7 +379,11 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
                             "BG36_MidGameEffect_000t61",
                             "BG36_MidGameEffect_000t7",
                             "BG36_MidGameEffect_000t71",
-                            "BG36_MidGameEffect_000t81" })
+                            "BG36_MidGameEffect_000t81",
+                            "BG36_MidGameEffect_000t16",
+                            "BG36_MidGameEffect_000t9",
+                            "BG36_MidGameEffect_000t60",
+                            "BG36_MidGameEffect_000t4" })
     {
         cards.emplace(id, CardDef{});
     }

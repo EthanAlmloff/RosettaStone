@@ -12,6 +12,26 @@
 
 namespace RosettaStone::Battlegrounds::SimpleTasks
 {
+namespace
+{
+// AttackTask is also used by immediate/forced attacks.  Keep the combat
+// state scoped even when a task callback aborts the exchange, so an
+// Invulnerability gift cannot leak into a later non-attack damage event.
+struct AttackingStateGuard
+{
+    Minion& minion;
+    const bool previous;
+
+    explicit AttackingStateGuard(Minion& value)
+        : minion(value), previous(value.IsAttacking())
+    {
+        minion.SetAttacking(true);
+    }
+
+    ~AttackingStateGuard() { minion.SetAttacking(previous); }
+};
+}  // namespace
+
 AttackTask::AttackTask(EntityType attacker) : m_attacker(attacker)
 {
     // Do nothing
@@ -25,6 +45,10 @@ TaskStatus AttackTask::Run(Player& player, Minion& source)
     for (auto& attacker : attackers)
     {
         Minion& battleTarget = battle.GetProperTarget(attacker);
+        // Forced/immediate attacks still count as attacks for Dark Gifts such
+        // as Invulnerability.  Preserve any enclosing attack state, since a
+        // Rally can legally dispatch another AttackTask during combat.
+        AttackingStateGuard attacking(attacker.get());
         battleTarget.TakeDamage(attacker);
         attacker.get().TakeDamage(battleTarget);
 
@@ -43,6 +67,7 @@ TaskStatus AttackTask::Run(Player& player, Minion& source, Minion& target)
     for (auto& attacker : attackers)
     {
         Minion& battleTarget = battle.GetProperTarget(attacker);
+        AttackingStateGuard attacking(attacker.get());
         battleTarget.TakeDamage(attacker);
         attacker.get().TakeDamage(battleTarget);
 

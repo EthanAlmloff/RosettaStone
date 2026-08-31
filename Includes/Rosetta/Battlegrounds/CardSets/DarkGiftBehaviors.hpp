@@ -22,14 +22,20 @@ enum class DarkGiftEffect
     NONE,
     TARGET_STATS,
     TARGET_KEYWORDS,
+    TARGET_MULTI_HIT_DIVINE_SHIELD,
     TARGET_GOLDEN,
     TARGET_REBORN,
     TARGET_STEALTH,
     START_COMBAT_STATS,
+    START_COMBAT_DEATHRATTLE,
+    START_COMBAT_LEFT_ATTACK,
+    IMMUNE_WHILE_ATTACKING,
     PLAY_CARD_STATS,
     END_TURN_BATTLECRY,
     DEATHRATTLE_STATS,
+    DEATHRATTLE_FREE_REFRESH,
     COUNTER_STATS,
+    INCUBATION,
     RANDOM_POOL_TASK,
 };
 
@@ -53,6 +59,10 @@ struct DarkGiftBehavior
     int counterKind = 0;
     //! Random-pool family: 1=most-common-race Rally, 2=Tavern-spell Deathrattle.
     int randomPoolKind = 0;
+    //! Number of free Tavern refreshes granted when the source dies.
+    int freeRefreshes = 0;
+    int divineShieldHits = 0;
+    int incubationTurns = 0;
 };
 
 //! Returns the complete behavior for a supported gift, or NONE when the

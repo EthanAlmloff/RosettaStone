@@ -110,6 +110,22 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Patch 36.4 batch")
     CHECK(battlecryDiscover.effect ==
           TavernSpellEffect::DISCOVER_BATTLECRY_MINION);
     CHECK(!TavernSpellRequiresTarget(battlecryDiscover.effect));
+    const auto tierDiscover = FindTavernSpellBehavior("BG31_890");
+    CHECK(tierDiscover.effect ==
+          TavernSpellEffect::DISCOVER_TIER_MINION_OR_SPELL);
+    CHECK(!TavernSpellRequiresTarget(tierDiscover.effect));
+    const auto raceRefresh = FindTavernSpellBehavior("EBG_Spell_038");
+    CHECK(raceRefresh.effect == TavernSpellEffect::REFRESH_RACE);
+    CHECK(TavernSpellRequiresTarget(raceRefresh.effect));
+    const auto combined = FindTavernSpellBehavior("BG31_892");
+    CHECK(combined.effect == TavernSpellEffect::DISCOVER_CHOOSE_ONE_COMBINED);
+    CHECK(!TavernSpellRequiresTarget(combined.effect));
+    const auto tomb = FindTavernSpellBehavior("BG34_888");
+    CHECK(tomb.effect == TavernSpellEffect::DISCOVER_UNDEAD_DIES_THIS_TURN);
+    CHECK(!TavernSpellRequiresTarget(tomb.effect));
+    const auto saloon = FindTavernSpellBehavior("BG28_849");
+    CHECK(saloon.effect == TavernSpellEffect::REFRESH_TAVERN_SPELLS);
+    CHECK(!TavernSpellRequiresTarget(saloon.effect));
 }
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - targeted stat batch")

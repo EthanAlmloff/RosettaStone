@@ -158,21 +158,34 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     heroPowerBatch4 = {};
     heroPowerBatch3State = 0;
     heroPowerBatch5 = {};
+    heroPowerBatch6 = {};
+    sharpenBladesPurchases = 0;
+    cloningGalleryUsed = false;
+    buriedTreasureDigs = 0;
+    firstKillCopyArmed = false;
+    firstKillCopy.reset();
+    lastTavernSpellDbfID = 0;
 }
 
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
 {
     goldSpentThisTurn = 0;
+    if (heroPowerDbfID == 57567)
+        sharpenBladesPurchases = 0;
     ResolveSeason14HeroPowerBatch1Event(
         heroPowerDbfID, Season14HeroPowerBatch1Event::BEGIN_TURN,
         heroPowerBatch1);
+    ResolveUpbeatHarmonyBeginTurn(heroPowerDbfID, heroPowerBatch1);
 
     Season14HeroPowerBatch2Result result{};
     ResolveSeason14HeroPowerBatch2Event(
         heroPowerDbfID, Season14HeroPowerBatch2Event::BEGIN_TURN,
         heroPowerBatch2, result);
+    if (heroPowerDbfID == 116924)
+        heroPowerBatch2.nextHeroPowerDiscount = true;
     BeginRecruitTurnBatch4();
     BeginRecruitTurnBatch5();
+    ResolveVoidPowerBeginTurn(heroPowerDbfID, heroPowerBatch6);
     return result;
 }
 
@@ -216,10 +229,60 @@ void Season14State::OnSellMinion()
         heroPowerBatch2, result);
 }
 
-std::int32_t Season14State::OnBuyMinion(bool purchasedPirate) const
+std::int32_t Season14State::OnBuyMinion(bool purchasedPirate)
 {
+    OnBuyMinionSharpenBlades();
     return Season14HeroPowerBatch1PurchaseGold(heroPowerDbfID,
                                                purchasedPirate);
+}
+
+void Season14State::OnBuyMinionSharpenBlades() noexcept
+{
+    if (heroPowerDbfID != 57567) return;
+    ++sharpenBladesPurchases;
+}
+
+std::pair<std::int32_t, std::int32_t>
+Season14State::SharpenBladesStats() const noexcept
+{
+    return {2 * sharpenBladesPurchases, sharpenBladesPurchases};
+}
+
+bool Season14State::CanBuriedTreasureDig() const noexcept
+{
+    return heroPowerDbfID == 62250 && buriedTreasureDigs < 4;
+}
+
+void Season14State::RecordBuriedTreasureDig() noexcept
+{
+    if (CanBuriedTreasureDig()) ++buriedTreasureDigs;
+}
+
+void Season14State::ArmFirstKillCopy() noexcept
+{
+    firstKillCopyArmed = true;
+    firstKillCopy.reset();
+}
+
+void Season14State::RecordFirstKillCopy(const Minion& minion)
+{
+    if (firstKillCopyArmed && !firstKillCopy.has_value())
+        firstKillCopy = minion;
+}
+
+bool Season14State::TakeFirstKillCopy(Minion& out)
+{
+    if (!firstKillCopy.has_value()) return false;
+    out = *firstKillCopy;
+    firstKillCopy.reset();
+    firstKillCopyArmed = false;
+    return true;
+}
+
+void Season14State::ExpireFirstKillCopy() noexcept
+{
+    firstKillCopy.reset();
+    firstKillCopyArmed = false;
 }
 
 std::int32_t Season14State::OnBuyMinionBatch4()
@@ -478,10 +541,12 @@ void Season14State::OnRefreshTavern(bool refreshSucceeded)
     }
 }
 
-void Season14State::OnTavernSpellResolved(bool spellResolved)
+void Season14State::OnTavernSpellResolved(bool spellResolved,
+                                           std::int32_t sourceDbfID)
 {
     if (!spellResolved)
         return;
+    if (sourceDbfID > 0) lastTavernSpellDbfID = sourceDbfID;
     if (heroPowerDbfID == 105432)
     {
         // Aranna's passive makes every third Tavern spell free.  Arm the
@@ -799,7 +864,8 @@ bool Season14State::CanUseHeroPower(std::int32_t availableGold) const
 std::int32_t Season14State::EffectiveHeroPowerCost() const
 {
     return std::max<std::int32_t>(
-        0, heroPowerCost - (heroPowerBatch2.nextHeroPowerDiscount ? 1 : 0));
+        0, heroPowerCost + heroPowerBatch1.leadExplorerCostDelta -
+               (heroPowerBatch2.nextHeroPowerDiscount ? 1 : 0));
 }
 
 bool Season14State::UseHeroPower()

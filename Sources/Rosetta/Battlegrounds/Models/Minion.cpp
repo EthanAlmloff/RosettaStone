@@ -8,11 +8,16 @@
 #include <Rosetta/Battlegrounds/Enchants/Power.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
+#include <effolkronium/random.hpp>
 
 #include <utility>
+#include <algorithm>
 #include <map>
 #include <type_traits>
 #include <vector>
+
+using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds
 {
@@ -110,7 +115,17 @@ void Minion::SetGameTag(GameTag tag, int value)
             m_hasTaunt = value == 1;
             break;
         case GameTag::DIVINE_SHIELD:
-            m_hasDivineShield = value == 1 ? true : false;
+            if (value == 1)
+            {
+                if (!m_hasDivineShield)
+                    m_divineShieldHitsRemaining = 0;
+                m_hasDivineShield = true;
+            }
+            else
+            {
+                m_hasDivineShield = false;
+                m_divineShieldHitsRemaining = 0;
+            }
             break;
         case GameTag::WINDFURY:
             m_hasWindfury = value == 1 ? true : false;
@@ -146,6 +161,14 @@ bool Minion::IsMagnetic() const
            m_card.gameTags.at(GameTag::MAGNETIC) != 0;
 }
 
+void Minion::ArmMagnetization() { m_magnetizationArmed = true; }
+bool Minion::ConsumeMagnetizationArm()
+{
+    const bool armed = m_magnetizationArmed;
+    m_magnetizationArmed = false;
+    return armed;
+}
+
 bool Minion::CanMagnetizeTo(const Minion& target) const
 {
     if (!IsMagnetic() || target.IsDestroyed())
@@ -161,8 +184,10 @@ void Minion::MagnetizeOnto(Minion& target) const
 {
     if (!CanMagnetizeTo(target))
         return;
-    target.SetAttack(target.GetAttack() + GetAttack());
-    target.SetHealth(target.GetHealth() + GetHealth());
+    const bool doubled = target.ConsumeMagnetizationArm();
+    const int multiplier = doubled ? 2 : 1;
+    target.SetAttack(target.GetAttack() + GetAttack() * multiplier);
+    target.SetHealth(target.GetHealth() + GetHealth() * multiplier);
     if (HasTaunt()) target.SetTaunt(true);
     if (HasDivineShield()) target.SetGameTag(GameTag::DIVINE_SHIELD, 1);
     if (HasReborn()) target.SetReborn(true);
@@ -273,6 +298,7 @@ bool Minion::MakeGolden()
     const bool hadDeathrattle = m_hasDeathrattle;
     const bool hadTaunt = m_hasTaunt;
     const bool hadDivineShield = m_hasDivineShield;
+    const int divineShieldHitsRemaining = m_divineShieldHitsRemaining;
     const bool hadReborn = m_hasReborn;
     const bool hadWindfury = m_hasWindfury;
     const bool hadMegaWindfury = m_hasMegaWindfury;
@@ -357,6 +383,7 @@ bool Minion::MakeGolden()
     m_hasDeathrattle = hadDeathrattle;
     m_hasTaunt = hadTaunt;
     m_hasDivineShield = hadDivineShield;
+    m_divineShieldHitsRemaining = divineShieldHitsRemaining;
     m_hasReborn = hadReborn;
     m_hasWindfury = hadWindfury;
     m_hasMegaWindfury = hadMegaWindfury;
@@ -596,6 +623,17 @@ bool Minion::HasDivineShield() const
     return m_hasDivineShield;
 }
 
+void Minion::SetDivineShieldHits(int hits)
+{
+    m_hasDivineShield = hits > 0;
+    m_divineShieldHitsRemaining = std::max(0, hits - 1);
+}
+
+int Minion::DivineShieldHitsRemaining() const
+{
+    return m_hasDivineShield ? m_divineShieldHitsRemaining + 1 : 0;
+}
+
 bool Minion::HasReborn() const
 {
     return m_hasReborn;
@@ -647,6 +685,77 @@ void Minion::ApplyStartCombatStatMultipliers()
     m_startCombatStatsApplied = true;
 }
 
+void Minion::SetStartCombatDeathrattleTrigger(bool enabled)
+{
+    if (!enabled) {
+        m_startCombatDeathrattleTriggers = 0;
+        return;
+    }
+    if (m_startCombatDeathrattleTriggers < 255)
+        ++m_startCombatDeathrattleTriggers;
+}
+
+bool Minion::HasStartCombatDeathrattleTrigger() const
+{
+    return m_startCombatDeathrattleTriggers != 0;
+}
+
+bool Minion::ConsumeStartCombatDeathrattleTrigger()
+{
+    if (m_startCombatDeathrattleTriggers == 0) return false;
+    --m_startCombatDeathrattleTriggers;
+    return true;
+}
+
+void Minion::SetStartCombatLeftAttack(bool enabled)
+{
+    if (!enabled) {
+        m_startCombatLeftAttackTriggers = 0;
+        return;
+    }
+    if (m_startCombatLeftAttackTriggers < 255)
+        ++m_startCombatLeftAttackTriggers;
+}
+
+bool Minion::HasStartCombatLeftAttack() const
+{
+    return m_startCombatLeftAttackTriggers != 0;
+}
+
+bool Minion::ConsumeStartCombatLeftAttack()
+{
+    if (m_startCombatLeftAttackTriggers == 0) return false;
+    --m_startCombatLeftAttackTriggers;
+    return true;
+}
+
+void Minion::ApplyStartCombatLeftAttack(const Minion& left)
+{
+    if (!ConsumeStartCombatLeftAttack())
+        return;
+    m_attack += left.GetAttack();
+}
+
+void Minion::SetImmuneWhileAttacking(bool enabled)
+{
+    m_immuneWhileAttacking = enabled;
+}
+
+bool Minion::HasImmuneWhileAttacking() const
+{
+    return m_immuneWhileAttacking;
+}
+
+void Minion::SetAttacking(bool attacking)
+{
+    m_isAttacking = attacking;
+}
+
+bool Minion::IsAttacking() const
+{
+    return m_isAttacking;
+}
+
 int Minion::GetAttackCount() const
 {
     if (m_hasMegaWindfury)
@@ -676,9 +785,20 @@ void Minion::SetFrozen(bool frozen)
 
 void Minion::TakeDamage(Minion& source)
 {
+    if (m_immuneWhileAttacking && m_isAttacking)
+        return;
     if (HasDivineShield())
     {
-        m_hasDivineShield = false;
+        if (m_divineShieldHitsRemaining > 0)
+        {
+            --m_divineShieldHitsRemaining;
+            if (m_divineShieldHitsRemaining == 0)
+                m_hasDivineShield = false;
+        }
+        else
+        {
+            m_hasDivineShield = false;
+        }
         return;
     }
 
@@ -707,6 +827,8 @@ void Minion::SetTaunt(bool taunt)
 
 void Minion::TakeDamage(int amount)
 {
+    if (m_immuneWhileAttacking && m_isAttacking)
+        return;
     m_health -= amount;
     if (m_health <= 0)
     {
@@ -970,6 +1092,33 @@ void Minion::ApplyDarkGiftCounterStep(int kind)
     m_health += m_darkGiftCounterHealth;
 }
 
+void Minion::SetIncubation(int turns)
+{
+    if (turns > 0)
+    {
+        m_incubationTurnsRemaining = turns;
+    }
+}
+
+void Minion::AdvanceIncubation()
+{
+    if (m_incubationTurnsRemaining <= 0)
+    {
+        return;
+    }
+    --m_incubationTurnsRemaining;
+    if (m_incubationTurnsRemaining == 0)
+    {
+        m_attack *= 2;
+        m_health *= 2;
+    }
+}
+
+int Minion::IncubationTurnsRemaining() const
+{
+    return m_incubationTurnsRemaining;
+}
+
 void Minion::ActivateHeroDamageTrigger()
 {
     auto& trigger = m_card.power.GetTrigger();
@@ -1049,7 +1198,8 @@ bool Minion::CanActivate(const Player& player, int targetIdx) const
         return false;
     }
     if (definition->effect == ActivateEffect::BUFF_TARGET ||
-        definition->effect == ActivateEffect::SET_TARGET_STATS)
+        definition->effect == ActivateEffect::SET_TARGET_STATS ||
+        definition->effect == ActivateEffect::TRIGGER_RALLY)
     {
         return targetIdx >= 0 && targetIdx < player.recruitField.GetCount() &&
                targetIdx != GetZonePosition() &&
@@ -1066,8 +1216,17 @@ bool Minion::CanActivate(const Player& player, int targetIdx) const
              card.GetCardType() != CardType::BATTLEGROUND_SPELL))
             return false;
     }
-    if (definition->effect == ActivateEffect::RANDOM_CARD)
+    if (definition->effect == ActivateEffect::RANDOM_CARD ||
+        definition->effect == ActivateEffect::RANDOM_CHROMADRAKE)
         return !player.hand.IsFull() && targetIdx < 0;
+    if (definition->effect == ActivateEffect::DISCOVER_TAVERN_SPELL) {
+        if (player.hand.IsFull() || targetIdx >= 0) return false;
+        return std::any_of(Cards::GetAllCards().begin(), Cards::GetAllCards().end(),
+            [](const Card& card) {
+                return card.isBattlegroundsPoolSpell && card.normalDbfID == 0 &&
+                    FindTavernSpellBehavior(card.id).effect != TavernSpellEffect::NONE;
+            });
+    }
     return targetIdx < 0;
 }
 
@@ -1182,6 +1341,55 @@ bool Minion::Activate(Player& player, int targetIdx)
         SimpleTasks::RandomCardToHandTask task{definition.race, 0, definition.amount};
         task.Run(player, *this);
     }
+    else if (definition.effect == ActivateEffect::RANDOM_CHROMADRAKE)
+    {
+        SimpleTasks::RandomChromadrakeToHandTask task{definition.amount};
+        task.Run(player, *this);
+    }
+    else if (definition.effect == ActivateEffect::DISCOVER_TAVERN_SPELL)
+    {
+        player.BeginTavernSpellDiscover(
+            definition.amount, static_cast<std::uint64_t>(GetIndex()),
+            GetDbfID());
+    }
+    else if (definition.effect == ActivateEffect::TAVERN_STATS_RANDOM_KEYWORD)
+    {
+        // Deft Deserter rolls one keyword per activation, then applies that
+        // same keyword to every minion currently in the Tavern.  Mutate the
+        // Tavern field directly: these are shop instances, not the player's
+        // recruit or combat field, and the +stats persist for this game via
+        // the normal shop entity lifecycle.
+        player.tavern.fieldZone.ForEachAlive([&](MinionData& data) {
+            auto& tavernMinion = data.value();
+            // The random choice is per eligible Tavern minion: the effect
+            // targets all minions, while each target independently receives
+            // one of the three listed keywords.
+            const auto keyword = Random::get<int>(0, 2);
+            tavernMinion.SetAttack(tavernMinion.GetAttack() + definition.attack);
+            tavernMinion.SetHealth(tavernMinion.GetHealth() + definition.health);
+            if (keyword == 0)
+                tavernMinion.SetTaunt(true);
+            else if (keyword == 1)
+                tavernMinion.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+            else
+                tavernMinion.SetGameTag(GameTag::WINDFURY, 1);
+        });
+    }
+    else if (definition.effect == ActivateEffect::TRIGGER_RALLY)
+    {
+        auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
+        // Golden Sky-hatch explicitly triggers the selected Rally twice.
+        for (int i = 0; i < std::max(1, definition.amount); ++i)
+            target.ActivateRally(player, *this, target);
+    }
+    else if (definition.effect == ActivateEffect::ARM_MAGNETIZATION)
+    {
+        ArmMagnetization();
+    }
+    else if (definition.effect == ActivateEffect::GAIN_NEXT_BOUGHT_STATS)
+    {
+        player.ArmNextBoughtStats(GetIndex(), definition.amount);
+    }
     --m_activateUses;
     return true;
 }
@@ -1189,6 +1397,7 @@ bool Minion::Activate(Player& player, int targetIdx)
 void Minion::ResetActivateUses()
 {
     m_activateUses = m_card.power.GetActivate().has_value() ? 1 : 0;
+    m_magnetizationArmed = false;
     m_bloodGemCountThisTurn = 0;
     m_buyTriggerUses = 0;
 }

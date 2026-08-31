@@ -17,6 +17,9 @@
 #include <array>
 #include <functional>
 #include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -51,13 +54,39 @@ class Player
     //! Tavern.
     void ApplyFreshMinionModifiers(Minion& minion) const;
     void ApplyPersistentRaceStats(Race race, int attack, int health);
+    //! Adds a cumulative race aura while excluding one triggering instance.
+    //! This supports "other [race]" discover/event effects without losing
+    //! the aura for minions created after the event.
+    void ApplyPersistentRaceStatsExcept(Race race, int attack, int health,
+                                        std::uint64_t excludedEntityID);
+    //! Resolves discover-triggered player auras after a choice is committed.
+    void ResolveDiscoverTriggers();
     void ApplySpellRaceBuff(Race race, int attack, int health, bool includeHand);
     void ApplySpellSpecialBuff(int mode, int attack, int health);
+    //! Resolve a supported Tavern spell without charging gold. Used by
+    //! combat-start card effects such as Runic Arcanist.
+    bool CastTavernSpellFree(const std::string& cardID, int amount = 1,
+                             int targetIdx = -1);
     void ApplyTavernRaceBuff(Race race, int attack, int health);
+    void ArmNextBoughtStats(int sourceIndex, int multiplier);
 
     //! Purchases a minion from Tavern's field.
     //! \param idx The index of a list of minions in Tavern's field.
     void PurchaseMinion(std::size_t idx);
+    //! Moves a Tavern minion to hand without purchase cost. Used by hero
+    //! powers that acquire a shop entity directly; pool ownership remains
+    //! with the moved instance.
+    bool TakeTavernMinionToHand(std::size_t idx, int attack, int health);
+    //! Summons an exact state copy of a friendly minion with a fresh entity
+    //! identity. Used by Cloning Gallery; does not charge or consume hand.
+    bool SummonExactMinionCopy(std::size_t idx);
+    //! Adds a metadata-only (plain) copy of the left-most hand card.
+    //! Dynamic buffs/enchantments are intentionally not copied.
+    bool AddPlainCopyOfLeftmostHandCard();
+    //! Begins Void Power's one-time Tier-5 Discover when its unlock fires.
+    bool BeginVoidPowerDiscover();
+    bool CanPurchaseTavernSlot(std::size_t idx) const;
+    bool PurchaseTavernSlot(std::size_t idx);
 
     //! Plays a minion or spell card.
     //! \param handIdx The index of a list of cards in player's hand.
@@ -103,6 +132,9 @@ class Player
     //! hand.  Only concrete minion and spell cards are accepted; unsupported
     //! modal effects remain pending and fail closed.
     bool ApplyChoice(std::size_t offeringIdx);
+    //! Begin a seeded Discover offering of supported Tavern spells.
+    bool BeginTavernSpellDiscover(int amount, std::uint64_t sourceEntityID,
+                                  std::int32_t sourceCardDbfID);
     bool ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx);
     //! Resolves a pending Tavern-spell modal without re-paying the spell.
     bool ApplySpellChoice(std::size_t offeringIdx);
@@ -145,7 +177,8 @@ class Player
     void RearrangeMinion(std::size_t curIdx, std::size_t newIdx);
 
     //! Completes recruit phase.
-    void CompleteRecruit() const;
+    void CompleteRecruit();
+    void ResolveRecruitEndDeaths();
     void ResolveDarkGiftEndTurnTriggers();
     //! Advances all per-minion Dark Gift counters after a matching event.
     void AdvanceDarkGiftCounters(int kind);
@@ -199,6 +232,7 @@ class Player
     bool isInCombat = false;
     bool isFoughtGhostLastTurn = false;
     bool freezeTavern = false;
+    std::vector<std::pair<int, int>> nextBoughtStatsArms;
 };
 }  // namespace RosettaStone::Battlegrounds
 

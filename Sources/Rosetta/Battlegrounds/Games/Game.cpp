@@ -117,7 +117,9 @@ void Game::Start()
 
     // Create callback to prepare a list of minions for purchase
     auto prepareTavernMinionsCallback = [this](Player& player) {
-        m_gameState.minionPool.AddMinionsToTavern(player, player.tavern);
+        const auto preferredRace = player.season14.TakeRefreshRace();
+        m_gameState.minionPool.AddMinionsToTavern(player, player.tavern,
+                                                  preferredRace);
     };
 
     // Create callback to purchase a minion in Tavern
@@ -147,6 +149,11 @@ void Game::Start()
             Minion minion = player.tavern.fieldZone.Remove(
                 player.tavern.fieldZone[static_cast<std::size_t>(i)]);
             m_gameState.minionPool.ReturnMinion(minion.GetPoolIndex());
+        }
+        for (int i = static_cast<int>(player.tavern.spellSlots.size()) - 1; i >= 0; --i)
+        {
+            if (player.tavern.spellSlots[static_cast<std::size_t>(i)].IsFrozen()) continue;
+            player.tavern.spellSlots.erase(player.tavern.spellSlots.begin() + i);
         }
     };
 
@@ -364,6 +371,9 @@ void Game::Recruit()
 
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.remainCoin += heroPowerResult.goldDelta;
+        if (player.season14.TakeVoidPowerDiscoverReady() &&
+            !player.BeginVoidPowerDiscover())
+            player.season14.RestoreVoidPowerDiscoverReady();
 
         // Decrease the value of coin to upgrade player's Tavern to next tier
         if (player.currentTier < TIER_UPPER_LIMIT)
@@ -393,12 +403,18 @@ void Game::Recruit()
         // from being filled on a normal end turn.
         if (!manuallyFrozen)
         {
+            for (int i = static_cast<int>(player.tavern.spellSlots.size()) - 1; i >= 0; --i)
+            {
+                if (player.tavern.spellSlots[static_cast<std::size_t>(i)].IsFrozen()) continue;
+                player.tavern.spellSlots.erase(player.tavern.spellSlots.begin() + i);
+            }
             player.PrepareTavern();
         }
 
         // Consume the one-turn frozen state.
         player.tavern.fieldZone.ForEach(
             [](MinionData& minion) { minion.value().SetFrozen(false); });
+        for (auto &slot : player.tavern.spellSlots) slot.SetFrozen(false);
         player.freezeTavern = false;
     }
 }
@@ -414,12 +430,14 @@ void Game::CompleteRecruitPhase()
     {
         if (player.playState == PlayState::PLAYING)
         {
+            player.ResolveRecruitEndDeaths();
             if (player.season14.ShouldFreezeRemainingTavern())
             {
                 player.tavern.fieldZone.ForEach(
                     [](MinionData& minion) {
                         minion.value().SetFrozen(true);
                     });
+                for (auto &slot : player.tavern.spellSlots) slot.SetFrozen(true);
             }
             // End-of-turn Trinkets resolve after the final recruit action.
             // Wallet increases the cap for subsequent turns, while Gilded
@@ -451,6 +469,11 @@ void Game::CompleteRecruitPhase()
                     }
                 });
             }
+            // Upbeat Harmony resolves at the end of every third recruit turn.
+            // Consume the schedule only after the copy is attempted; a full
+            // hand still consumes the triggered reward, as in-game.
+            if (player.season14.TakeUpbeatHarmonyCopyReady())
+                player.AddPlainCopyOfLeftmostHandCard();
             player.season14.Emit(Season14Event::RECRUIT_END);
         }
     }
@@ -484,6 +507,27 @@ void Game::Combat()
         player2.getBattleCallback = [&battle]() -> Battle& { return battle; };
 
         const CombatResult result = battle.Run();
+        // Resolve the owner-side first-kill copy after combat, using the
+        // canonical normal card definition so temporary/golden combat state
+        // cannot leak into the plain hand copy.
+        auto resolveFirstKillCopy = [](Player& owner) {
+            Minion snapshot;
+            if (!owner.season14.TakeFirstKillCopy(snapshot)) return;
+            if (owner.hand.IsFull()) return;
+            Card card = Cards::FindCardByDbfID(snapshot.GetDbfID());
+            if (card.normalDbfID != 0)
+                card = Cards::FindCardByDbfID(card.normalDbfID);
+            if (card.dbfID == 0) return;
+            Minion plain(card);
+            owner.ApplyFreshMinionModifiers(plain);
+            owner.hand.Add(CardData{std::move(plain)});
+        };
+        resolveFirstKillCopy(player1);
+        resolveFirstKillCopy(player2);
+        // The power lasts for one combat only, including a combat in which no
+        // qualifying kill occurred or the reward could not fit in hand.
+        player1.season14.ExpireFirstKillCopy();
+        player2.season14.ExpireFirstKillCopy();
         player1.season14.ResolveNextCombatReward(result.outcome, true);
         player2.season14.ResolveNextCombatReward(result.outcome, false);
         std::vector<Season14PendingCombatBuff> player1Buffs;
