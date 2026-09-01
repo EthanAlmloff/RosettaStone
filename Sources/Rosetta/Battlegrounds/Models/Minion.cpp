@@ -298,12 +298,17 @@ bool Minion::MakeGolden()
     const int futureLobsterHealth = m_futureLobsterHealth;
     const int futureBallerAttack = m_futureBallerAttack;
     const int futureBallerHealth = m_futureBallerHealth;
+    const int persistentMinionAttack = m_persistentMinionAttack;
+    const int persistentMinionHealth = m_persistentMinionHealth;
+    const int persistentTierMinionAttack = m_persistentTierMinionAttack;
+    const int persistentTierMinionHealth = m_persistentTierMinionHealth;
     const auto persistentRaceAttack = m_persistentRaceAttack;
     const auto persistentRaceHealth = m_persistentRaceHealth;
     const int bloodGemCount = m_bloodGemCount;
     const int bloodGemCountThisTurn = m_bloodGemCountThisTurn;
     const int bloodGemAttack = m_bloodGemAttack;
     const int bloodGemHealth = m_bloodGemHealth;
+    const int skyGolemDeathrattleCount = m_skyGolemDeathrattleCount;
     // The premium card supplies the new identity and its static keywords,
     // but conversion must not erase state accumulated by this particular
     // instance.  Dark Gifts and other recruit effects mutate these fields
@@ -339,12 +344,17 @@ bool Minion::MakeGolden()
     m_futureLobsterHealth = futureLobsterHealth;
     m_futureBallerAttack = futureBallerAttack;
     m_futureBallerHealth = futureBallerHealth;
+    m_persistentMinionAttack = persistentMinionAttack;
+    m_persistentMinionHealth = persistentMinionHealth;
+    m_persistentTierMinionAttack = persistentTierMinionAttack;
+    m_persistentTierMinionHealth = persistentTierMinionHealth;
     m_persistentRaceAttack = persistentRaceAttack;
     m_persistentRaceHealth = persistentRaceHealth;
     m_bloodGemCount = bloodGemCount;
     m_bloodGemCountThisTurn = bloodGemCountThisTurn;
     m_bloodGemAttack = bloodGemAttack;
     m_bloodGemHealth = bloodGemHealth;
+    m_skyGolemDeathrattleCount = skyGolemDeathrattleCount;
 
     m_hasDeathrattle = false;
     m_hasTaunt = false;
@@ -508,6 +518,35 @@ void Minion::ApplyFutureBallerStats(int attack, int health)
     {
         m_health += health - m_futureBallerHealth;
         m_futureBallerHealth = health;
+    }
+}
+
+void Minion::ApplyPersistentMinionStats(int attack, int health)
+{
+    if (attack > m_persistentMinionAttack)
+    {
+        m_attack += attack - m_persistentMinionAttack;
+        m_persistentMinionAttack = attack;
+    }
+    if (health > m_persistentMinionHealth)
+    {
+        m_health += health - m_persistentMinionHealth;
+        m_persistentMinionHealth = health;
+    }
+}
+
+void Minion::ApplyPersistentTierMinionStats(int tier, int attack, int health)
+{
+    if (GetTier() > tier) return;
+    if (attack > m_persistentTierMinionAttack)
+    {
+        m_attack += attack - m_persistentTierMinionAttack;
+        m_persistentTierMinionAttack = attack;
+    }
+    if (health > m_persistentTierMinionHealth)
+    {
+        m_health += health - m_persistentTierMinionHealth;
+        m_persistentTierMinionHealth = health;
     }
 }
 
@@ -1042,6 +1081,12 @@ bool Minion::CheckTargetingType([[maybe_unused]] Minion& target)
 
 void Minion::ActivateTrigger(TriggerType type, Minion& source)
 {
+    if (type == TriggerType::SUMMON &&
+        (source.GetCardID() == "BG22_HERO_305t" || source.GetCardID() == "BG22_HERO_305t_G")) {
+        const int amount = GetCardID() == "BG22_HERO_305_Buddy" ? 2
+                         : GetCardID() == "BG22_HERO_305_Buddy_G" ? 4 : 0;
+        if (amount > 0) ApplyPersistentMinionStats(amount, amount);
+    }
     auto& trigger = m_card.power.GetTrigger();
     if (!trigger.has_value())
     {
@@ -1164,6 +1209,17 @@ void Minion::SetDeathrattleStatTransfer(int attack, int health)
 {
     m_deathrattleAttackTransfer = attack;
     m_deathrattleHealthTransfer = health;
+}
+
+void Minion::ApplySkyGolemDeathrattleCount(int count)
+{
+    if (count <= m_skyGolemDeathrattleCount) return;
+    const int delta = count - m_skyGolemDeathrattleCount;
+    const int scale = IsGolden() ? 8 : 4;
+    const int healthScale = IsGolden() ? 4 : 2;
+    m_attack += delta * scale;
+    m_health += delta * healthScale;
+    m_skyGolemDeathrattleCount = count;
 }
 
 int Minion::DeathrattleAttackTransfer() const
@@ -1667,7 +1723,7 @@ void Minion::ResetBuyTriggerUses()
     m_buyTriggerUses = 0;
 }
 
-std::vector<TaskType> Minion::GetTasks(PowerType type)
+std::vector<TaskType> Minion::GetTasks(PowerType type) const
 {
     switch (type)
     {

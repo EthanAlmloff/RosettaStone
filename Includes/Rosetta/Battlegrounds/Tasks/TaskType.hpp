@@ -92,9 +92,12 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftGolemDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMurlocSummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMinionSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ExactCopyDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatDestroyAdjacentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandSelfCopyTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSpellcraftToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/QuilboarBloodGolemDeathrattleTask.hpp>
 
 #include <variant>
 
@@ -132,6 +135,8 @@ using TaskType =
                  SimpleTasks::SummonedMinionStatMultiplierTask,
                  SimpleTasks::RallyTavernSpellHealthBonusTask,
                  SimpleTasks::RandomTavernSpellToHandTask, SimpleTasks::DestroyUndeadBuffSelfTask, SimpleTasks::ActivateFishbaitTask, SimpleTasks::ActivateRandomTavernSpellsTask, SimpleTasks::DealDamageSelfBuffTask,
+                 SimpleTasks::RandomSpellcraftToHandTask,
+                 SimpleTasks::QuilboarBloodGolemDeathrattleTask,
                  SimpleTasks::EndTurnStatTransferTask,
                  SimpleTasks::RallyHighestHandSummonTask,
                  SimpleTasks::RallyHighestHandMurlocBuffTask,
@@ -157,6 +162,7 @@ using TaskType =
                  SimpleTasks::DarkGiftGolemDeathrattleTask,
                  SimpleTasks::StartCombatHandStatsTask,
                  SimpleTasks::StartCombatHighestHandMurlocSummonTask,
+                 SimpleTasks::StartCombatHighestHandMinionSummonTask,
                  SimpleTasks::ExactCopyDeathrattleTask,
                  SimpleTasks::StartCombatDestroyAdjacentTask,
                  SimpleTasks::StartCombatHandSelfCopyTask>;

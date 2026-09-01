@@ -32,7 +32,7 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG26_135_G","battlecry","self","always","gain_gold",2,2,0,0,0,0,false},
   {"BGS_116","battlecry","self","always","free_refresh",1,1,0,0,0,0,false},
   {"TB_BaconUps_167","battlecry","self","always","free_refresh",2,2,0,0,0,0,false},
-  {"TB_BaconShop_HERO_01_Buddy_G","after_buy","self","always","buy_minion",4,1,4,0,0,0,false},
+  {"TB_BaconShop_HERO_01_Buddy_G","after_buy","self","always","buy_minion",2,1,2,0,0,0,false},
   {"BG20_HERO_102_Buddy_G","after_buy","self","always","buy_minion",0,1,0,1,0,0,false},
   {"BG34_950","after_buy","self","always","buy_minion",20,1,20,2,1,0,true},
   {"BG34_950_G","after_buy","self","always","buy_minion",20,1,20,3,1,0,true},

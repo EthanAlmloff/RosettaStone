@@ -88,6 +88,8 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG32_172_G","deathrattle","self","always","deathrattle_summon",1,1,0,0,0,0,false},
   {"BG35_604","deathrattle","self","always","deathrattle_summon",2,1,0,0,0,0,false},
   {"BG35_604_G","deathrattle","self","always","deathrattle_summon",2,1,0,0,0,0,false},
+  {"BG19_010","deathrattle","self","always","deathrattle_summon",1,1,0,0,0,0,false},
+  {"BG19_010_G","deathrattle","self","always","deathrattle_summon",1,1,0,0,0,0,false},
   {"BG25_010","deathrattle","self","always","deathrattle_summon",1,2,0,0,0,0,false},
   {"BG25_010_G","deathrattle","self","always","deathrattle_summon",2,2,0,0,0,0,false},
   {"BG25_009","deathrattle","self","always","deathrattle_summon",1,1,0,0,0,0,false},

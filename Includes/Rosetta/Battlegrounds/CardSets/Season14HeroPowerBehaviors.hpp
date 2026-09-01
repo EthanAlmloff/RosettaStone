@@ -52,6 +52,7 @@ enum class Season14HeroPowerKind : std::uint8_t
     QUEEN_OF_DRAGONS,
     IMPRISON,
     SIGN_NEW_ARTIST,
+    CONVICTION,
 };
 
 struct Season14HeroPowerDefinition
@@ -72,14 +73,44 @@ struct Season14GeneratedChoiceDefinition
 {
     std::string_view id;
     std::int32_t dbfID;
+    //! The reward's typed rules contract.  The executable bit is set only
+    //! after a matching Player lifecycle hook and focused test exist.
+    enum class Effect : std::uint8_t
+    {
+        END_TURN_BATTLECRY,
+        START_COMBAT_GOLDEN_FLANKS,
+        START_COMBAT_HIGHEST_HEALTH_COPY,
+        DEATHRATTLE_DEATH_BUFF,
+        END_TURN_RIGHTMOST_STEALTH_HEALTH,
+        FIRST_BATTLECRY_REPEAT,
+        GLOBAL_ATTACK_AURA,
+        REFRESH_RANDOM_MINION_BUFF,
+        DISCOVER_COPY,
+        START_TURN_HAND_BUFF,
+        END_TURN_EXTRA_TRIGGER,
+        START_TURN_RANDOM_CARDS,
+    } effect;
+    bool executable = false;
+    std::string_view missingLinkReason = {};
 };
 
-inline constexpr std::array<Season14GeneratedChoiceDefinition, 8>
+inline constexpr std::array<Season14GeneratedChoiceDefinition, 12>
     SEASON14_GENERATED_QUEST_REWARDS = {{
-        {"BG24_Reward_107", 89449}, {"BG24_Reward_109", 89473},
-        {"BG24_Reward_111", 89481}, {"BG24_Reward_113", 89483},
-        {"BG24_Reward_115", 89947}, {"BG24_Reward_123", 90861},
-        {"BG24_Reward_125", 90865}, {"BG24_Reward_128", 90914},
+        {"BG24_Reward_107", 89449, Season14GeneratedChoiceDefinition::Effect::END_TURN_BATTLECRY, true},
+        {"BG24_Reward_109", 89473, Season14GeneratedChoiceDefinition::Effect::START_COMBAT_GOLDEN_FLANKS, true},
+        {"BG24_Reward_111", 89481, Season14GeneratedChoiceDefinition::Effect::START_COMBAT_HIGHEST_HEALTH_COPY, true},
+        {"BG24_Reward_113", 89483, Season14GeneratedChoiceDefinition::Effect::DEATHRATTLE_DEATH_BUFF, true},
+        {"BG24_Reward_115", 89947, Season14GeneratedChoiceDefinition::Effect::END_TURN_RIGHTMOST_STEALTH_HEALTH, true},
+        {"BG24_Reward_123", 90861, Season14GeneratedChoiceDefinition::Effect::FIRST_BATTLECRY_REPEAT, true},
+        {"BG24_Reward_125", 90865, Season14GeneratedChoiceDefinition::Effect::GLOBAL_ATTACK_AURA, true},
+        {"BG24_Reward_128", 90914, Season14GeneratedChoiceDefinition::Effect::REFRESH_RANDOM_MINION_BUFF, true},
+        // These generated quest-reward options are pinned from cards.json.
+        // Entries without complete linked-entity data remain metadata-only
+        // until their event/state contracts are implemented.
+        {"BG24_Reward_129", 90916, Season14GeneratedChoiceDefinition::Effect::DISCOVER_COPY, true},
+        {"BG24_Reward_130", 90917, Season14GeneratedChoiceDefinition::Effect::END_TURN_EXTRA_TRIGGER, false, "placeholder_copy_target_0"},
+        {"BG24_Reward_131", 92542, Season14GeneratedChoiceDefinition::Effect::START_TURN_HAND_BUFF, true},
+        {"BG24_Reward_134", 92551, Season14GeneratedChoiceDefinition::Effect::START_TURN_RANDOM_CARDS, false, "placeholder_random_card_92"},
     }};
 
 constexpr bool IsSeason14GeneratedQuestReward(std::int32_t dbfID) noexcept
@@ -89,8 +120,33 @@ constexpr bool IsSeason14GeneratedQuestReward(std::int32_t dbfID) noexcept
     return false;
 }
 
+constexpr const Season14GeneratedChoiceDefinition*
+FindSeason14GeneratedQuestReward(std::int32_t dbfID) noexcept
+{
+    for (const auto& definition : SEASON14_GENERATED_QUEST_REWARDS)
+        if (definition.dbfID == dbfID) return &definition;
+    return nullptr;
+}
+
+//! Only choices with a complete Player lifecycle may earn executable
+//! behavior coverage; metadata-only options remain fail-closed.
+constexpr bool IsExecutableSeason14GeneratedQuestReward(
+    std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14GeneratedQuestReward(dbfID);
+    return definition != nullptr && definition->executable;
+}
+
+constexpr std::string_view GeneratedQuestRewardMissingLinkReason(
+    std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14GeneratedQuestReward(dbfID);
+    return definition == nullptr ? std::string_view{"unknown_reward"}
+                                 : definition->missingLinkReason;
+}
+
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 36>
+inline constexpr std::array<Season14HeroPowerDefinition, 37>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},
@@ -110,6 +166,8 @@ inline constexpr std::array<Season14HeroPowerDefinition, 36>
          Season14HeroPowerKind::MAX_GOLD, 3, false},
         {"BG28_HERO_801p", 110472,
          Season14HeroPowerKind::RANDOM_TAVERN_SPELL, 1, false},
+        {"BG21_HERO_000p", 73941,
+         Season14HeroPowerKind::CONVICTION, 0, false},
         {"TB_BaconShop_HP_010", 57562,
          Season14HeroPowerKind::BOON_OF_LIGHT, 2, false},
         {"TB_BaconShop_HP_001", 57567,

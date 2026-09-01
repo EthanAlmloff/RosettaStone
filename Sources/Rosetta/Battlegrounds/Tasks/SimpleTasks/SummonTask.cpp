@@ -115,11 +115,13 @@ TaskStatus SummonTask::Run(Player& player, Minion& source)
                                  ? summonPos
                                  : player.GetField().GetCount() - 1;
         Minion& summoned = player.GetField()[addedPos];
+        player.ApplyTamuzoCombatSummon(summoned);
 
         player.GetField().ForEachAlive([&summoned](MinionData& aliveMinion) {
             aliveMinion.value().ActivateTrigger(TriggerType::SUMMON,
                                                 summoned);
         });
+        player.ApplySummonTrinkets(summoned);
 
         if (m_addToStack)
         {

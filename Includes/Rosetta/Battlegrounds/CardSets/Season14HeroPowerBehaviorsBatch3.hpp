@@ -17,6 +17,7 @@ namespace RosettaStone::Battlegrounds
 enum class Season14HeroPowerBatch3Kind : std::uint8_t
 {
     COMBAT_KILL_ATTACK,
+    CONVICTION_IMPROVEMENT,
 };
 
 struct Season14HeroPowerBatch3Definition
@@ -28,10 +29,12 @@ struct Season14HeroPowerBatch3Definition
     bool passive;
 };
 
-inline constexpr std::array<Season14HeroPowerBatch3Definition, 1>
+inline constexpr std::array<Season14HeroPowerBatch3Definition, 2>
     SEASON14_HERO_POWER_BEHAVIORS_BATCH3 = {{
         {"BG20_HERO_100p", 80229,
          Season14HeroPowerBatch3Kind::COMBAT_KILL_ATTACK, 0, true},
+        {"BG21_HERO_000p", 73941,
+         Season14HeroPowerBatch3Kind::CONVICTION_IMPROVEMENT, 0, false},
     }};
 
 constexpr const Season14HeroPowerBatch3Definition*
@@ -62,9 +65,8 @@ FindSeason14HeroPowerBehaviorBatch3(std::string_view id) noexcept
 
 //! Result of a target-free Batch-3 activation.
 //!
-//! No current Batch-3 registry entry uses this result.  It remains as the
-//! narrow extension point for Conviction once its post-combat improvement
-//! choice and persistent per-game modifiers are represented by Season14State.
+//! Choice-based powers do not use this target-free result. It remains the
+//! narrow extension point for stateless Batch-3 activations.
 struct Season14HeroPowerBatch3Activation
 {
     std::int32_t attack = 0;
@@ -75,10 +77,8 @@ struct Season14HeroPowerBatch3Activation
 
 //! Resolve a complete target-free Batch-3 activation.
 //!
-//! Conviction is intentionally fail-closed here.  Its Patch 36.4 text has a
-//! post-combat "choose an improvement" state; using Tavern tier as a proxy
-//! for that choice would silently implement a different hero power.  Other
-//! unregistered families also return false.
+//! Choice-based Conviction is resolved through Player's replayable modal;
+//! other unregistered families return false.
 constexpr bool ResolveSeason14HeroPowerBatch3Activation(
     std::int32_t dbfID, std::int32_t currentTier,
     Season14HeroPowerBatch3Activation& result) noexcept

@@ -54,12 +54,23 @@ struct Season14Offering
     std::int32_t darkGiftDbfID = 0;
 };
 
+// Synthetic, player-visible option IDs for Conviction's improvement modal.
+// They deliberately do not resolve to cards: the modal is a typed choice,
+// not a card Discover, and ApplyChoice handles these IDs only with source
+// BG21_HERO_000p.
+inline constexpr std::int32_t CONVICTION_IMPROVE_ATTACK = -739420;
+inline constexpr std::int32_t CONVICTION_IMPROVE_HEALTH = -739421;
+inline constexpr std::int32_t CONVICTION_IMPROVE_TARGETS = -739422;
+
 //! Persistent Trinket or Dark Gift state owned by one player.
 struct Season14PersistentEffect
 {
     std::int32_t dbfID = 0;
     std::uint8_t remainingUses = 0;
     bool active = true;
+    //! Trigger progress owned by this effect (for cadence-based Trinkets).
+    //! It must not be shared between distinct Trinket instances.
+    std::int32_t triggerProgress = 0;
 };
 struct Season14ChooseOneState { bool pending = false; std::uint64_t sourceEntityID = 0; std::uint32_t targetMask = 0; std::int32_t sourceCardDbfID = 0; };
 
@@ -137,6 +148,30 @@ class Season14State
         return completed;
     }
     Season14Decision pendingDecision = Season14Decision::NONE;
+    // Detective for Hire uses hidden opponent information; retain only the
+    // committed result for Watfin, never the opponent's unrevealed board.
+    std::int32_t detectiveLastGuessDbfID = 0;
+    bool detectiveGuessCorrect = false;
+    std::int32_t zippersPendingCards = 0;
+    std::int32_t convictionAttackBonus = 0;
+    std::int32_t convictionHealthBonus = 0;
+    std::int32_t convictionExtraTargets = 0;
+    std::int32_t convictionPendingImprovements = 0;
+    std::int32_t buddyCombatKillHealth = 0;
+    std::int32_t buddyAvengeDeaths = 0;
+    void ImproveConviction(std::int32_t choice) noexcept { if (choice == 0) ++convictionAttackBonus; else if (choice == 1) ++convictionHealthBonus; else ++convictionExtraTargets; }
+    std::int32_t ConvictionAttackBonus() const noexcept { return convictionAttackBonus; }
+    std::int32_t ConvictionHealthBonus() const noexcept { return convictionHealthBonus; }
+    std::int32_t ConvictionExtraTargets() const noexcept { return convictionExtraTargets; }
+    void QueueConvictionImprovements(std::int32_t count = 1) noexcept { convictionPendingImprovements += std::max<std::int32_t>(0, count); }
+    std::int32_t PendingConvictionImprovements() const noexcept { return convictionPendingImprovements; }
+    void QueueBuddyCombatKillHealth(std::int32_t amount) noexcept { buddyCombatKillHealth += std::max<std::int32_t>(0, amount); }
+    std::int32_t TakeBuddyCombatKillHealth() noexcept { const auto value = buddyCombatKillHealth; buddyCombatKillHealth = 0; return value; }
+    bool BeginConvictionImprovementChoice();
+    bool ApplyConvictionImprovement(std::size_t offeringIndex);
+    void ArmZippersCards(std::int32_t count) noexcept { zippersPendingCards += std::max(0, count); }
+    std::int32_t ConsumeZippersCards() noexcept { const auto n = zippersPendingCards; zippersPendingCards = 0; return n; }
+    bool ConsumeDetectiveGuessResult() noexcept { const bool r = detectiveGuessCorrect; detectiveGuessCorrect = false; detectiveLastGuessDbfID = 0; return r; }
     std::vector<Season14Offering> choiceOfferings;
     std::vector<Season14Offering> pendingOfferings;
     //! Identity of the effect that created the public offering. These fields
@@ -156,11 +191,48 @@ class Season14State
     //! reward DBF is retained until its effect family is resolved by the
     //! corresponding reward subsystem, making replay state explicit.
     std::vector<std::int32_t> generatedQuestRewards;
+    //! Executable subset of generated quest rewards.  These flags are
+    //! installed only by the typed ApplyChoice dispatch; raw selected DBFs
+    //! never imply behavior by themselves.
+    bool generatedRewardStolenGold = false;
+    bool generatedRewardParasol = false;
+    bool generatedRewardMirrorShield = false;
+    std::int32_t generatedRewardGlobalAttack = 0;
+    std::uint64_t generatedRewardStealthEntityID = 0;
+    bool generatedRewardEvilTwin = false;
+    bool generatedRewardRitualDagger = false;
+    bool generatedRewardSnickerSnacks = false;
+    bool generatedRewardExquisiteConch = false;
+    bool generatedRewardConchUsedThisTurn = false;
+    bool generatedRewardSecretSinstone = false;
+    bool generatedRewardRedHand = false;
+
+    //! Install one supported generated quest reward effect. Returns false
+    //! for metadata-only choices so callers cannot award executable credit.
+    bool ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept;
+    bool HasGeneratedRewardStolenGold() const noexcept { return generatedRewardStolenGold; }
+    bool HasGeneratedRewardParasol() const noexcept { return generatedRewardParasol; }
+    bool HasGeneratedRewardMirrorShield() const noexcept { return generatedRewardMirrorShield; }
+    bool HasGeneratedRewardEvilTwin() const noexcept { return generatedRewardEvilTwin; }
+    bool HasGeneratedRewardRitualDagger() const noexcept { return generatedRewardRitualDagger; }
+    bool HasGeneratedRewardSnickerSnacks() const noexcept { return generatedRewardSnickerSnacks; }
+    bool HasGeneratedRewardExquisiteConch() const noexcept { return generatedRewardExquisiteConch; }
+    bool HasGeneratedRewardSecretSinstone() const noexcept { return generatedRewardSecretSinstone; }
+    bool HasGeneratedRewardRedHand() const noexcept { return generatedRewardRedHand; }
+    bool ConsumeGeneratedRewardConch() noexcept {
+        if (!generatedRewardExquisiteConch || generatedRewardConchUsedThisTurn) return false;
+        generatedRewardConchUsedThisTurn = true;
+        return true;
+    }
+    std::int32_t GeneratedRewardGlobalAttack() const noexcept { return generatedRewardGlobalAttack; }
 
     std::int32_t heroPowerDbfID = 0;
     std::int32_t heroPowerCost = 0;
     bool heroPowerAvailable = false;
     bool heroPowerUsed = false;
+    std::int32_t buddyExtraHeroPowerUses = 0;
+    void EnableBuddyExtraHeroPowerUses(std::int32_t n) noexcept { buddyExtraHeroPowerUses = std::max(buddyExtraHeroPowerUses, n); }
+    void ResetBuddyExtraHeroPowerUses() noexcept { buddyExtraHeroPowerUses = 0; }
     bool powerOfStormActive = false;
     std::int32_t luckyRollCooldown = 0;
 
@@ -176,6 +248,9 @@ class Season14State
     std::array<Race, 3> stirPotRaces{};
     std::int32_t stirPotCount = 0;
     std::int32_t imprisonedSlot = -1;
+    //! Stable entity identity for Imprison; the slot can move when other
+    //! Tavern cards are bought or removed before the two-turn duration ends.
+    std::int32_t imprisonedEntityID = -1;
     std::int32_t imprisonedTurns = 0;
     std::vector<std::string> reclaimedSoulsDeaths;
     void RecordReclaimedSoulsDeath(const Minion& minion);
@@ -231,6 +306,24 @@ class Season14State
     std::int32_t freeRefreshes = 0;
     std::int32_t persistentShopAttack = 0;
     std::int32_t persistentShopHealth = 0;
+    //! Permanent all-minion aura installed by deterministic Trinkets.
+    std::int32_t persistentMinionAttack = 0;
+    std::int32_t persistentMinionHealth = 0;
+    std::int32_t persistentFodderAttack = 0;
+    std::int32_t persistentFodderHealth = 0;
+    std::int32_t soldMinionsThisTurn = 0;
+    std::int32_t trinketStatSpellDiscount = 0;
+    std::int32_t trinketFreeSpellUses = 0;
+    std::int32_t trinketFreeSpellUsesPerTurn = 0;
+    std::int32_t temporaryRefreshShopAttack = 0;
+    std::int32_t temporaryRefreshShopHealth = 0;
+    void AddTemporaryRefreshShopStats(std::int32_t attack,
+                                      std::int32_t health) noexcept
+    { temporaryRefreshShopAttack += attack; temporaryRefreshShopHealth += health; }
+    std::int32_t refreshShopStatsDeltaAttack = 0;
+    std::int32_t refreshShopStatsDeltaHealth = 0;
+    std::int32_t temporaryTavernSpellAttack = 0;
+    std::int32_t temporaryTavernSpellHealth = 0;
     //! Cumulative improvement applied to newly created Tasty Lobsters.  This
     //! is player-owned game state, so it survives combat, deaths, Tavern
     //! refreshes, and recruit-phase transitions.
@@ -239,9 +332,22 @@ class Season14State
     std::int32_t futureBallerAttack = 0;
     std::int32_t futureBallerHealth = 0;
     std::int32_t trinketExtraShopSlots = 0;
+    std::int32_t refreshExtraShopSlots = 0;
+    std::int32_t spellMinionAttackProgress = 0;
+    //! Number of successfully resolved spells this game.
+    std::int32_t successfulSpellCount = 0;
+    std::int32_t spellMinionAttackDelta = 0;
+    bool tierSixGoldClaimed = false;
+    std::int32_t treasureMapTurns = 0;
+    bool treasureMapClaimed = false;
+    std::int32_t spellCastMinionAttackDelta = 0;
+    std::int32_t spellCastMinionHealthDelta = 0;
     std::int32_t trinketHigherTierRefreshes = 0;
     std::int32_t trinketMaxGoldDelta = 0;
     std::int32_t trinketImmediateGold = 0;
+    //! Per-trigger counters for refresh/self-damage Trinket families.  These
+    //! are intentionally player state rather than card-instance locals so a
+    //! refresh cannot reset progress or make a replay depend on pointers.
     //! Number of end-of-recruit effects that increase the next turn's gold cap.
     std::int32_t trinketEndTurnMaxGold = 0;
     std::vector<Season14RaceShopStats> persistentShopRaceStats;
@@ -250,6 +356,7 @@ class Season14State
     std::int32_t refreshRandomShopHealth = 0;
     std::int32_t fodderRefreshes = 0;
     std::int32_t goldenMinionsPlayed = 0;
+    std::int32_t piratesPlayedThisGame = 0;
     std::int32_t unboundElementals = 0;
     std::vector<std::string> combatAvengeCards;
     std::int32_t foddersPerRefresh = 1;
@@ -274,6 +381,7 @@ class Season14State
     std::int32_t bloodGemHealthBonus = 0;
     std::vector<Season14RaceShopStats> bloodGemRaceBonuses;
     std::int32_t goldSpentThisTurn = 0;
+    std::int32_t goldSpentThisGame = 0;
     std::int32_t heroDamageThisTurn = 0;
     //! Number of minions bought this recruit turn for Sharpen Blades.
     std::int32_t sharpenBladesPurchases = 0;
@@ -345,6 +453,7 @@ class Season14State
 
     //! Applies a successful minion sale to deferred hero-power state.
     void OnSellMinion();
+    std::int32_t SoldMinionsThisTurn() const noexcept { return soldMinionsThisTurn; }
 
     //! Returns immediate bonus gold for a successfully purchased minion.
     std::int32_t OnBuyMinion(bool purchasedPirate);
@@ -439,9 +548,25 @@ class Season14State
 
     //! Records a successful Tavern refresh so one-shot effects are consumed.
     void OnRefreshTavern(bool refreshSucceeded);
+    //! Resolve recruit-phase Trinket counters after authoritative events.
+    //! Returns the permanent shop aura delta applied by this event.
+    std::pair<std::int32_t, std::int32_t> OnRecruitHeroDamage(
+        std::int32_t healthLost);
+    //! Returns and clears the current refresh's temporary Tavern delta.
+    std::pair<std::int32_t, std::int32_t> TakeRefreshShopStatsDelta() noexcept;
+    //! Returns cumulative this-turn Tavern-spell stat bonuses.
+    std::pair<std::int32_t, std::int32_t> TemporaryTavernSpellStats() const noexcept
+    { return {temporaryTavernSpellAttack, temporaryTavernSpellHealth}; }
+    //! Resolves Trinket Avenge progress after a friendly combat death.
+    std::pair<std::int32_t, std::int32_t> OnTrinketFriendlyMinionDied();
+    void ResetTrinketAvengeProgress() noexcept;
+    void OnFriendlyPirateAttack();
 
     //! Records a successfully resolved Tavern spell.
     void OnTavernSpellResolved(bool spellResolved, std::int32_t sourceDbfID = 0);
+    std::int32_t SuccessfulSpellCount() const noexcept { return successfulSpellCount; }
+    std::int32_t TakeSpellMinionAttackDelta() noexcept
+    { const auto d = spellMinionAttackDelta; spellMinionAttackDelta = 0; return d; }
     std::int32_t LastTavernSpellDbfID() const noexcept { return lastTavernSpellDbfID; }
 
     //! Adds deferred gold paid at the next recruit start.
@@ -459,6 +584,10 @@ class Season14State
         if (count > 0)
             pendingCombatHandSummons.emplace_back(std::move(snapshot), count);
     }
+    std::int32_t ResolveTierSixTrinketGold() noexcept;
+    std::int32_t ResolveDelayedTrinketGold() noexcept;
+    std::pair<std::int32_t, std::int32_t> TakeSpellCastMinionStats() noexcept
+    { auto r = std::pair{spellCastMinionAttackDelta, spellCastMinionHealthDelta}; spellCastMinionAttackDelta = spellCastMinionHealthDelta = 0; return r; }
     std::vector<std::pair<Minion, std::int32_t>> TakeCombatHandSummons()
     {
         auto out = std::move(pendingCombatHandSummons);
@@ -507,12 +636,15 @@ class Season14State
     }
     void RecordBattlecry() noexcept { ++battlecriesTriggered; }
     int RecordGoldSpent(std::int32_t amount) noexcept;
+    std::int32_t GoldSpentThisGame() const noexcept { return goldSpentThisGame; }
 
     //! Returns and clears deferred next-turn gold.
     std::int32_t TakeNextTurnGold() noexcept;
 
     //! Returns and clears gold granted when a Trinket was selected.
     std::int32_t TakeImmediateGold() noexcept;
+    //! Returns and clears max-Gold increases armed for the current recruit end.
+    std::int32_t TakeEndTurnMaxGold() noexcept;
 
     //! Returns the configured maximum gold cap.
     std::int32_t EffectiveMaxGold(std::int32_t baseCap) const noexcept;
@@ -557,6 +689,19 @@ class Season14State
     std::pair<std::int32_t, std::int32_t>
     RefreshRandomShopStats() noexcept;
     void ArmFodderRefreshes(std::int32_t count, std::int32_t amount = 1) noexcept { if (count > 0) { fodderRefreshes += count; foddersPerRefresh = std::max(foddersPerRefresh, amount); } }
+    //! Arms the shared next-three-refresh window used by Defiler triggers.
+    //! Multiple Defilers resolve together, so their window is not extended.
+    void ArmFodderDefilerRefreshes(std::int32_t count,
+                                   std::int32_t amount = 1) noexcept
+    {
+        if (count > 0) {
+            // The window is shared, but each Defiler contributes its own
+            // Fodder to every refresh in that window.  Preserve the longest
+            // remaining window while summing simultaneous contributions.
+            fodderRefreshes = std::max(fodderRefreshes, count);
+            foddersPerRefresh += amount;
+        }
+    }
     std::int32_t ConsumeFodderRefresh() noexcept { if (fodderRefreshes <= 0) return 0; --fodderRefreshes; const auto result = foddersPerRefresh; if (fodderRefreshes == 0) foddersPerRefresh = 1; return result; }
     void TrackCombatAvengeCard(std::string id) { combatAvengeCards.push_back(std::move(id)); }
     std::vector<std::string> TakeCombatAvengeCards() { auto result = std::move(combatAvengeCards); combatAvengeCards.clear(); return result; }

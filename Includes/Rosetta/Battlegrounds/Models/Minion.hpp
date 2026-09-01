@@ -167,6 +167,9 @@ class Minion
     //! between Tavern, hand, and board must not stack the same aura.
     void ApplyFutureLobsterStats(int attack, int health);
     void ApplyFutureBallerStats(int attack, int health);
+    //! Applies the cumulative all-minion Trinket aura idempotently.
+    void ApplyPersistentMinionStats(int attack, int health);
+    void ApplyPersistentTierMinionStats(int tier, int attack, int health);
     void ApplyPersistentRaceStats(Race race, int attack, int health);
 
     //! Applies one Blood Gem's resolved stats and records the permanent
@@ -200,6 +203,10 @@ class Minion
     //! Commits only explicitly persistent combat deltas from a matching copy.
     void ReconcileCombatPersistentState(const Minion& combatCopy);
     void ApplyTemporaryKeyword(GameTag tag);
+    //! Applies the cumulative Falling Sky Golem deathrattle aura exactly once
+    //! per observed deathrattle.  The applied count is instance state so an
+    //! existing minion can safely pass through fresh-modifier setup again.
+    void ApplySkyGolemDeathrattleCount(int count);
     void ExpireTemporaryEffects();
     //! Resets the per-recruit-turn Lava Lurker Spellcraft allowance.
     void ResetSpellcraftUses() noexcept;
@@ -209,6 +216,9 @@ class Minion
     //! Returns the flag that indicates whether it has deathrattle.
     //! \return The flag that indicates whether it has deathrattle.
     bool HasDeathrattle() const;
+    //! Returns the task list for a requested power phase.  The native bridge
+    //! uses this read-only query to reconstruct exact legality.
+    std::vector<TaskType> GetTasks(PowerType type) const;
     //! Copies the currently configured deathrattle tasks to another instance.
     //! Used by recursive combat deathrattle effects such as Leapfrogger.
     void CopyDeathrattleTo(Minion& target) const;
@@ -401,11 +411,6 @@ class Minion
     std::function<Player&()> getPlayerCallback;
 
  private:
-    //! Gets a list of tasks according to the power type.
-    //! \param type The type of power.
-    //! \return A list of tasks according to the power type.
-    std::vector<TaskType> GetTasks(PowerType type);
-
     Card m_card;
     int m_index = -1;
     int m_poolIdx = -1;
@@ -422,6 +427,10 @@ class Minion
     int m_futureLobsterHealth = 0;
     int m_futureBallerAttack = 0;
     int m_futureBallerHealth = 0;
+    int m_persistentMinionAttack = 0;
+    int m_persistentMinionHealth = 0;
+    int m_persistentTierMinionAttack = 0;
+    int m_persistentTierMinionHealth = 0;
     std::array<int, 40> m_persistentRaceAttack{};
     std::array<int, 40> m_persistentRaceHealth{};
     int m_buyTriggerUses = 0;
@@ -442,6 +451,7 @@ class Minion
     bool m_heroDamageThresholdFired = false;
     int m_deathrattleAttackTransfer = 0;
     int m_deathrattleHealthTransfer = 0;
+    int m_skyGolemDeathrattleCount = 0;
     int m_darkGiftCounterAttack = 0;
     int m_darkGiftCounterHealth = 0;
     int m_darkGiftCounterKind = 0;

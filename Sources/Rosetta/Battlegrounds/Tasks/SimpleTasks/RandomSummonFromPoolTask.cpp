@@ -29,6 +29,7 @@ TaskStatus RandomSummonFromPoolTask::Run(Player& player, Minion& source) {
   const int addedPosition = position < player.GetField().GetCount() ? position : player.GetField().GetCount() - 1;
   Minion& added = player.GetField()[addedPosition];
   player.GetField().ForEachAlive([&added](MinionData& data) { data.value().ActivateTrigger(TriggerType::SUMMON, added); });
+  player.ApplySummonTrinkets(added);
   return TaskStatus::COMPLETE;
 }
 TaskStatus RandomSummonFromPoolTask::Run(Player& player, Minion& source, Minion&) { return Run(player, source); }

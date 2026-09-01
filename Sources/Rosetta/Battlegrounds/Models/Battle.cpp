@@ -7,6 +7,9 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/QuilboarBloodGolemDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 
 #include <effolkronium/random.hpp>
 
@@ -130,11 +133,16 @@ Battle::Battle(Player& player1, Player& player2)
                 // but give it the owning player's callback and a new entity
                 // index so trigger/source identity cannot alias the hand
                 // instance or another summoned copy.
-                owner.ApplyFreshMinionModifiers(copy);
                 copy.getPlayerCallback = [&owner]() -> Player& { return owner; };
                 if (owner.getNextCardIndexCallback)
                     copy.SetIndex(owner.getNextCardIndexCallback());
                 field.Add(copy);
+                Minion& summoned = field[field.GetCount() - 1];
+                field.ForEachAlive([&summoned](MinionData& alive) {
+                    alive.value().ActivateTrigger(TriggerType::SUMMON,
+                                                   summoned);
+                });
+                owner.ApplySummonTrinkets(summoned);
             }
         }
     };
@@ -234,6 +242,12 @@ Battle::Battle(Player& player1, Player& player2)
                 Minion beetle{ beetleCard };
                 owner.ApplyFreshMinionModifiers(beetle);
                 field.Add(beetle);
+                Minion& summoned = field[field.GetCount() - 1];
+                field.ForEachAlive([&summoned](MinionData& alive) {
+                    alive.value().ActivateTrigger(TriggerType::SUMMON,
+                                                   summoned);
+                });
+                owner.ApplySummonTrinkets(summoned);
             }
     };
     summonBeetles(m_player1, m_p1Field);
@@ -261,12 +275,20 @@ void Battle::CommitPersistentState()
 
 void Battle::Initialize()
 {
+    // Stolen Gold is a player-owned quest reward.  Resolve it on the combat
+    // copies so the temporary golden conversion cannot mutate recruit state.
+    m_player1.ResolveGeneratedQuestRewardStartCombat(m_p1Field);
+    m_player2.ResolveGeneratedQuestRewardStartCombat(m_p2Field);
     m_p1Field.ForEachAlive([](MinionData& data) { data.value().ResetAvengeProgress(); });
     m_p2Field.ForEachAlive([](MinionData& data) { data.value().ResetAvengeProgress(); });
     m_player1.season14.TakeCombatAvengeCards();
     m_player2.season14.TakeCombatAvengeCards();
     m_player1.season14.BeginCombatBatch4();
     m_player2.season14.BeginCombatBatch4();
+    m_player1.season14.ResetTrinketAvengeProgress();
+    m_player2.season14.ResetTrinketAvengeProgress();
+    m_player1.ApplyStartCombatTrinkets();
+    m_player2.ApplyStartCombatTrinkets();
 
     // Determine the player attacks first
     // NOTE: The player with the greater number of minions attacks first.
@@ -452,7 +474,7 @@ bool Battle::Attack()
 
     Minion& attacker = (m_turn == Turn::PLAYER1) ? m_p1Field[attackerIdx]
                                                  : m_p2Field[attackerIdx];
-
+    auto& attackerOwner = (m_turn == Turn::PLAYER1) ? m_player1 : m_player2;
     FieldZone& defendingField =
         (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
     if (!HasAttackableTarget(defendingField))
@@ -470,6 +492,29 @@ bool Battle::Attack()
         }
         m_turn = (m_turn == Turn::PLAYER1) ? Turn::PLAYER2 : Turn::PLAYER1;
         return false;
+    }
+    if (attacker.HasRace(Race::PIRATE))
+            attackerOwner.season14.OnFriendlyPirateAttack();
+            for (auto& trinket : attackerOwner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect == TrinketEffect::AFTER_TWO_ATTACKS_QUILBOAR_GEM &&
+                    ++trinket.triggerProgress >= behavior.value)
+                {
+                    trinket.triggerProgress = 0;
+                    attackerOwner.battleField.ForEachAlive([&](MinionData& data) {
+                        if (data.value().HasRace(Race::QUILBOAR)) data.value().ApplyBloodGem(1, 1);
+                    });
+                }
+            }
+    for (const auto& trinket : attackerOwner.season14.trinkets)
+    {
+        if (!trinket.active || trinket.remainingUses == 0) continue;
+        const auto behavior = FindTrinketBehavior(
+            Cards::FindCardByDbfID(trinket.dbfID).id);
+        if (behavior.effect == TrinketEffect::ATTACKING_MINION_STATS)
+            attacker.SetAttack(attacker.GetAttack() + behavior.attack);
     }
 
     int& pendingAttacks =
@@ -507,7 +552,6 @@ bool Battle::Attack()
     // already-selected target first. Resolve it here, after all Rally tasks
     // have run, so inserting the Golem cannot invalidate the active attacker
     // or target references during task dispatch.
-    auto& attackerOwner = (m_turn == Turn::PLAYER1) ? m_player1 : m_player2;
     for (const auto& pending : attackerOwner.season14.TakeBloodGemGolemAttacks()) {
         const Card golemCard = Cards::FindCardByID("BG30_MagicItem_442t");
         if (!golemCard.id.empty() && !attackerField.IsFull()) {
@@ -523,6 +567,7 @@ bool Battle::Attack()
             attackerField.ForEachAlive([&summoned](MinionData& data) {
                 data.value().ActivateTrigger(TriggerType::SUMMON, summoned);
             });
+            attackerOwner.ApplySummonTrinkets(summoned);
             Minion* queuedTarget = nullptr;
             defendingField.ForEachAlive([&](MinionData& data) {
                 if (data.value().GetIndex() == pending.targetEntityID)
@@ -583,6 +628,30 @@ bool Battle::Attack()
     // enemy and that the same minion survived cleanup.  Looking the attacker
     // up by stable identity avoids touching a reference invalidated by zone
     // compaction or deathrattle processing.
+    // Captain Fairmount improves Conviction after a friendly combat kill.
+    // Read the combat field: a Buddy that died earlier in this combat no
+    // longer supplies its trigger. Queue the modal for post-combat so no
+    // player decision is requested in the middle of combat resolution.
+    if (targetWasDestroyed) {
+        int improvements = 0;
+        int buddyHealth = 0;
+        attackerField.ForEachAlive([&improvements](const MinionData& data) {
+            const auto& id = data.value().GetCardID();
+            if (id == "BG21_HERO_000_Buddy") improvements += 1;
+            else if (id == "BG21_HERO_000_Buddy_G") improvements += 2;
+        });
+        attackerField.ForEachAlive([&buddyHealth](const MinionData& data) {
+            const auto& id = data.value().GetCardID();
+            if (id == "BG20_HERO_100_Buddy") buddyHealth += 1;
+            else if (id == "BG20_HERO_100_Buddy_G") buddyHealth += 2;
+        });
+        auto& owner = m_turn == Turn::PLAYER1 ? m_player1 : m_player2;
+        if (owner.season14.heroPowerDbfID == 73941 && improvements > 0)
+            owner.season14.QueueConvictionImprovements(improvements);
+        if (buddyHealth > 0)
+            owner.season14.QueueBuddyCombatKillHealth(buddyHealth);
+    }
+
     if (targetWasDestroyed && attackerSurvived)
     {
         const auto bonus =
@@ -837,9 +906,136 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 PowerType::DEATHRATTLE,
                 std::get<0>(deadMinion) == 1 ? m_player1 : m_player2);
             Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+            // Unholy Sanctum resolves after the deathrattle and permanently
+            // buffs the right-most surviving friendly minion.
+            for (const auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(
+                    Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect != TrinketEffect::AFTER_DEATHRATTLE_RIGHTMOST_STATS)
+                    continue;
+                Minion* rightmost = nullptr;
+                owner.battleField.ForEachAlive([&rightmost](MinionData& data) {
+                    rightmost = &data.value();
+                });
+                if (!rightmost) continue;
+                rightmost->SetAttack(rightmost->GetAttack() + behavior.attack);
+                rightmost->SetHealth(rightmost->GetHealth() + behavior.health);
+                const auto index = rightmost->GetIndex();
+                owner.recruitField.ForEachAlive([&](MinionData& data) {
+                    auto& recruit = data.value();
+                    if (recruit.GetIndex() == index)
+                    {
+                        recruit.SetAttack(recruit.GetAttack() + behavior.attack);
+                        recruit.SetHealth(recruit.GetHealth() + behavior.health);
+                    }
+                });
+            }
+            owner.ResolveGeneratedQuestRewardDeath(removedMinion);
             ++owner.season14.deathrattlesTriggered;
+            for (auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect == TrinketEffect::AVENGE_RANDOM_MAGNETIC &&
+                    ++trinket.triggerProgress >= behavior.value)
+                {
+                    trinket.triggerProgress = 0;
+                    (void)SimpleTasks::RandomCardToHandTask{Race::INVALID, 0, 1, true}.Run(owner);
+                }
+            }
+            for (auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0 || trinket.triggerProgress != 0) continue;
+                const auto behavior = FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect != TrinketEffect::FIRST_DEATH_MAX_STATS_RANDOM) continue;
+                std::vector<Minion*> targets;
+                owner.battleField.ForEachAlive([&](MinionData& data) { targets.push_back(&data.value()); });
+                if (!targets.empty())
+                {
+                    auto* target = targets[Random::get<std::size_t>(0, targets.size() - 1)];
+                    target->SetAttack(target->GetAttack() + removedMinion.GetAttack());
+                    target->SetHealth(target->GetHealth() + removedMinion.GetHealth());
+                    trinket.triggerProgress = 1;
+                }
+            }
+            for (auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect != TrinketEffect::AVENGE_RANDOM_UNDEAD_REBORN ||
+                    ++trinket.triggerProgress < behavior.value) continue;
+                trinket.triggerProgress = 0;
+                std::vector<Minion*> undead;
+                owner.battleField.ForEachAlive([&](MinionData& data) {
+                    if (data.value().HasRace(Race::UNDEAD) && !data.value().HasReborn()) undead.push_back(&data.value());
+                });
+                if (!undead.empty()) undead[Random::get<std::size_t>(0, undead.size() - 1)]->SetReborn(true);
+            }
+            for (auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect == TrinketEffect::AVENGE_BLOOD_GEM_BONUS &&
+                    ++trinket.triggerProgress >= behavior.value)
+                {
+                    trinket.triggerProgress = 0;
+                    owner.season14.AddBloodGemBonus(behavior.attack, behavior.health);
+                }
+            }
             owner.UpdateSkyGolemsForDeathrattle();
             owner.AdvanceDarkGiftCounters(2);
+        }
+
+        // Avenge counts every friendly death, not only deaths that happen to
+        // have a Deathrattle. The Deathrattle branch above handles those
+        // deaths after their Deathrattle resolves; handle plain minion deaths
+        // here without double-counting.
+        if (!removedMinion.HasDeathrattle())
+        {
+            Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+            for (auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect == TrinketEffect::AVENGE_RANDOM_UNDEAD_REBORN &&
+                    ++trinket.triggerProgress >= behavior.value)
+                {
+                    trinket.triggerProgress = 0;
+                    std::vector<Minion*> undead;
+                    owner.battleField.ForEachAlive([&](MinionData& data) {
+                        if (data.value().HasRace(Race::UNDEAD) && !data.value().HasReborn()) undead.push_back(&data.value());
+                    });
+                    if (!undead.empty()) undead[Random::get<std::size_t>(0, undead.size() - 1)]->SetReborn(true);
+                }
+                if (behavior.effect == TrinketEffect::AVENGE_BLOOD_GEM_BONUS &&
+                    ++trinket.triggerProgress >= behavior.value)
+                {
+                    trinket.triggerProgress = 0;
+                    owner.season14.AddBloodGemBonus(behavior.attack, behavior.health);
+                }
+            }
+        }
+
+        // Blood Golem Sticker watches every friendly Quilboar death,
+        // including Quilboars summoned after combat began. Resolve it after
+        // the minion's own deathrattle so the newly freed slot is available.
+        if (removedMinion.HasRace(Race::QUILBOAR))
+        {
+            bool hasBloodGolemSticker = false;
+            for (const auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                if (FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
+                    TrinketEffect::START_COMBAT_QUILBOAR_BLOOD_GOLEM)
+                {
+                    hasBloodGolemSticker = true;
+                    break;
+                }
+            }
+            if (hasBloodGolemSticker)
+                SimpleTasks::QuilboarBloodGolemDeathrattleTask{}.Run(owner, removedMinion);
         }
 
         if (removedMinion.DeathrattleAttackTransfer() != 0 ||
@@ -887,6 +1083,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     alive.value().ActivateTrigger(TriggerType::SUMMON,
                                                   removedMinion);
                 });
+                owner.ApplySummonTrinkets(removedMinion);
                 // Dispatch only after the revived entity is inserted and
                 // alive. This preserves deathrattle -> Reborn -> summon
                 // ordering and gives post-Reborn effects the real instance.
@@ -903,6 +1100,40 @@ void Battle::ProcessDestroy(bool beforeAttack)
         // a newly reborn friendly minion also receives the permanent bonus.
         Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
         auto& combatField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
+        bool hasBuddyAvenge = false;
+        combatField.ForEachAlive([&hasBuddyAvenge](const MinionData& data) {
+            const auto& id = data.value().GetCardID();
+            hasBuddyAvenge = hasBuddyAvenge || id == "BG22_HERO_002_Buddy" ||
+                             id == "BG22_HERO_002_Buddy_G" ||
+                             id == "BG22_HERO_003_Buddy" ||
+                             id == "BG22_HERO_003_Buddy_G";
+        });
+        if (hasBuddyAvenge && ++owner.season14.buddyAvengeDeaths >= 2) {
+            int attack = 0, health = 0;
+            combatField.ForEachAlive([&attack, &health](const MinionData& data) {
+                const auto& id = data.value().GetCardID();
+                if (id == "BG22_HERO_002_Buddy") attack += 1;
+                else if (id == "BG22_HERO_002_Buddy_G") attack += 2;
+                else if (id == "BG22_HERO_003_Buddy") health += 1;
+                else if (id == "BG22_HERO_003_Buddy_G") health += 2;
+            });
+            owner.season14.buddyAvengeDeaths = 0;
+            ApplyPermanentAvengeBonus(owner, combatField, attack, health);
+        }
+        // Monstrosity gains the dead friendly minion's Attack permanently;
+        // golden Monstrosity gains it twice. Resolve on the combat copy so
+        // the normal persistent-state reconciliation carries it back to the
+        // recruit entity after combat.
+        const int deadAttack = removedMinion.GetAttack();
+        if (deadAttack > 0) {
+            combatField.ForEachAlive([deadAttack](MinionData& data) {
+                auto& receiver = data.value();
+                if (receiver.GetCardID() == "BG20_HERO_282_Buddy")
+                    receiver.SetAttack(receiver.GetAttack() + deadAttack);
+                else if (receiver.GetCardID() == "BG20_HERO_282_Buddy_G")
+                    receiver.SetAttack(receiver.GetAttack() + 2 * deadAttack);
+            });
+        }
         combatField.ForEachAlive([&owner](MinionData& data) {
             data.value().TriggerAvenge(owner);
         });
@@ -913,6 +1144,19 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 owner,
                 std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field,
                 avenger.attack, avenger.health);
+        }
+        const auto trinketAvenger = owner.season14.OnTrinketFriendlyMinionDied();
+        if (trinketAvenger.first != 0 || trinketAvenger.second != 0)
+        {
+            ApplyPermanentAvengeBonus(
+                owner, combatField, trinketAvenger.first,
+                trinketAvenger.second);
+            // Gilnean Thorned Rose deals one damage to the same friendly
+            // minions after granting the permanent stats.  Keep this on the
+            // combat copy; reconciliation only commits the stat delta.
+            combatField.ForEachAlive([](MinionData& data) {
+                data.value().SetHealth(data.value().GetHealth() - 1);
+            });
         }
     }
 

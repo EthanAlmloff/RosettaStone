@@ -55,6 +55,8 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch53.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch54.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch55.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch56.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch57.hpp>
 #include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch31.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch26.hpp>
@@ -124,6 +126,8 @@ CardDefs::CardDefs()
     ModernMinionBehaviorsBatch53::AddAll(m_data);
     ModernMinionBehaviorsBatch54::AddAll(m_data);
     ModernMinionBehaviorsBatch55::AddAll(m_data);
+    ModernMinionBehaviorsBatch56::AddAll(m_data);
+    ModernMinionBehaviorsBatch57::AddAll(m_data);
     GeneratedBehaviorMappings::AddAll(m_data);
     ModernMinionBehaviorsBatch31::AddAll(m_data);
     ModernMinionBehaviorsBatch26::AddAll(m_data);

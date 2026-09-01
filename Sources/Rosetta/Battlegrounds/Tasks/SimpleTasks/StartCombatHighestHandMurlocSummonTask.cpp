@@ -11,6 +11,11 @@ TaskStatus StartCombatHighestHandMurlocSummonTask::Run(Player& p, Minion&) {
     const auto count = std::min<std::size_t>(candidates.size(), static_cast<std::size_t>(std::max(0, m_count)));
     for (std::size_t i = 0; i < count && !p.GetField().IsFull(); ++i) {
         Minion copy{*candidates[i]}; p.ApplyFreshMinionModifiers(copy); copy.getPlayerCallback = [&p]() -> Player& { return p; }; if (p.getNextCardIndexCallback) copy.SetIndex(p.getNextCardIndexCallback()); p.GetField().Add(copy);
+        Minion& summoned = p.GetField()[p.GetField().GetCount() - 1];
+        p.GetField().ForEachAlive([&summoned](MinionData& alive) {
+            alive.value().ActivateTrigger(TriggerType::SUMMON, summoned);
+        });
+        p.ApplySummonTrinkets(summoned);
     }
     return count == 0 ? TaskStatus::STOP : TaskStatus::COMPLETE;
 }

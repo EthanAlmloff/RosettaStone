@@ -7,7 +7,13 @@ TaskStatus StartCombatHandSelfCopyTask::Run(Player& p, Minion& source) {
     p.hand.ForEach([&](const std::optional<CardData>& entry) { if (!snapshot && std::holds_alternative<Minion>(*entry) && std::get<Minion>(*entry).GetCardID() == id) snapshot = &std::get<Minion>(*entry); });
     if (!snapshot) return TaskStatus::STOP;
     Minion copy{*snapshot}; if (m_golden) { copy.SetAttack(copy.GetAttack() * 2); copy.SetHealth(copy.GetHealth() * 2); }
-    p.ApplyFreshMinionModifiers(copy); copy.getPlayerCallback = [&p]() -> Player& { return p; }; if (p.getNextCardIndexCallback) copy.SetIndex(p.getNextCardIndexCallback()); p.GetField().Add(copy); return TaskStatus::COMPLETE;
+    p.ApplyFreshMinionModifiers(copy); copy.getPlayerCallback = [&p]() -> Player& { return p; }; if (p.getNextCardIndexCallback) copy.SetIndex(p.getNextCardIndexCallback()); p.GetField().Add(copy);
+    Minion& summoned = p.GetField()[p.GetField().GetCount() - 1];
+    p.GetField().ForEachAlive([&summoned](MinionData& alive) {
+        alive.value().ActivateTrigger(TriggerType::SUMMON, summoned);
+    });
+    p.ApplySummonTrinkets(summoned);
+    return TaskStatus::COMPLETE;
 }
 TaskStatus StartCombatHandSelfCopyTask::Run(Player& p, Minion& s, Minion&) { return Run(p, s); }
 }

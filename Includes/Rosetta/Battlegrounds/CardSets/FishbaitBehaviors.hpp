@@ -20,6 +20,30 @@ struct FishbaitSellDefinition
     std::int32_t generatedFishbaitDbfID;
 };
 
+//! Generated Fishbait entities retain their own typed deathrattle contract.
+//! They are not ordinary CardDefs because the Shark lifecycle may resolve
+//! them immediately when the left-most Beast attacks.
+struct FishbaitTokenDefinition
+{
+    std::string_view id;
+    std::int32_t dbfID;
+    std::int32_t killerStat;
+};
+
+inline constexpr std::array<FishbaitTokenDefinition, 2>
+    FISHBAIT_TOKEN_BEHAVIORS = {{
+        {"BG36_205", 132802, 5},
+        {"BG36_205_G", 132803, 10},
+    }};
+
+constexpr const FishbaitTokenDefinition* FindFishbaitTokenBehavior(
+    std::int32_t dbfID) noexcept
+{
+    for (const auto& definition : FISHBAIT_TOKEN_BEHAVIORS)
+        if (definition.dbfID == dbfID) return &definition;
+    return nullptr;
+}
+
 inline constexpr std::array<FishbaitSellDefinition, 4>
     FISHBAIT_SELL_BEHAVIORS = {{
         {"BG36_181", 133455, FishbaitSellKind::AIR_BALLER, 2, 0},

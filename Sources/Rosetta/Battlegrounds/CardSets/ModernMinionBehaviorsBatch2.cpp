@@ -2,6 +2,7 @@
 
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch2.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
+#include <Rosetta/Battlegrounds/CardSets/SewerRatTokenBehaviors.hpp>
 
 #include <utility>
 
@@ -38,8 +39,11 @@ void ModernMinionBehaviorsBatch2::AddAll(
     // BG32_172 Auto Assembler summons an Ancestral Automaton. The golden
     // form explicitly summons the golden generated entity.
 
-    // BG35_604 Sewer Lord summons two rats. Registering the rat definitions
-    // below makes the nested rat -> Half-Shell deathrattle executable too.
+    // BG35_604 Sewer Lord summons two rats. The rat family is itself
+    // executable: each generated Rat deathrattle summons its pinned
+    // Half-Shell token, including the golden pair.
+    cards.emplace("BG19_010t", CardDef{});
+    cards.emplace("BG19_010_Gt", CardDef{});
 
     // Aureate Laureate is always golden but has no distinct behavior beyond
     // the Divine Shield keyword represented by the pinned metadata.

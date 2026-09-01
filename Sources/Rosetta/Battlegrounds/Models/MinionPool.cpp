@@ -292,6 +292,20 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern,
     }
 }
 
+bool MinionPool::AddRandomMinionToTavern(Player& player, Tavern& tavern, int tier)
+{
+    if (tavern.fieldZone.IsFull()) return false;
+    auto candidates = GetMinions(tier, tier, true);
+    if (candidates.empty()) return false;
+    Random::shuffle(candidates.begin(), candidates.end());
+    const auto poolIndex = candidates.front().GetPoolIndex();
+    auto minion = std::move(candidates.front());
+    player.ApplyFreshMinionModifiers(minion);
+    tavern.fieldZone.Add(std::move(minion));
+    std::get<2>(m_minions.at(poolIndex)) = false;
+    return true;
+}
+
 void MinionPool::ReturnMinion(int idx)
 {
     if (idx < 0 || idx >= NUM_TOTAL_TAVERN_MINIONS)

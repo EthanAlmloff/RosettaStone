@@ -53,6 +53,30 @@ class Player
     //! passive hero powers do not depend on the minion first appearing in the
     //! Tavern.
     void ApplyFreshMinionModifiers(Minion& minion) const;
+    //! Installs the supported generated quest-reward aura on a fresh or
+    //! existing minion. Unsupported modal options remain fail-closed.
+    bool ApplyGeneratedQuestReward(std::int32_t dbfID);
+    //! Resolves player-owned generated rewards at recruit end / combat start.
+    void ResolveGeneratedQuestRewardEndTurn();
+    void ResolveGeneratedQuestRewardStartCombat(FieldZone& combatField);
+    void ResolveGeneratedQuestRewardDeath(Minion& deadMinion);
+    void ResolveGeneratedQuestRewardSnickerSnacks();
+    void ResolveGeneratedQuestRewardStartTurn();
+    //! Arms Fodder refreshes from Woodland Defiler end-of-turn triggers.
+    void ResolveFodderDefilerEndTurn();
+    void ResolveEnigmaticHeadstoneEndTurn();
+    bool AddGeneratedDiscoverCopy(const Card& card);
+    //! Applies Tamuzo's combat-only summon multiplier to a newly summoned unit.
+    void ApplyTamuzoCombatSummon(Minion& summoned);
+    //! Resolves combat-only Trinkets that listen to a newly summoned minion.
+    //! The call is made by every authoritative summon path after insertion
+    //! and ordinary SUMMON observers have seen the entity.
+    void ApplySummonTrinkets(Minion& summoned);
+    void RefreshSousChefHeroPowerUses();
+    //! Applies Watfin only after Detective for Hire commits a correct guess.
+    void ResolveWatfinGuess(bool correct, const Card& guessedMinion);
+    //! Resolves Zippers only when a canonical helpful-card pool is available.
+    bool ResolveZippersDeathrattle();
     //! Gives +2/+2 to one random friendly minion of every occupied Tavern
     //! Tier, using the simulator RNG stream.
     void ApplyNaturalBalance();
@@ -145,12 +169,17 @@ class Player
     //! hand.  Only concrete minion and spell cards are accepted; unsupported
     //! modal effects remain pending and fail closed.
     bool ApplyChoice(std::size_t offeringIdx);
+    //! Applies Conviction's selected improvement option and its random
+    //! friendly-minion buff. The modal itself is replayable through Choice.
+    bool ApplyConvictionHeroPower();
     //! Resolve a completed Dungar flightpath at recruit start.
     bool ResolveFlightpathCompletion();
     //! Sell one friendly minion and transfer its current stats to another.
     bool ApplyDevour(std::size_t sourceIdx, std::size_t targetIdx);
     //! Begin I Spy's public Discover from the next opponent's visible warband.
     bool BeginISpyDiscover();
+    //! Adds the next opponent's public hero-linked Buddy at recruit start.
+    int ResolveWardenBuddy();
     //! Begin Power of the Storm's two-option hero-power choice.
     bool BeginPowerOfStormChoice();
     //! Begin a seeded Discover offering of supported Tavern spells.
@@ -162,8 +191,10 @@ class Player
     //! Resolves persistent Trinket effects after any successful Tavern spell,
     //! including modal/Choose-One completion paths.
     void ApplyTavernSpellTrinkets();
-    void ApplyAfterPlayCardTrinkets();
+    void ApplyAfterPlayCardTrinkets(Race playedRace = Race::INVALID);
     void ApplyAfterRebornTrinkets();
+    void ApplyStartCombatTrinkets();
+    void ResolveStartTurnTrinkets();
     bool ShouldDuplicateDragonBattlecry() const noexcept;
     void ApplyFirstMinionDivineShield(Minion& minion);
     void ApplyDeferredTavernSpellStats();
@@ -211,6 +242,11 @@ class Player
     //! minions in the same zone as the damage.  Armor-only damage never
     //! reaches this lifecycle.
     void DispatchHeroDamage(const HeroDamageEvent& event);
+    //! Dispatches damage dealt by a hero power to Buddy listeners.
+    void DispatchHeroPowerDamage(int damage);
+    //! Commits a supported damaging hero-power activation and dispatches the
+    //! actual damage exactly once. Generic card damage must not use this.
+    bool ResolveDamagingHeroPower(int actualDamage);
 
     PlayState playState = PlayState::INVALID;
     std::size_t idx = 0;
@@ -235,6 +271,8 @@ class Player
     std::function<void(Player&)> selectHeroCallback;
     std::function<void(Player&)> prepareTavernMinionsCallback;
     std::function<void(Player&, std::size_t)> purchaseMinionCallback;
+    std::function<bool(Player&, int)> addRandomTavernMinionCallback;
+    std::function<bool(Player&, int)> addRandomMinionToHandCallback;
     std::function<int()> getNextCardIndexCallback;
     std::function<void(int)> returnMinionCallback;
     std::function<void(Player&)> clearTavernMinionsCallback;

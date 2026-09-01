@@ -46,6 +46,7 @@ class MinionPool
     //! \param tavern The tavern to add minions.
     void AddMinionsToTavern(Player& player, Tavern& tavern);
     void AddMinionsToTavern(Player& player, Tavern& tavern, Race preferredRace);
+    bool AddRandomMinionToTavern(Player& player, Tavern& tavern, int tier);
 
     //! Returns a minion to the pool.
     //! \param idx The pool index of a minion.

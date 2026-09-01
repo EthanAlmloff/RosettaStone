@@ -21,6 +21,7 @@ TaskStatus DarkGiftGolemDeathrattleTask::Run(Player& player, Minion& source) {
   player.GetField().ForEachAlive([&added](MinionData& data) {
     data.value().ActivateTrigger(TriggerType::SUMMON, added);
   });
+  player.ApplySummonTrinkets(added);
   return TaskStatus::COMPLETE;
 }
 TaskStatus DarkGiftGolemDeathrattleTask::Run(Player& player, Minion& source, Minion&) { return Run(player, source); }

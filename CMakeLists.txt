@@ -30,11 +30,17 @@ include_directories(Includes)
 include_directories(Extensions/RosettaPython/Includes)
 
 # Dependencies
-find_package(doctest CONFIG REQUIRED)
+option(BUILD_TESTING "Build RosettaStone tests" ON)
+if (BUILD_TESTING)
+    find_package(doctest CONFIG REQUIRED)
+endif()
 find_package(effolkronium_random CONFIG REQUIRED)
-find_package(lyra CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
-find_package(pybind11 CONFIG REQUIRED)
+option(BUILD_EXTENSIONS "Build RosettaStone command-line extensions" ON)
+if (BUILD_EXTENSIONS)
+    find_package(lyra CONFIG REQUIRED)
+    find_package(pybind11 CONFIG REQUIRED)
+endif()
 
 # Compile options
 include(Builds/CMake/CompileOptions.cmake)
@@ -104,9 +110,13 @@ set(RESOURCES_JSONS
 
 # Project modules
 add_subdirectory(Sources/Rosetta)
-add_subdirectory(Tests/UnitTests)
-add_subdirectory(Extensions/RosettaConsole)
-add_subdirectory(Extensions/RosettaTool)
+if (BUILD_TESTING)
+    add_subdirectory(Tests/UnitTests)
+endif()
+if (BUILD_EXTENSIONS)
+    add_subdirectory(Extensions/RosettaConsole)
+    add_subdirectory(Extensions/RosettaTool)
+endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Builds/setup.py.in ${CMAKE_CURRENT_SOURCE_DIR}/setup.py)
 

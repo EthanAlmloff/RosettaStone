@@ -139,6 +139,8 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     if (id == "BG23_008_Gt") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP };
     if (id == "BG31_830t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
     if (id == "BG31_830_Gt") return { 0, 4, 4, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
+    if (id == "BG34_Giant_035t" || id == "BG34_Giant_035t_G")
+        return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD };
     if (id == "BG28_168") // Shiny Ring: Give your minions +1/+1.
     {
         return { 0, 1, 1, TavernSpellEffect::ALL_STATS };
