@@ -32,6 +32,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomEnemyDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomHandMinionBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomMagneticMechToTargetTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeapfroggerDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSummonFromPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberEndTask.hpp>
@@ -84,6 +85,11 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConfigureAttackThresholdTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellDiscoverTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnConsumeHighestTavernTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConsumeRandomTavernTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/NomiElementalTavernBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonRecentDeadMinionsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DestroyLastDamageSourceTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomElementalHandAndSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomGoldenTierMinionToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellAttackBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GrowingSummonAttackTask.hpp>
@@ -118,6 +124,7 @@ using TaskType =
                  SimpleTasks::RandomFriendlyRaceTask, SimpleTasks::RandomEnemyDamageTask,
                  SimpleTasks::RandomHandMinionBuffTask,
                  SimpleTasks::RandomCardToHandTask,
+                 SimpleTasks::RandomMagneticMechToTargetTask,
                  SimpleTasks::LeapfroggerDeathrattleTask,
                  SimpleTasks::RandomSummonFromPoolTask,
                  SimpleTasks::LeftmostFriendlyRaceTask,
@@ -155,6 +162,11 @@ using TaskType =
                  SimpleTasks::ConfigureAttackThresholdTask,
                  SimpleTasks::BattlecryTavernSpellDiscoverTask,
                  SimpleTasks::EndTurnConsumeHighestTavernTask,
+                 SimpleTasks::ConsumeRandomTavernTask,
+                 SimpleTasks::NomiElementalTavernBuffTask,
+                 SimpleTasks::SummonRecentDeadMinionsTask,
+                 SimpleTasks::DestroyLastDamageSourceTask,
+                 SimpleTasks::RandomElementalHandAndSummonTask,
                  SimpleTasks::RandomGoldenTierMinionToHandTask,
                  SimpleTasks::BattlecryTavernSpellAttackBonusTask,
                  SimpleTasks::GrowingSummonAttackTask,

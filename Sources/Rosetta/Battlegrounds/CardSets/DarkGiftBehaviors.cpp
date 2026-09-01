@@ -21,6 +21,21 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
     {
         return { DarkGiftEffect::DEATHRATTLE_STATS, 0, 10 };
     }
+    if (id == "BG36_MidGameEffect_000t22") // Amalgamation: all minion types.
+        return { DarkGiftEffect::ALL_RACES };
+    if (id == "BG36_MidGameEffect_000t62") // Sunken Persistence: permanent Spellcrafts.
+        return { DarkGiftEffect::SUNKEN_PERSISTENCE };
+    if (id == "BG36_MidGameEffect_000t21")
+        return { DarkGiftEffect::TIME_TURNING };
+    if (id == "BG36_MidGameEffect_000t50") // Tarecgosa's Blessing.
+        return { DarkGiftEffect::TARECGOSA_BLESSING };
+    // Steady Growth (BG36_MidGameEffect_000t51) remains fail-closed: the
+    // checked-in 36.4 DBF export contains +0/+0 placeholders and no
+    // authoritative schedule. Do not infer executable values from comments.
+    if (id == "BG36_MidGameEffect_000t82") // Affinity: every two turns.
+        return { DarkGiftEffect::AFFINITY };
+    if (id == "BG36_MidGameEffect_000t65") // Polarization: end-turn Magnetic Mech.
+        return { DarkGiftEffect::POLARIZATION };
     if (id == "BG36_MidGameEffect_000t52") // Fresh Perspective: two free refreshes on death.
     {
         DarkGiftBehavior behavior;
@@ -213,6 +228,20 @@ bool DarkGiftTargetIsLegal(const Minion& target,
             return true;
         case DarkGiftEffect::TARGET_STATS:
             return behavior.attack != 0 || behavior.health != 0;
+        case DarkGiftEffect::ALL_RACES:
+            return true;
+        case DarkGiftEffect::SUNKEN_PERSISTENCE:
+            return true;
+        case DarkGiftEffect::TIME_TURNING:
+            return true;
+        case DarkGiftEffect::TARECGOSA_BLESSING:
+            return true;
+        case DarkGiftEffect::STEADY_GROWTH:
+            return behavior.attack != 0 || behavior.health != 0;
+        case DarkGiftEffect::AFFINITY:
+            return target.GetRace() != Race::INVALID;
+        case DarkGiftEffect::POLARIZATION:
+            return target.HasRace(Race::MECHANICAL);
         case DarkGiftEffect::TARGET_KEYWORDS:
             return behavior.divineShield || behavior.windfury ||
                    behavior.venomous;
@@ -259,6 +288,33 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
     {
         target.SetAttack(target.GetAttack() + behavior.attack);
         target.SetHealth(target.GetHealth() + behavior.health);
+    }
+    if (behavior.effect == DarkGiftEffect::ALL_RACES) {
+        target.SetAmalgamation();
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::SUNKEN_PERSISTENCE) {
+        target.SetPermanentSpellcraft();
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::TIME_TURNING) {
+        target.SetTimeTurning();
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::TARECGOSA_BLESSING) {
+        target.SetTarecgosaBlessing();
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::AFFINITY) {
+        const auto race = target.GetRace();
+        if (race == Race::INVALID) return false;
+        target.SetAffinity(race);
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::POLARIZATION) {
+        if (!target.HasRace(Race::MECHANICAL)) return false;
+        target.SetPolarization();
+        return true;
     }
 
     if (behavior.effect == DarkGiftEffect::PLAY_CARD_STATS)
@@ -410,6 +466,11 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
     return true;
 }
 
+bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior)
+{
+    return ApplyDarkGift(target, behavior, 0);
+}
+
 bool ApplyDarkGift(Player& player, Minion& target,
                    const DarkGiftBehavior& behavior, int currentCount)
 {
@@ -469,7 +530,13 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
                             "BG36_MidGameEffect_000t18",
                             "BG36_MidGameEffect_000t9",
                             "BG36_MidGameEffect_000t60",
-                            "BG36_MidGameEffect_000t4" })
+                            "BG36_MidGameEffect_000t4",
+                            "BG36_MidGameEffect_000t22",
+                            "BG36_MidGameEffect_000t62",
+                            "BG36_MidGameEffect_000t21",
+                            "BG36_MidGameEffect_000t50",
+                            "BG36_MidGameEffect_000t82",
+                            "BG36_MidGameEffect_000t65" })
     {
         cards.emplace(id, CardDef{});
     }

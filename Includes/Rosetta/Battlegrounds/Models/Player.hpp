@@ -52,7 +52,10 @@ class Player
     //! instance.  This is intentionally callable by pool and summon paths so
     //! passive hero powers do not depend on the minion first appearing in the
     //! Tavern.
-    void ApplyFreshMinionModifiers(Minion& minion) const;
+    void ApplyFreshMinionModifiers(Minion& minion);
+    //! Applies fresh-instance passives plus persistent Tavern-offer auras.
+    //! Shop-only auras never leak onto hand or board summons.
+    void ApplyFreshTavernMinionModifiers(Minion& minion);
     //! Installs the supported generated quest-reward aura on a fresh or
     //! existing minion. Unsupported modal options remain fail-closed.
     bool ApplyGeneratedQuestReward(std::int32_t dbfID);
@@ -62,6 +65,9 @@ class Player
     void ResolveGeneratedQuestRewardDeath(Minion& deadMinion);
     void ResolveGeneratedQuestRewardSnickerSnacks();
     void ResolveGeneratedQuestRewardStartTurn();
+    //! Relics of the Deep grants one Spellcraft at each recruit start.
+    void ResolveRelicsOfTheDeepStartTurn();
+    void ResolveMechGyverDeath();
     //! Arms Fodder refreshes from Woodland Defiler end-of-turn triggers.
     void ResolveFodderDefilerEndTurn();
     void ResolveEnigmaticHeadstoneEndTurn();
@@ -110,6 +116,7 @@ class Player
     //! Summons an exact state copy of a friendly minion with a fresh entity
     //! identity. Used by Cloning Gallery; does not charge or consume hand.
     bool SummonExactMinionCopy(std::size_t idx);
+    bool SummonCombatSnapshot(Minion snapshot);
     //! Adds a metadata-only (plain) copy of the left-most hand card.
     //! Dynamic buffs/enchantments are intentionally not copied.
     bool AddPlainCopyOfLeftmostHandCard();

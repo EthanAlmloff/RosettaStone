@@ -23,4 +23,4 @@ TaskStatus RandomSpellcraftToHandTask::Run(Player& player)
 }
 TaskStatus RandomSpellcraftToHandTask::Run(Player& p, Minion&) { return Run(p); }
 TaskStatus RandomSpellcraftToHandTask::Run(Player& p, Minion& s, Minion&) { return Run(p, s); }
-}}
+}

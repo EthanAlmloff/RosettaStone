@@ -21,4 +21,4 @@ TaskStatus QuilboarBloodGolemDeathrattleTask::Run(Player& player, Minion& source
     return TaskStatus::COMPLETE;
 }
 TaskStatus QuilboarBloodGolemDeathrattleTask::Run(Player& p, Minion& s, Minion&) { return Run(p, s); }
-}}
+}

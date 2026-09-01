@@ -395,8 +395,13 @@ void Game::Recruit()
         player.RefreshSousChefHeroPowerUses();
         player.remainCoin += heroPowerResult.goldDelta;
         player.ResolveStartTurnTrinkets();
+        player.recruitField.ForEachAlive([](MinionData& data) {
+            if (data.value().HasTimeTurning())
+                data.value().ActivateTrigger(TriggerType::TURN_END, data.value());
+        });
         player.remainCoin += player.season14.ResolveDelayedTrinketGold();
         player.ResolveGeneratedQuestRewardStartTurn();
+        player.ResolveRelicsOfTheDeepStartTurn();
         if (player.season14.imprisonedTurns == 0) {
             int imprisonedSlot = -1;
             for (int slot = 0; slot < player.tavern.fieldZone.GetCount(); ++slot) {
@@ -490,6 +495,9 @@ void Game::CompleteRecruitPhase()
             player.ResolveFodderDefilerEndTurn();
             player.ResolveEnigmaticHeadstoneEndTurn();
             player.ResolveGeneratedQuestRewardSnickerSnacks();
+            // Advance persistent end-of-turn counters (including Patient
+            // Scout's tier improvement) before combat begins.
+            player.ResolveDarkGiftEndTurnTriggers();
             if (player.season14.ShouldFreezeRemainingTavern())
             {
                 player.tavern.fieldZone.ForEach(
@@ -717,6 +725,8 @@ void Game::Combat()
         player2.getBattleCallback = [&battle]() -> Battle& { return battle; };
 
         const CombatResult result = battle.Run();
+        player1.season14.lastCombatLost = result.outcome == BattleResult::PLAYER2_WIN;
+        player2.season14.lastCombatLost = result.outcome == BattleResult::PLAYER1_WIN;
         // Combat fields are copies.  Commit only deltas explicitly marked as
         // permanent by combat effects before post-combat rewards resolve.
         battle.CommitPersistentState();

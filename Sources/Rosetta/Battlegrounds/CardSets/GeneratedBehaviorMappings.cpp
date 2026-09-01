@@ -123,7 +123,7 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddBattlecryTask(SimpleTasks::GainGoldTask{2, false}); cards.emplace("BG26_135_G", CardDef{std::move(p)}); }
   { Power p; p.AddBattlecryTask(SimpleTasks::FreeRefreshTask{1}); cards.emplace("BGS_116", CardDef{std::move(p)}); }
   { Power p; p.AddBattlecryTask(SimpleTasks::FreeRefreshTask{2}); cards.emplace("TB_BaconUps_167", CardDef{std::move(p)}); }
-  { Power p; Trigger t{TriggerType::BUY_MINION}; t.SetTriggerSource(TriggerSource::FRIENDLY); t.SetTasks({SimpleTasks::BuyMinionTask{2, 2, 0, false, 0}}); p.AddTrigger(std::move(t)); cards.emplace("TB_BaconShop_HERO_01_Buddy_G", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::BUY_MINION}; t.SetTriggerSource(TriggerSource::FRIENDLY); t.SetTasks({SimpleTasks::BuyMinionTask{4, 4, 0, false, 0}}); p.AddTrigger(std::move(t)); cards.emplace("TB_BaconShop_HERO_01_Buddy_G", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::BUY_MINION}; t.SetTriggerSource(TriggerSource::FRIENDLY); t.SetTasks({SimpleTasks::BuyMinionTask{0, 0, 1, false, 0}}); p.AddTrigger(std::move(t)); cards.emplace("BG20_HERO_102_Buddy_G", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::BUY_MINION}; t.SetTriggerSource(TriggerSource::FRIENDLY); t.SetTasks({SimpleTasks::BuyMinionTask{20, 20, 2, true, 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_950", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::BUY_MINION}; t.SetTriggerSource(TriggerSource::FRIENDLY); t.SetTasks({SimpleTasks::BuyMinionTask{20, 20, 3, true, 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG34_950_G", CardDef{std::move(p)}); }
@@ -358,8 +358,8 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; Trigger t{TriggerType::HERO_DAMAGE}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::HeroDamageThresholdSpellTask{3, "BG28_168", 2}}); p.AddTrigger(std::move(t)); cards.emplace("BG36_733_G", CardDef{std::move(p)}); }
   { Power p; p.AddActivate({ActivateEffect::DESTROY_UNDEAD_BUFF_SELF, 1, 4, 4, 1}); cards.emplace("BG36_511", CardDef{std::move(p)}); }
   { Power p; p.AddActivate({ActivateEffect::DESTROY_UNDEAD_BUFF_SELF, 1, 8, 8, 1}); cards.emplace("BG36_511_G", CardDef{std::move(p)}); }
-  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_FISHBAIT, 2, 5, 0, 1, "BG36_205"}); cards.emplace("BG36_201", CardDef{std::move(p)}); }
-  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_FISHBAIT, 2, 10, 0, 1, "BG36_205_G"}); cards.emplace("BG36_201_G", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_FISHBAIT, 2, 5, 0, 1, false, "BG36_205"}); cards.emplace("BG36_201", CardDef{std::move(p)}); }
+  { Power p; p.AddActivate({ActivateEffect::ACTIVATE_FISHBAIT, 2, 10, 0, 1, false, "BG36_205_G"}); cards.emplace("BG36_201_G", CardDef{std::move(p)}); }
   { Power p; p.AddActivate({ActivateEffect::ACTIVATE_RANDOM_TAVERN_SPELLS, 1, 0, 0, 2}); cards.emplace("BG36_508", CardDef{std::move(p)}); }
   { Power p; p.AddActivate({ActivateEffect::ACTIVATE_RANDOM_TAVERN_SPELLS, 1, 0, 0, 4}); cards.emplace("BG36_508_G", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::AddCardTask{"BG35_140", 1}}); p.AddTrigger(std::move(t)); cards.emplace("BG35_142", CardDef{std::move(p)}); }
@@ -376,5 +376,6 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddDeathrattleTask(SimpleTasks::RandomFriendlyRaceTask{Race::BEAST, 2, 2, 1, false, true}); cards.emplace("BG36_202_G", CardDef{std::move(p)}); }
   { cards.emplace("BG36_206", CardDef{}); }
   { cards.emplace("BG36_206_G", CardDef{}); }
+  { cards.emplace("BG23_HERO_304p", CardDef{}); }
 }
 }

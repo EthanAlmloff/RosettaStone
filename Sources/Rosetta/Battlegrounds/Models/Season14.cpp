@@ -7,6 +7,23 @@
 
 namespace RosettaStone::Battlegrounds
 {
+std::vector<Minion> Season14State::TakeCombatDeadMinions(Race race, std::size_t count)
+{
+    std::vector<Minion> result;
+    for (auto it = combatDeadMinions.begin(); it != combatDeadMinions.end() && result.size() < count; ++it) {
+        if (race == Race::INVALID || it->HasRace(race)) {
+            // Kangor summons *plain* copies.  Do not carry over a dead
+            // instance's golden flag, enchantments, temporary keywords, or
+            // combat-damaged stats; resolve the normal card definition.
+            const auto card = Cards::FindCardByID(it->GetCardID());
+            const auto plainCard = card.normalDbfID != 0
+                                       ? Cards::FindCardByDbfID(card.normalDbfID)
+                                       : card;
+            result.emplace_back(plainCard);
+        }
+    }
+    return result;
+}
 bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
 {
     const auto* definition = FindSeason14GeneratedQuestReward(dbfID);
@@ -64,6 +81,7 @@ void Season14State::BeginDecision(
         pendingTavernReplacementTier = 0;
         chooseOne = {};
         spellModal = {};
+        transformModal = {};
         pendingHandLock = false;
         return;
     }
@@ -76,6 +94,7 @@ void Season14State::BeginDecision(
     pendingTavernReplacementTier = 0;
     chooseOne = {};
     spellModal = {};
+    transformModal = {};
     pendingHandLock = false;
     if (decision == Season14Decision::CHOICE ||
         decision == Season14Decision::DISCOVER)
@@ -220,6 +239,36 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     lastTavernSpellDbfID = 0;
 }
 
+bool Season14State::BeginTransformDecision(std::uint64_t sourceEntityID,
+                                            std::int32_t sourceCardDbfID,
+                                            std::uint64_t targetEntityID,
+                                            std::int32_t targetIndex,
+                                            std::int32_t targetTier)
+{
+    if (pendingDecision != Season14Decision::NONE || targetEntityID == 0 ||
+        targetIndex < 0 || targetTier < 1)
+        return false;
+    pendingDecision = Season14Decision::CHOOSE_ONE;
+    pendingSourceEntityID = sourceEntityID;
+    pendingSourceCardDbfID = sourceCardDbfID;
+    pendingOfferings.clear();
+    choiceOfferings.clear();
+    transformModal = { Season14TransformStage::TARGET, sourceEntityID,
+                       sourceCardDbfID, targetEntityID, targetIndex, targetTier };
+    return true;
+}
+
+void Season14State::CancelTransformDecision() noexcept
+{
+    if (transformModal.stage == Season14TransformStage::NONE) return;
+    transformModal = {};
+    pendingDecision = Season14Decision::NONE;
+    pendingSourceEntityID = 0;
+    pendingSourceCardDbfID = 0;
+    pendingOfferings.clear();
+    choiceOfferings.clear();
+}
+
 bool Season14State::BeginConvictionImprovementChoice()
 {
     if (heroPowerDbfID != 73941 || convictionPendingImprovements <= 0 ||
@@ -265,6 +314,7 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     if (luckyRollCooldown > 0) --luckyRollCooldown;
     goldSpentThisTurn = 0;
     soldMinionsThisTurn = 0;
+    trinketHeroPowerRepeats = trinketHeroPowerRepeatSources;
     buddyAvengeDeaths = 0;
     refreshExtraShopSlots = 0;
     spellMinionAttackDelta = 0;
@@ -1193,8 +1243,9 @@ std::int32_t Season14State::EffectiveHeroPowerCost() const
 bool Season14State::UseHeroPower()
 {
     if (!heroPowerAvailable ||
-        (heroPowerUsed && !(heroPowerDbfID == 71459 &&
-                            heroPowerBatch2.bloodboundUsesThisTurn < 2)) ||
+        (heroPowerUsed && trinketHeroPowerRepeats <= 0 &&
+         !(heroPowerDbfID == 71459 &&
+           heroPowerBatch2.bloodboundUsesThisTurn < 2)) ||
         heroPowerDbfID == 0)
     {
         return false;
@@ -1202,8 +1253,12 @@ bool Season14State::UseHeroPower()
 
     if (heroPowerDbfID != 71459)
     {
-        if (heroPowerUsed && buddyExtraHeroPowerUses > 0) --buddyExtraHeroPowerUses;
-        else heroPowerUsed = true;
+        if (heroPowerUsed && trinketHeroPowerRepeats > 0)
+            --trinketHeroPowerRepeats;
+        else if (heroPowerUsed && buddyExtraHeroPowerUses > 0)
+            --buddyExtraHeroPowerUses;
+        else
+            heroPowerUsed = true;
     }
     // The Galaxy's Lens grants a one-use discount for the next hero power.
     // Consume it at the successful use site so failed/unauthorized attempts
@@ -1302,6 +1357,9 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 // aura is installed because only Golden minions qualify.
                 break;
             case TrinketEffect::NONE:
+                break;
+            case TrinketEffect::HERO_POWER_TWICE:
+                ++trinketHeroPowerRepeatSources;
                 break;
         }
     }

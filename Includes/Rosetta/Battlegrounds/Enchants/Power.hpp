@@ -85,6 +85,7 @@ class Power
     //! Returns a list of start of combat tasks.
     //! \return A list of start of combat tasks.
     std::vector<TaskType>& GetStartCombatTask();
+    const std::vector<TaskType>& GetStartCombatTask() const;
 
     //! Returns a list of deathrattle tasks.
     //! \return A list of deathrattle tasks.

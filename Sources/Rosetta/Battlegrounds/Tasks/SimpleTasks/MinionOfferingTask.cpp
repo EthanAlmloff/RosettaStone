@@ -51,7 +51,14 @@ TaskStatus MinionOfferingTask::Run(Player& player, Minion& source) {
     });
     if (!found) return TaskStatus::COMPLETE;
   }
-  auto candidates = Pool(m_race, std::max(1, m_minTier), std::min(7, m_maxTier));
+  int minTier = std::max(1, m_minTier);
+  int maxTier = std::min(7, m_maxTier);
+  if (source.GetCardID() == "BG24_715" || source.GetCardID() == "BG24_715_G") {
+    const int tier = std::min(6, 1 + source.PatientScoutTurns());
+    minTier = maxTier = tier;
+    if (source.GetCardID().ends_with("_G")) maxTier = std::min(6, tier + 1);
+  }
+  auto candidates = Pool(m_race, minTier, maxTier);
   if (candidates.empty()) return TaskStatus::COMPLETE;
   Random::shuffle(candidates.begin(), candidates.end());
   const auto count = std::min<std::size_t>(static_cast<std::size_t>(m_count), candidates.size());

@@ -91,7 +91,9 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            AVENGE_RANDOM_UNDEAD_REBORN,
                            FIRST_DEATH_MAX_STATS_RANDOM,
                            AVENGE_RANDOM_MAGNETIC,
-                           AFTER_TWO_ATTACKS_QUILBOAR_GEM };
+                           AFTER_TWO_ATTACKS_QUILBOAR_GEM,
+                           HERO_POWER_TWICE,
+                           SPELLCRAFT_TRANSFORM_HIGHER_TIER };
 // End-of-recruit persistent race aura.
 // Effects whose trigger is a successful recruit-phase refresh or self-damage
 // are deliberately separate from static auras: their counters must survive

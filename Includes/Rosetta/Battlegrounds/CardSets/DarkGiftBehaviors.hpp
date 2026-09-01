@@ -22,6 +22,13 @@ enum class DarkGiftEffect
 {
     NONE,
     TARGET_STATS,
+    ALL_RACES,
+    SUNKEN_PERSISTENCE,
+    TIME_TURNING,
+    TARECGOSA_BLESSING,
+    STEADY_GROWTH,
+    AFFINITY,
+    POLARIZATION,
     TARGET_KEYWORDS,
     TARGET_MULTI_HIT_DIVINE_SHIELD,
     TARGET_GOLDEN,
@@ -85,7 +92,8 @@ bool DarkGiftTargetIsLegal(const Minion& target,
 //! Applies a previously validated gift to one friendly board minion.
 //! Returns false for an unsupported behavior and performs no mutation then.
 bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
-                   int currentCount = 0);
+                   int currentCount);
+bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior);
 
 //! Applies a gift when its effect also needs the owning player's hand.
 bool ApplyDarkGift(Player& player, Minion& target,

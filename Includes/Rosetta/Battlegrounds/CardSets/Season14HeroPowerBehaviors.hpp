@@ -25,6 +25,8 @@ enum class Season14HeroPowerKind : std::uint8_t
     TAVERN_SPELL_AURA,
     MAX_GOLD,
     RANDOM_TAVERN_SPELL,
+    START_TURN_SPELLCRAFT,
+    MECHGYVER,
     BOON_OF_LIGHT,
     SHARPEN_BLADES,
     BURIED_TREASURE,
@@ -146,7 +148,7 @@ constexpr std::string_view GeneratedQuestRewardMissingLinkReason(
 }
 
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 37>
+inline constexpr std::array<Season14HeroPowerDefinition, 51>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},
@@ -166,6 +168,10 @@ inline constexpr std::array<Season14HeroPowerDefinition, 37>
          Season14HeroPowerKind::MAX_GOLD, 3, false},
         {"BG28_HERO_801p", 110472,
          Season14HeroPowerKind::RANDOM_TAVERN_SPELL, 1, false},
+        {"BG23_HERO_304p", 85126,
+         Season14HeroPowerKind::START_TURN_SPELLCRAFT, 1, true},
+        {"BG22_HERO_200p", 81572,
+         Season14HeroPowerKind::MECHGYVER, 9, true},
         {"BG21_HERO_000p", 73941,
          Season14HeroPowerKind::CONVICTION, 0, false},
         {"TB_BaconShop_HP_010", 57562,

@@ -4,6 +4,10 @@ namespace RosettaStone::Battlegrounds
 {
 TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
 {
+    if (id == "BG30_MagicItem_416") return {TrinketEffect::SPELLCRAFT_TRANSFORM_HIGHER_TIER};
+    // Ancient Wishbone says "Your Hero Power triggers twice." The current
+    // model only supports an extra paid/use gate, not duplicate resolution
+    // from one activation, so this remains fail-closed.
     // Only effects whose complete acquisition and lifecycle semantics are
     // implemented are registered here.  Nether Pendant and both Cheese
     // Wheel forms improve on a counter; Innkeeper's Stein and Minion Bait
@@ -139,6 +143,7 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
 
 void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
 {
+    cards.emplace("BG30_MagicItem_416", CardDef{});
     cards.emplace("BG30_MagicItem_996", CardDef{});
     cards.emplace("BG30_MagicItem_998", CardDef{});
     cards.emplace("BG30_MagicItem_841", CardDef{});

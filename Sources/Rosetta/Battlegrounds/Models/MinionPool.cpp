@@ -280,7 +280,7 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern,
         // A passive such as ALL Will Burn! applies when a fresh minion
         // instance is created, including fills that bypass Player::PrepareTavern
         // in isolated bridge/replay setups.
-        player.ApplyFreshMinionModifiers(minion);
+        player.ApplyFreshTavernMinionModifiers(minion);
         tavern.fieldZone.Add(minion);
         std::get<2>(m_minions.at(minion.GetPoolIndex())) = false;
         ++idx;
@@ -300,8 +300,8 @@ bool MinionPool::AddRandomMinionToTavern(Player& player, Tavern& tavern, int tie
     Random::shuffle(candidates.begin(), candidates.end());
     const auto poolIndex = candidates.front().GetPoolIndex();
     auto minion = std::move(candidates.front());
-    player.ApplyFreshMinionModifiers(minion);
-    tavern.fieldZone.Add(std::move(minion));
+    player.ApplyFreshTavernMinionModifiers(minion);
+    tavern.fieldZone.Add(minion);
     std::get<2>(m_minions.at(poolIndex)) = false;
     return true;
 }

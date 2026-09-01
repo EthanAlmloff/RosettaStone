@@ -166,6 +166,8 @@ Race Minion::GetRace() const
 
 bool Minion::HasRace(Race race) const
 {
+    if (m_amalgamation && race != Race::INVALID && race != Race::ALL)
+        return true;
     return m_card.HasRace(race);
 }
 
@@ -625,7 +627,20 @@ void Minion::ApplyTemporaryStats(int attack, int health, bool taunt)
 
 void Minion::ApplyCombatPersistentStats(int attack, int health)
 {
+    // This API represents a gain explicitly marked permanent by a combat
+    // effect.  Damage and debuffs use the ordinary setters and must never be
+    // recorded as persistent deltas, even if a caller passes a mixed or
+    // negative value accidentally.
+    attack = std::max(attack, 0);
+    health = std::max(health, 0);
     if (attack == 0 && health == 0) return;
+    // Tarecgosa doubles stats gained during combat, while retaining the
+    // explicit persistent accounting so only those gains survive reconciliation.
+    if (m_tarecgosaBlessing)
+    {
+        attack *= 2;
+        health *= 2;
+    }
     SetAttack(GetAttack() + attack);
     SetHealth(GetHealth() + health);
     m_combatPersistentAttack += attack;
@@ -937,6 +952,7 @@ void Minion::TakeDamage(Minion& source)
         return;
     }
 
+    SetLastDamageSource(source);
     const int damage = source.GetAttack();
     m_health -= damage;
     if (m_health <= 0 || (source.HasVenomous() && damage > 0))
@@ -1050,6 +1066,14 @@ bool Minion::IsValidPlayTarget(Player& player, int targetIdx)
     {
         Minion& target = player.recruitField[targetIdx];
 
+        // Mind Muck's targeting metadata is a friendly-minion arrow, but its
+        // semantic requirement is a friendly Demon.  Keep legality aligned
+        // with ConsumeRandomTavernTask so an invalid target cannot consume
+        // the Tavern and then fail the battlecry.
+        if ((GetCardID() == "BG23_357" || GetCardID() == "BG23_357_G") &&
+            !target.HasRace(Race::DEMON))
+            return false;
+
         if (!CheckTargetingType(target))
         {
             return false;
@@ -1117,18 +1141,36 @@ void Minion::ActivateTask(PowerType type, Player& player)
         player.AdvanceDarkGiftCounters(1);
     }
 
+    int repeats = 1;
+    if (type == PowerType::DEATHRATTLE) {
+        // During combat battleField is the copied authoritative board;
+        // recruitField still contains the originals.  Outside combat use the
+        // recruit board.  Sum every Titus copy: the effect stacks rather than
+        // taking the strongest copy, and Titus has no deathrattle of its own.
+        auto& field = player.isInCombat ? player.battleField : player.recruitField;
+        field.ForEachAlive([&repeats](const MinionData& data) {
+            const auto& id = data.value().GetCardID();
+            if (id == "BG25_354") ++repeats;
+            else if (id == "BG25_354_G") repeats += 2;
+        });
+    }
     for (auto& task : tasks)
     {
         if (player.taskStack.isStackingTasks &&
             !std::holds_alternative<SimpleTasks::RepeatNumberEndTask>(task))
         {
-            player.taskStack.tasks.emplace_back(task);
+            // Deferred execution must preserve Titus's multiplicity too;
+            // enqueue one task instance per repetition rather than silently
+            // collapsing stacked Deathrattles back to one.
+            for (int repeat = 0; repeat < repeats; ++repeat)
+                player.taskStack.tasks.emplace_back(task);
         }
         else
         {
-            std::visit(
-                [this, &player](auto& _task) { _task.Run(player, *this); },
-                task);
+            for (int repeat = 0; repeat < repeats; ++repeat)
+                std::visit(
+                    [this, &player](auto& _task) { _task.Run(player, *this); },
+                    task);
         }
     }
 }
@@ -1146,20 +1188,37 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
         player.AdvanceDarkGiftCounters(1);
     }
 
+    int repeats = 1;
+    if (type == PowerType::DEATHRATTLE) {
+        auto& field = player.isInCombat ? player.battleField : player.recruitField;
+        field.ForEachAlive([&repeats](const MinionData& data) {
+            const auto& id = data.value().GetCardID();
+            if (id == "BG25_354") ++repeats;
+            else if (id == "BG25_354_G") repeats += 2;
+        });
+    }
     for (auto& task : tasks)
     {
         if (player.taskStack.isStackingTasks &&
             !std::holds_alternative<SimpleTasks::RepeatNumberEndTask>(task))
         {
-            player.taskStack.tasks.emplace_back(task);
+            for (int repeat = 0; repeat < repeats; ++repeat)
+                player.taskStack.tasks.emplace_back(task);
         }
         else
         {
-            std::visit([this, &player, &target](
-                           auto& _task) { _task.Run(player, *this, target); },
-                       task);
+            for (int repeat = 0; repeat < repeats; ++repeat)
+                std::visit([this, &player, &target](
+                               auto& _task) { _task.Run(player, *this, target); },
+                           task);
         }
     }
+}
+
+void Minion::SetLastDamageSource(const Minion& source) noexcept
+{
+    m_lastDamageSourceIndex = source.GetIndex();
+    m_lastDamageSourceCardID = std::string(source.GetCardID());
 }
 
 void Minion::SetPlayCardStatBonus(int attack, int health)
@@ -1442,7 +1501,7 @@ bool Minion::CanActivate(const Player& player, int targetIdx) const
             return false;
         bool hasCandidate = false;
         player.tavern.fieldZone.ForEachAlive(
-            [&hasCandidate](MinionData&) { hasCandidate = true; });
+            [&hasCandidate](const MinionData&) { hasCandidate = true; });
         return hasCandidate;
     }
     if (definition->effect == ActivateEffect::ACTIVATE_FISHBAIT)

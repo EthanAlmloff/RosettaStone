@@ -57,6 +57,17 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch55.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch56.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch57.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch58.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch59.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch60.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch61.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch62.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch63.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch64.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch65.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch66.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch67.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch70.hpp>
 #include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch31.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch26.hpp>
@@ -67,6 +78,7 @@
 #include <Rosetta/Battlegrounds/CardSets/ActivateBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -128,7 +140,31 @@ CardDefs::CardDefs()
     ModernMinionBehaviorsBatch55::AddAll(m_data);
     ModernMinionBehaviorsBatch56::AddAll(m_data);
     ModernMinionBehaviorsBatch57::AddAll(m_data);
+    ModernMinionBehaviorsBatch58::AddAll(m_data);
+    ModernMinionBehaviorsBatch59::AddAll(m_data);
+    ModernMinionBehaviorsBatch60::AddAll(m_data);
+    ModernMinionBehaviorsBatch61::AddAll(m_data);
+    ModernMinionBehaviorsBatch62::AddAll(m_data);
+    ModernMinionBehaviorsBatch63::AddAll(m_data);
+    ModernMinionBehaviorsBatch64::AddAll(m_data);
+    ModernMinionBehaviorsBatch65::AddAll(m_data);
+    ModernMinionBehaviorsBatch66::AddAll(m_data);
+    ModernTokenBehaviorsBatch67::AddAll(m_data);
+    ModernTokenBehaviorsBatch70::AddAll(m_data);
     GeneratedBehaviorMappings::AddAll(m_data);
+    { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG19_010t", 1}); m_data.emplace("BG19_010", CardDef{std::move(p)}); }
+    { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG19_010_Gt", 1}); m_data.emplace("BG19_010_G", CardDef{std::move(p)}); }
+    { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG25_010t", 1}); m_data.emplace("BG25_010", CardDef{std::move(p)}); }
+    { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG25_010_Gt", 2}); m_data.emplace("BG25_010_G", CardDef{std::move(p)}); }
+    // Relics of the Deep is a passive hero power whose start-turn effect is
+    // resolved by Player::ResolveRelicsOfTheDeepStartTurn.
+    m_data.emplace("BG23_HERO_304p", CardDef{});
+    // Token of the Old Gods is consumed by Player::PlaySpell only after its
+    // two-stage transform modal is successfully opened.
+    m_data.emplace("BG30_MagicItem_416t", CardDef{});
+    // MechGyver's threshold/reward is owned by Player::ResolveMechGyverDeath;
+    // this marker makes CardLoader expose the passive hero power.
+    m_data.emplace("BG22_HERO_200p", CardDef{});
     ModernMinionBehaviorsBatch31::AddAll(m_data);
     ModernMinionBehaviorsBatch26::AddAll(m_data);
     ModernMinionBehaviorsBatch25::AddAll(m_data);

@@ -19,8 +19,8 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviorsBatch57] - Tad sell variants")
         normal.GetTasks().front());
     const auto& goldenTask = std::get<SimpleTasks::RandomCardToHandTask>(
         golden.GetTasks().front());
-    CHECK(normalTask.Amount() == 1);
-    CHECK(goldenTask.Amount() == 2);
-    CHECK(normalTask.RaceFilter() == Race::MURLOC);
-    CHECK(goldenTask.RaceFilter() == Race::MURLOC);
+    CHECK(normalTask.GetAmount() == 1);
+    CHECK(goldenTask.GetAmount() == 2);
+    CHECK(normalTask.GetRace() == Race::MURLOC);
+    CHECK(goldenTask.GetRace() == Race::MURLOC);
 }

@@ -509,3 +509,70 @@ TEST_CASE(
     // A spent gift cannot be applied a second time through the lifecycle.
     CHECK_FALSE(state.ConsumeEffect(state.darkGifts, 0));
 }
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - amalgamation and sunken persistence")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion minion(base);
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t22")));
+    CHECK(minion.HasRace(Race::ELEMENTAL));
+    CHECK(minion.HasRace(Race::MECHANICAL));
+    CHECK_FALSE(minion.HasRace(Race::INVALID));
+    REQUIRE(ApplyDarkGift(minion,
+                          FindDarkGiftBehavior("BG36_MidGameEffect_000t62")));
+    CHECK(minion.HasPermanentSpellcraft());
+    // Reapplying either gift is idempotent at the instance level.
+    CHECK(ApplyDarkGift(minion,
+                        FindDarkGiftBehavior("BG36_MidGameEffect_000t22")));
+    CHECK(ApplyDarkGift(minion,
+                        FindDarkGiftBehavior("BG36_MidGameEffect_000t62")));
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Tarecgosa keeps doubled combat gains")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t50");
+    CHECK(behavior.effect == DarkGiftEffect::TARECGOSA_BLESSING);
+
+    Minion recruit(base);
+    REQUIRE(ApplyDarkGift(recruit, behavior));
+    CHECK(recruit.HasTarecgosaBlessing());
+    // Applying the same gift again is idempotent: it does not add another
+    // multiplier to future combat gains.
+    REQUIRE(ApplyDarkGift(recruit, behavior));
+
+    Minion combat = recruit;
+    combat.ApplyCombatPersistentStats(3, 4);
+    combat.SetHealth(combat.GetHealth() - 5); // ordinary combat damage
+    combat.ApplyCombatPersistentKeyword(GameTag::TAUNT);
+    recruit.ReconcileCombatPersistentState(combat);
+
+    CHECK(recruit.GetAttack() == base.GetAttack() + 6);
+    CHECK(recruit.GetHealth() == base.GetHealth() + 8);
+    CHECK(recruit.HasTaunt());
+
+    // A negative stat delta cannot become a persistent debuff.
+    Minion second = recruit;
+    second.ApplyCombatPersistentStats(-100, -100);
+    recruit.ReconcileCombatPersistentState(second);
+    CHECK(recruit.GetAttack() == base.GetAttack() + 6);
+    CHECK(recruit.GetHealth() == base.GetHealth() + 8);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Affinity captures race and cadence")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion target(base);
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t82");
+    REQUIRE(ApplyDarkGift(target, behavior));
+    CHECK(target.AffinityRace() == target.GetRace());
+    CHECK_FALSE(target.AdvanceAffinity());
+    // Reapplication does not reset a half-complete cadence.
+    REQUIRE(ApplyDarkGift(target, behavior));
+    CHECK(target.AdvanceAffinity());
+    CHECK_FALSE(target.AdvanceAffinity());
+}

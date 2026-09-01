@@ -88,6 +88,44 @@ class Minion
     //! \param race The tribe to test.
     //! \return true when this minion has the requested tribe.
     bool HasRace(Race race) const;
+    void SetAmalgamation(bool enabled = true) noexcept { m_amalgamation = enabled; }
+    //! Tarecgosa's Blessing keeps combat bonus keywords and doubles explicit
+    //! combat stat gains when the combat copy is reconciled.
+    void SetTarecgosaBlessing(bool enabled = true) noexcept { m_tarecgosaBlessing = enabled; }
+    bool HasTarecgosaBlessing() const noexcept { return m_tarecgosaBlessing; }
+    void SetTimeTurning(bool enabled = true) noexcept { m_timeTurning = enabled; }
+    bool HasTimeTurning() const noexcept { return m_timeTurning; }
+    void SetSteadyGrowth(int attack, int health) noexcept
+    {
+        m_steadyGrowthAttack = attack;
+        m_steadyGrowthHealth = health;
+    }
+    bool HasSteadyGrowth() const noexcept { return m_steadyGrowthAttack != 0 || m_steadyGrowthHealth != 0; }
+    void ApplySteadyGrowth() noexcept
+    {
+        m_attack += m_steadyGrowthAttack;
+        m_health += m_steadyGrowthHealth;
+    }
+    // Reapplying the same gift is idempotent and must not reset a partially
+    // elapsed two-turn cadence.  A changed captured race is a new target
+    // choice and intentionally starts a fresh cadence.
+    void SetAffinity(Race race) noexcept
+    {
+        if (m_affinityRace == race) return;
+        m_affinityRace = race;
+        m_affinityTurns = 0;
+    }
+    bool HasAffinity() const noexcept { return m_affinityRace != Race::INVALID; }
+    bool AdvanceAffinity() noexcept
+    {
+        if (!HasAffinity()) return false;
+        if (++m_affinityTurns < 2) return false;
+        m_affinityTurns = 0;
+        return true;
+    }
+    Race AffinityRace() const noexcept { return m_affinityRace; }
+    void SetPolarization(bool enabled = true) noexcept { m_polarization = enabled; }
+    bool HasPolarization() const noexcept { return m_polarization; }
 
     //! Returns whether this card has the Magnetic keyword.
     bool IsMagnetic() const;
@@ -211,6 +249,9 @@ class Minion
     //! Resets the per-recruit-turn Lava Lurker Spellcraft allowance.
     void ResetSpellcraftUses() noexcept;
     bool ConsumeSpellcraftUse() noexcept;
+    int GetSpellcraftUsesRemaining() const noexcept { return m_spellcraftUsesRemaining; }
+    void SetPermanentSpellcraft(bool enabled = true) noexcept { m_permanentSpellcraft = enabled; }
+    bool HasPermanentSpellcraft() const noexcept { return m_permanentSpellcraft; }
     bool IsLavaLurker() const noexcept;
 
     //! Returns the flag that indicates whether it has deathrattle.
@@ -299,6 +340,9 @@ class Minion
     void SetIncubation(int turns = 2);
     void AdvanceIncubation();
     int IncubationTurnsRemaining() const;
+    //! Number of completed recruit turns Patient Scout has waited.
+    void AdvancePatientScout() noexcept { if (m_patientScoutTurns < 6) ++m_patientScoutTurns; }
+    int PatientScoutTurns() const noexcept { return m_patientScoutTurns; }
     //! Arms Replication and advances its two-turn recruit countdown.
     void SetReplication(int turns = 2);
     bool AdvanceReplication();
@@ -328,6 +372,10 @@ class Minion
     //! Takes damage from a certain other minion.
     //! \param source A minion to give damage.
     void TakeDamage(Minion& source);
+    void SetLastDamageSource(const Minion& source) noexcept;
+    int LastDamageSourceIndex() const noexcept { return m_lastDamageSourceIndex; }
+    const std::string& LastDamageSourceCardID() const noexcept { return m_lastDamageSourceCardID; }
+    void DestroyImmediately() noexcept { m_isDestroyed = true; m_health = 0; }
 
     //! Takes damage to the minion.
     //! \param amount The amount of damage.
@@ -441,6 +489,12 @@ class Minion
     int m_combatPersistentAttack = 0;
     int m_combatPersistentHealth = 0;
     std::uint32_t m_combatPersistentKeywords = 0;
+    bool m_tarecgosaBlessing = false;
+    int m_steadyGrowthAttack = 0;
+    int m_steadyGrowthHealth = 0;
+    Race m_affinityRace = Race::INVALID;
+    int m_affinityTurns = 0;
+    bool m_polarization = false;
     int m_avengeDeaths = 0;
     int m_playCardAttackBonus = 0;
     int m_playCardHealthBonus = 0;
@@ -457,6 +511,7 @@ class Minion
     int m_darkGiftCounterKind = 0;
     int m_incubationTurnsRemaining = 0;
     int m_replicationTurnsRemaining = 0;
+    int m_patientScoutTurns = 0;
 
     bool m_hasDeathrattle = false;
     bool m_hasTaunt = false;
@@ -473,6 +528,7 @@ class Minion
     bool m_temporaryWindfury = false;
     bool m_temporaryMegaWindfury = false;
     int m_spellcraftUsesRemaining = 0;
+    bool m_permanentSpellcraft = false;
     bool m_hasVenomous = false;
     bool m_hasStealth = false;
     bool m_isFrozen = false;
@@ -489,6 +545,10 @@ class Minion
     std::uint8_t m_startCombatLeftAttackTriggers = 0;
     bool m_immuneWhileAttacking = false;
     bool m_isAttacking = false;
+    bool m_amalgamation = false;
+    bool m_timeTurning = false;
+    int m_lastDamageSourceIndex = -1;
+    std::string m_lastDamageSourceCardID;
 };
 }  // namespace RosettaStone::Battlegrounds
 

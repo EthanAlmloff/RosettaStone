@@ -95,6 +95,17 @@ struct Season14SpellModalState {
     bool secondBranchDelayed = false;
     std::string offeringFilter;
 };
+//! Two-stage transform modal state. Stage one selects a stable board entity;
+//! stage two exposes only active normal minions from the next Tavern tier.
+enum class Season14TransformStage : std::uint8_t { NONE, TARGET, CANDIDATE };
+struct Season14TransformState {
+    Season14TransformStage stage = Season14TransformStage::NONE;
+    std::uint64_t sourceEntityID = 0;
+    std::int32_t sourceCardDbfID = 0;
+    std::uint64_t targetEntityID = 0;
+    std::int32_t targetIndex = -1;
+    std::int32_t targetTier = 0;
+};
 struct Season14PendingCombatBuff
 {
     std::int32_t sourceCardDbfID = 0;
@@ -185,6 +196,7 @@ class Season14State
     std::int32_t pendingTavernReplacementTier = 0;
     Season14ChooseOneState chooseOne;
     Season14SpellModalState spellModal;
+    Season14TransformState transformModal;
     std::vector<Season14PersistentEffect> trinkets;
     std::vector<Season14PersistentEffect> darkGifts;
     //! Generated quest-reward choices selected from a public modal. The
@@ -231,6 +243,8 @@ class Season14State
     bool heroPowerAvailable = false;
     bool heroPowerUsed = false;
     std::int32_t buddyExtraHeroPowerUses = 0;
+    std::int32_t trinketHeroPowerRepeats = 0;
+    std::int32_t trinketHeroPowerRepeatSources = 0;
     void EnableBuddyExtraHeroPowerUses(std::int32_t n) noexcept { buddyExtraHeroPowerUses = std::max(buddyExtraHeroPowerUses, n); }
     void ResetBuddyExtraHeroPowerUses() noexcept { buddyExtraHeroPowerUses = 0; }
     bool powerOfStormActive = false;
@@ -252,6 +266,13 @@ class Season14State
     //! Tavern cards are bought or removed before the two-turn duration ends.
     std::int32_t imprisonedEntityID = -1;
     std::int32_t imprisonedTurns = 0;
+    std::int32_t mechGyverDeaths = 0;
+    bool AdvanceMechGyverDeath() noexcept
+    {
+        if (++mechGyverDeaths < 9) return false;
+        mechGyverDeaths = 0;
+        return true;
+    }
     std::vector<std::string> reclaimedSoulsDeaths;
     void RecordReclaimedSoulsDeath(const Minion& minion);
 
@@ -289,6 +310,13 @@ class Season14State
     //! Handles are stored in TaskType to avoid recursively embedding Minion's
     //! card-power task graph inside itself.
     std::vector<std::optional<Minion>> pendingExactCopySnapshots;
+    std::vector<Minion> combatDeadMinions;
+    void RecordCombatDeadMinion(const Minion& minion) { combatDeadMinions.push_back(minion); }
+    //! Returns plain copies of the first matching combat deaths.  History is
+    //! intentionally non-consuming: multiple Kangor deathrattles each refer
+    //! to the same first deaths; it is cleared at the next combat start.
+    std::vector<Minion> TakeCombatDeadMinions(Race race, std::size_t count);
+    void ClearCombatDeadMinions() noexcept { combatDeadMinions.clear(); }
     std::vector<std::int32_t> pendingCombatStartEffects;
     //! Remaining Discover selections for a multi-spell Activate.
     std::int32_t tavernSpellDiscoverRemaining = 0;
@@ -306,6 +334,7 @@ class Season14State
     std::int32_t freeRefreshes = 0;
     std::int32_t persistentShopAttack = 0;
     std::int32_t persistentShopHealth = 0;
+    bool lastCombatLost = false;
     //! Permanent all-minion aura installed by deterministic Trinkets.
     std::int32_t persistentMinionAttack = 0;
     std::int32_t persistentMinionHealth = 0;
@@ -405,6 +434,12 @@ class Season14State
     //! Selects one public offering and clears the pending decision.
     //! \return false when no matching pending offering exists.
     bool SelectDecision(std::size_t offeringIndex);
+    bool BeginTransformDecision(std::uint64_t sourceEntityID,
+                                std::int32_t sourceCardDbfID,
+                                std::uint64_t targetEntityID,
+                                std::int32_t targetIndex,
+                                std::int32_t targetTier);
+    void CancelTransformDecision() noexcept;
     void BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t targetMask, std::int32_t sourceCardDbfID, std::vector<Season14Offering> offerings);
     void BeginSpellTargetChoice(std::int32_t sourceCardDbfID, std::int32_t targetIndex,
                                 std::uint64_t targetEntityID,

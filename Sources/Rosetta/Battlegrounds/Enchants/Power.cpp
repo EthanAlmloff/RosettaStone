@@ -37,6 +37,11 @@ std::vector<TaskType>& Power::GetStartCombatTask()
     return m_startCombatTask;
 }
 
+const std::vector<TaskType>& Power::GetStartCombatTask() const
+{
+    return m_startCombatTask;
+}
+
 std::vector<TaskType>& Power::GetDeathrattleTask()
 {
     return m_deathrattleTask;

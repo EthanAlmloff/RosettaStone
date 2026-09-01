@@ -121,6 +121,8 @@ Battle::Battle(Player& player1, Player& player2)
 {
     m_player1.season14.ClearCombatExactCopySnapshots();
     m_player2.season14.ClearCombatExactCopySnapshots();
+    m_player1.season14.ClearCombatDeadMinions();
+    m_player2.season14.ClearCombatDeadMinions();
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
     const auto summonHandSnapshot = [](Player& owner, FieldZone& field) {
@@ -595,12 +597,36 @@ bool Battle::Attack()
     // The first attacker may have killed the original target; choose the
     // ordinary attack target only after that exchange and cleanup.
     Minion& nextTarget = GetProperTarget(attackerAfterRally);
+    const int targetHealthBeforeAttack = nextTarget.GetHealth();
     {
         AttackingStateGuard attacking(attackerAfterRally);
         nextTarget.TakeDamage(attackerAfterRally);
         attackerAfterRally.TakeDamage(nextTarget);
     }
     const bool targetWasDestroyed = nextTarget.IsDestroyed();
+
+    // Wildfire Elemental carries excess combat damage into one adjacent
+    // enemy. Resolve it before cleanup while the defeated target still has a
+    // stable zone position; the adjacent hit itself participates in the
+    // normal damage/death lifecycle below.
+    const bool wildfire = attackerAfterRally.GetCardID() == "BGS_126" ||
+                          attackerAfterRally.GetCardID() == "TB_BaconUps_166";
+    if (targetWasDestroyed && wildfire) {
+        const int excess = std::max(0, attackerAfterRally.GetAttack() - targetHealthBeforeAttack);
+        if (excess > 0) {
+            std::vector<Minion*> adjacent;
+            const int position = nextTarget.GetZonePosition();
+            defendingField.ForEachAlive([&](MinionData& data) {
+                const int candidate = data.value().GetZonePosition();
+                if (candidate == position - 1 || candidate == position + 1)
+                    adjacent.push_back(&data.value());
+            });
+            if (attackerAfterRally.GetCardID() == "TB_BaconUps_166")
+                for (auto* target : adjacent) target->TakeDamage(excess);
+            else if (!adjacent.empty())
+                adjacent[Random::get<std::size_t>(0, adjacent.size() - 1)]->TakeDamage(excess);
+        }
+    }
 
     ProcessDestroy(false);
 
@@ -820,11 +846,16 @@ void Battle::ProcessDestroy(bool beforeAttack)
     for (auto& deadMinion : deadMinions)
     {
         Minion& minion = std::get<1>(deadMinion);
+        if (minion.HasRace(Race::MECHANICAL))
+            (std::get<0>(deadMinion) == 1 ? m_player1 : m_player2)
+                .season14.RecordCombatDeadMinion(minion);
         Minion removedMinion;
         if (std::get<0>(deadMinion) == 1)
             m_player1.season14.RecordReclaimedSoulsDeath(minion);
         else
             m_player2.season14.RecordReclaimedSoulsDeath(minion);
+        (std::get<0>(deadMinion) == 1 ? m_player1 : m_player2)
+            .ResolveMechGyverDeath();
 
         // I'll Take That! records the first enemy minion killed by the
         // attacking player. Restrict capture to the attack-resolution pass;
@@ -1023,6 +1054,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
         // the minion's own deathrattle so the newly freed slot is available.
         if (removedMinion.HasRace(Race::QUILBOAR))
         {
+            Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
             bool hasBloodGolemSticker = false;
             for (const auto& trinket : owner.season14.trinkets)
             {
