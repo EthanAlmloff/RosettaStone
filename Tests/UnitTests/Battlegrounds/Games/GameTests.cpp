@@ -321,6 +321,23 @@ TEST_CASE("[Game] - Per-card freeze survives normal end turn")
     CHECK_EQ(player.tavern.fieldZone.GetCount(), 3);
 }
 
+TEST_CASE("[Game] - Mana Per Minute prepares a spell-only Tavern")
+{
+    Game game;
+    game.Start();
+    for (auto& player : game.GetGameState().players)
+        player.SelectHero(1);
+
+    auto& player = game.GetGameState().players.at(0);
+    player.season14.SetHeroPower(126538, 0, true);
+    player.PrepareTavern();
+
+    CHECK(player.tavern.fieldZone.GetCount() == 0);
+    CHECK(!player.tavern.spellSlots.empty());
+    for (const auto& slot : player.tavern.spellSlots)
+        CHECK(slot.IsSpell());
+}
+
 TEST_CASE("[Game] - Recruit phase selects recruit field")
 {
     Game game(43);

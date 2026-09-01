@@ -9,6 +9,8 @@ struct DeclarativeBehaviorRow { std::string_view id, trigger, selector, conditio
 struct DeclarativeEnchantmentRow { std::string_view id, owner, source, duration; int attack, health; unsigned keywordBits; };
 inline constexpr unsigned DeclarativeBehaviorSchema = 2;
 inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
+  {"BG21_006","deathrattle","other_friendly_minions","always","max_health_deathrattle",1,1,0,0,0,0,false},
+  {"BG21_006_G","deathrattle","other_friendly_minions","always","max_health_deathrattle",2,2,0,0,0,0,false},
   {"BG31_999","start_of_combat","left_adjacent","always","start_combat_destroy_adjacent_copy",1,1,0,0,0,0,false},
   {"BG31_999_G","start_of_combat","adjacent","always","start_combat_destroy_adjacent_copy",2,2,0,0,0,0,false},
   {"BG32_330","start_of_combat","hand_self","always","start_combat_hand_self_copy",1,1,0,0,0,0,false},

@@ -28,6 +28,19 @@ namespace RosettaStone::Battlegrounds
 class Minion
 {
  public:
+    //! Typed lifecycle payload for recruit-turn enchantments.  These effects
+    //! are removed by ExpireTemporaryEffects at the next recruit start.
+    enum class TemporaryEnchantment : std::uint8_t
+    {
+        Stats,
+        StatsAndTaunt,
+        StatsAndWindfury,
+        StatsAndReborn,
+        DivineShield,
+        Venomous,
+        StatsAndStealth,
+    };
+
     //! Identity used when a recruit-phase entity is copied into combat.
     //! Entity IDs are preferred; pool/zone identity keeps deterministic
     //! hand-built fixtures usable without aliasing different cards.
@@ -224,6 +237,8 @@ class Minion
     //! Returns the value of health.
     //! \return The value of health.
     int GetHealth() const;
+    //! Maximum Health is independent of combat damage for max-health effects.
+    int GetMaxHealth() const;
 
     //! Sets the value of health.
     //! \param val The value of health to set.
@@ -241,6 +256,11 @@ class Minion
     //! Commits only explicitly persistent combat deltas from a matching copy.
     void ReconcileCombatPersistentState(const Minion& combatCopy);
     void ApplyTemporaryKeyword(GameTag tag);
+    //! Apply one typed temporary enchantment payload.  Keeping the lifecycle
+    //! choice in Minion prevents individual Tavern spells from duplicating
+    //! expiry bookkeeping.
+    void ApplyTemporaryEnchantment(TemporaryEnchantment kind, int attack = 0,
+                                   int health = 0);
     //! Applies the cumulative Falling Sky Golem deathrattle aura exactly once
     //! per observed deathrattle.  The applied count is instance state so an
     //! existing minion can safely pass through fresh-modifier setup again.
@@ -331,6 +351,12 @@ class Minion
     bool HasEndTurnBattlecryTrigger() const;
     bool HasBattlecry() const;
     void SetDeathrattleStatTransfer(int attack, int health);
+    //! Configures the transfer to affect every surviving friendly minion.
+    //! The default transfer targets the first surviving recipient (Dark Gift).
+    void SetDeathrattleStatTransferToAll(bool enabled);
+    bool DeathrattleStatTransferToAll() const;
+    void SetEarthElementalDeathrattle(bool enabled);
+    bool HasEarthElementalDeathrattle() const;
     int DeathrattleAttackTransfer() const;
     int DeathrattleHealthTransfer() const;
     void SetDarkGiftCounter(int attack, int health, int kind,
@@ -459,6 +485,9 @@ class Minion
     std::function<Player&()> getPlayerCallback;
 
  private:
+    void NotifyPersistentAttackGain(int amount);
+
+ private:
     Card m_card;
     int m_index = -1;
     int m_poolIdx = -1;
@@ -469,6 +498,7 @@ class Minion
 
     int m_attack = 0;
     int m_health = 0;
+    int m_maxHealth = 0;
     int m_frenzyUses = 0;
     int m_globalMinionAttack = 0;
     int m_futureLobsterAttack = 0;
@@ -505,6 +535,8 @@ class Minion
     bool m_heroDamageThresholdFired = false;
     int m_deathrattleAttackTransfer = 0;
     int m_deathrattleHealthTransfer = 0;
+    bool m_deathrattleStatTransferToAll = false;
+    bool m_earthElementalDeathrattle = false;
     int m_skyGolemDeathrattleCount = 0;
     int m_darkGiftCounterAttack = 0;
     int m_darkGiftCounterHealth = 0;
@@ -527,6 +559,8 @@ class Minion
     bool m_temporaryReborn = false;
     bool m_temporaryWindfury = false;
     bool m_temporaryMegaWindfury = false;
+    bool m_temporaryVenomous = false;
+    bool m_temporaryStealth = false;
     int m_spellcraftUsesRemaining = 0;
     bool m_permanentSpellcraft = false;
     bool m_hasVenomous = false;

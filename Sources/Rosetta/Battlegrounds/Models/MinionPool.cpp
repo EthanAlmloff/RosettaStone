@@ -228,15 +228,18 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern)
 void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern,
                                     Race preferredRace)
 {
-    const std::size_t targetCount = player.season14.TavernOfferCount(
+    const bool extraDragon = player.season14.heroPowerDbfID == 61408 &&
+                             player.season14.refreshInProgress;
+    std::size_t targetCount = player.season14.TavernOfferCount(
         GetNumMinionsCanPurchase(player.currentTier));
+    if (extraDragon)
+        ++targetCount;
     const std::size_t currentCount =
         static_cast<std::size_t>(tavern.fieldZone.GetCount());
     if (currentCount >= targetCount)
     {
         return;
     }
-    const std::size_t numMinions = targetCount - currentCount;
     auto minions = GetMinions(1, player.currentTier, true);
 
     // Lost Staff prefers the selected tribe, then fills any unavailable
@@ -256,6 +259,26 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern,
     }
 
     Random::shuffle(minions.begin(), minions.end());
+
+    if (extraDragon)
+    {
+        const auto dragon = std::find_if(
+            minions.begin(), minions.end(), [](const Minion& minion) {
+                return minion.HasRace(Race::DRAGON);
+            });
+        if (dragon == minions.end())
+        {
+            // No available Dragon means the extra offer cannot be fulfilled;
+            // do not silently replace it with a non-Dragon.
+            --targetCount;
+        }
+        else if (dragon != minions.begin())
+        {
+            std::iter_swap(minions.begin(), dragon);
+        }
+    }
+
+    const std::size_t numMinions = targetCount - currentCount;
 
     // Temporal Tavern arms exactly one subsequent fill. Select the requested
     // higher-tier offers first, then fill the remaining slots normally. The

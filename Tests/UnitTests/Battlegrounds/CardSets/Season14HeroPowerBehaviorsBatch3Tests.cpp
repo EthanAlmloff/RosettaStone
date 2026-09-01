@@ -8,7 +8,7 @@ using namespace RosettaStone::Battlegrounds;
 
 TEST_CASE("[Season14HeroPowerBehaviorsBatch3] - registry is exact")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH3.size() == 1);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH3.size() == 2);
     CHECK(FindSeason14HeroPowerBehaviorBatch3("BG20_HERO_100p") != nullptr);
     CHECK(FindSeason14HeroPowerBehaviorBatch3(80229) != nullptr);
     // Conviction is a typed post-combat choice, not a Tavern-tier proxy.

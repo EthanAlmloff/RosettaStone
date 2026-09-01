@@ -107,6 +107,21 @@ void BattlegroundsCardsGen::AddTier1Minions(
         SelfCondition{ SelfCondition::IsRace(Race::DEMON) });
     cards.emplace("BGS_004", CardDef{ power });
 
+    // [TB_BaconUps_079] Golden Wrath Weaver - TIER:1 [ATK:2/HP:6]
+    // The golden trigger deals the same one damage and applies the normal
+    // +2/+2 enchantment twice, producing the pinned +4/+4 result.
+    power.ClearData();
+    power.AddTrigger(Trigger{ TriggerType::AFTER_PLAY_MINION });
+    power.GetTrigger().value().SetTriggerSource(
+        TriggerSource::MINIONS_EXCEPT_SELF);
+    power.GetTrigger().value().SetTasks(std::vector<TaskType>{
+        DamageHeroTask{ 1 },
+        AddEnchantmentTask{ "BGS_004e", EntityType::SOURCE },
+        AddEnchantmentTask{ "BGS_004e", EntityType::SOURCE } });
+    power.GetTrigger().value().SetCondition(
+        SelfCondition{ SelfCondition::IsRace(Race::DEMON) });
+    cards.emplace("TB_BaconUps_079", CardDef{ power });
+
     // --------------------------------- MINION - BATTLEGROUNDS
     // [BGS_039] Dragonspawn Lieutenant - TIER:1 [ATK:2/HP:2]
     // - Race: Dragon, Set: Battlegrounds
@@ -251,6 +266,14 @@ void BattlegroundsCardsGen::AddTier1Minions(
     power.AddDeathrattleTask(AttackTask{ EntityType::STACK });
     cards.emplace("BGS_061", CardDef{ power });
 
+    // [TB_BaconUps_141] Golden Scallywag - TIER:1 [ATK:6/HP:2]
+    // Deathrattle summons a 2/2 Sky Pirate and makes it attack immediately.
+    power.ClearData();
+    power.AddDeathrattleTask(
+        SummonTask{ "TB_BaconUps_141t", 1, SummonSide::DEATHRATTLE, true });
+    power.AddDeathrattleTask(AttackTask{ EntityType::STACK });
+    cards.emplace("TB_BaconUps_141", CardDef{ power });
+
     // --------------------------------- MINION - BATTLEGROUNDS
     // [ICC_038] Righteous Protector - TIER:1 [ATK:1/HP:1]
     // - Set: Icecrown
@@ -342,6 +365,10 @@ void BattlegroundsCardsGen::AddTokenMinions(
     // --------------------------------------------------------
     power.ClearData();
     cards.emplace("BGS_061t", CardDef{ power });
+
+    // [TB_BaconUps_141t] Golden Sky Pirate (*) - TIER:1 [ATK:2/HP:2]
+    power.ClearData();
+    cards.emplace("TB_BaconUps_141t", CardDef{ power });
 }
 
 void BattlegroundsCardsGen::AddEnchantments(

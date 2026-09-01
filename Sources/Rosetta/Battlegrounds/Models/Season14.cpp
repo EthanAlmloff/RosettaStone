@@ -237,6 +237,9 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     firstKillCopyArmed = false;
     firstKillCopy.reset();
     lastTavernSpellDbfID = 0;
+    tavernLightingAttack = dbfID == 122960 ? 1 : 0;
+    tavernLightingHealth = dbfID == 122960 ? 1 : 0;
+    tavernLightingTurns = 0;
 }
 
 bool Season14State::BeginTransformDecision(std::uint64_t sourceEntityID,
@@ -314,7 +317,6 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     if (luckyRollCooldown > 0) --luckyRollCooldown;
     goldSpentThisTurn = 0;
     soldMinionsThisTurn = 0;
-    trinketHeroPowerRepeats = trinketHeroPowerRepeatSources;
     buddyAvengeDeaths = 0;
     refreshExtraShopSlots = 0;
     spellMinionAttackDelta = 0;
@@ -328,6 +330,11 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     // Reclaimed Souls' preceding-combat records remain available until its
     // Discover is committed during this recruit phase.
     heroDamageThisTurn = 0;
+    if (heroPowerDbfID == 122960 && ++tavernLightingTurns == 3) {
+        tavernLightingTurns = 0;
+        ++tavernLightingAttack;
+        ++tavernLightingHealth;
+    }
     if (heroPowerDbfID == 57567)
         sharpenBladesPurchases = 0;
     ResolveSeason14HeroPowerBatch1Event(
@@ -383,6 +390,8 @@ void Season14State::BeginCombatBatch4()
 void Season14State::OnSellMinion()
 {
     ++soldMinionsThisTurn;
+    if (heroPowerDbfID == 86014)
+        ++tentacularBonus;
     Season14HeroPowerBatch2Result result{};
     ResolveSeason14HeroPowerBatch2Event(
         heroPowerDbfID, Season14HeroPowerBatch2Event::SELL_MINION,
@@ -493,6 +502,9 @@ Season14HeroPowerBatch2Result Season14State::OnUpgradeTavern()
 
 std::int32_t Season14State::MinionPurchaseCost(std::int32_t baseCost) const
 {
+    if (heroPowerDbfID == 61915 &&
+        Season14HeroPowerBatch5FirstBuyFree(heroPowerBatch5))
+        return 0;
     const auto withBatch1 = heroPowerBatch1.MinionCost(baseCost);
     const auto batch2 = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
     return std::max<std::int32_t>(0, withBatch1 + batch2.minionCost);
@@ -852,6 +864,14 @@ void Season14State::OnFriendlyPirateAttack()
             AddNextTurnGold(behavior.amount);
         }
     }
+}
+
+void Season14State::OnFriendlyMinionAttack()
+{
+    Season14HeroPowerBatch5Result result{};
+    ResolveSeason14HeroPowerBatch5Event(
+        heroPowerDbfID, Season14HeroPowerBatch5Event::FRIENDLY_MINION_ATTACKED,
+        heroPowerBatch5, result);
 }
 
 std::pair<std::int32_t, std::int32_t>
@@ -1218,6 +1238,19 @@ std::int32_t Season14State::HeroPowerBatch3CombatKillAttackBonus() const noexcep
         heroPowerDbfID);
 }
 
+bool Season14State::RecordFriendlyCombatKill() noexcept
+{
+    const auto threshold = Season14HeroPowerBatch3CombatKillThresholdFor(
+        heroPowerDbfID);
+    if (threshold.threshold <= 0 || combatKillThresholdTriggered)
+        return false;
+    ++combatKillProgress;
+    if (combatKillProgress < threshold.threshold)
+        return false;
+    combatKillThresholdTriggered = true;
+    return true;
+}
+
 bool Season14State::CanUseHeroPower(std::int32_t availableGold) const
 {
     // Lucky Roll has a variable cooldown (the die result).  Keep the
@@ -1243,7 +1276,7 @@ std::int32_t Season14State::EffectiveHeroPowerCost() const
 bool Season14State::UseHeroPower()
 {
     if (!heroPowerAvailable ||
-        (heroPowerUsed && trinketHeroPowerRepeats <= 0 &&
+        (heroPowerUsed &&
          !(heroPowerDbfID == 71459 &&
            heroPowerBatch2.bloodboundUsesThisTurn < 2)) ||
         heroPowerDbfID == 0)
@@ -1253,9 +1286,7 @@ bool Season14State::UseHeroPower()
 
     if (heroPowerDbfID != 71459)
     {
-        if (heroPowerUsed && trinketHeroPowerRepeats > 0)
-            --trinketHeroPowerRepeats;
-        else if (heroPowerUsed && buddyExtraHeroPowerUses > 0)
+        if (heroPowerUsed && buddyExtraHeroPowerUses > 0)
             --buddyExtraHeroPowerUses;
         else
             heroPowerUsed = true;
@@ -1359,7 +1390,8 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
             case TrinketEffect::NONE:
                 break;
             case TrinketEffect::HERO_POWER_TWICE:
-                ++trinketHeroPowerRepeatSources;
+                // Resolution duplication is executor-owned and never grants
+                // another hero-power use.
                 break;
         }
     }
@@ -1396,6 +1428,11 @@ bool Season14State::ConsumeEffect(
 
 void Season14State::Emit(Season14Event event)
 {
+    if (event == Season14Event::COMBAT_START)
+    {
+        combatKillProgress = 0;
+        combatKillThresholdTriggered = false;
+    }
     const auto index = static_cast<std::size_t>(event);
     if (index < eventCounts.size())
     {

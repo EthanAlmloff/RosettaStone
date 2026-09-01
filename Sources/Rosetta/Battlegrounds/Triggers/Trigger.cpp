@@ -130,7 +130,8 @@ void Trigger::Run(Minion& owner, Minion& source)
     for (auto& task : m_tasks)
         std::visit([&owner, &source, this](auto& _task) {
             if (m_triggerType == TriggerType::REBORN ||
-                m_triggerType == TriggerType::SUMMON)
+                m_triggerType == TriggerType::SUMMON ||
+                m_triggerType == TriggerType::GAIN_ATTACK)
                 _task.Run(owner.getPlayerCallback(), owner, source);
             else
                 _task.Run(owner.getPlayerCallback(), owner);

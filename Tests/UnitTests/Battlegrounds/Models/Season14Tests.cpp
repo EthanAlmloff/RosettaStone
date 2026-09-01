@@ -86,6 +86,25 @@ TEST_CASE("[Season14] - Hero power availability is costed and one-shot")
     CHECK(!state.UseHeroPower());
 }
 
+TEST_CASE("[Season14] - Double Time turns two copies into a golden and Tavern Coin")
+{
+    Player player;
+    player.season14.SetHeroPower(126533, 0, true);
+    const auto card = Cards::FindCardByDbfID(49169);
+    REQUIRE(card.GetCardType() == CardType::MINION);
+    REQUIRE(card.premiumDbfID != 0);
+    player.hand.Add(CardData{Minion(card)});
+    player.hand.Add(CardData{Minion(card)});
+
+    CHECK(player.ResolveDoubleTimeCopies());
+    CHECK(player.hand.GetCount() == 2);
+    CHECK(std::holds_alternative<Minion>(player.hand[0]));
+    CHECK(std::get<Minion>(player.hand[0]).IsGolden());
+    REQUIRE(std::holds_alternative<Spell>(player.hand[1]));
+    CHECK(std::get<Spell>(player.hand[1]).GetCardID() == "BG28_810");
+    CHECK(!player.ResolveDoubleTimeCopies());
+}
+
 TEST_CASE("[Season14] - Persistent effects and event hooks")
 {
     Season14State state;

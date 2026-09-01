@@ -34,6 +34,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomMagneticMechToTargetTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeapfroggerDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MaxHealthDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSummonFromPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberEndTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberStartTask.hpp>
@@ -54,6 +55,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastOnSelfHealthTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastSpellBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackingMinionBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackGainHealthTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/OnePerTypeRallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRaceBuffTask.hpp>
@@ -86,6 +88,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellDiscoverTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnConsumeHighestTavernTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConsumeRandomTavernTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConsumeTavernForFriendlyDemonsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnGoldenCountSelfBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/NomiElementalTavernBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonRecentDeadMinionsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DestroyLastDamageSourceTask.hpp>
@@ -126,6 +130,7 @@ using TaskType =
                  SimpleTasks::RandomCardToHandTask,
                  SimpleTasks::RandomMagneticMechToTargetTask,
                  SimpleTasks::LeapfroggerDeathrattleTask,
+                 SimpleTasks::MaxHealthDeathrattleTask,
                  SimpleTasks::RandomSummonFromPoolTask,
                  SimpleTasks::LeftmostFriendlyRaceTask,
                  SimpleTasks::ReduceTavernCostTask,
@@ -137,7 +142,7 @@ using TaskType =
                  SimpleTasks::RandomChooseOneCardToHandTask,
                  SimpleTasks::MagnetizeSatelliteTask,
                  SimpleTasks::RebornAttackTask,
-                  SimpleTasks::PersistentRaceBuffTask, SimpleTasks::PersistentBeetleBuffTask, SimpleTasks::RandomChromadrakeToHandTask, SimpleTasks::BattlecryTavernSpellDiscountTask, SimpleTasks::EndTurnTavernSpellStatsTask, SimpleTasks::BattlecrySpentGoldRaceHealthTask, SimpleTasks::PersistentTavernTierBuffTask, SimpleTasks::ArmRefreshRandomShopStatsTask, SimpleTasks::ArmFodderRefreshTask, SimpleTasks::TriggerLeftmostDeathrattleTask, SimpleTasks::SummonTrackedAvengeCardsTask, SimpleTasks::SpellCastSelfScalingTask, SimpleTasks::SpellCastOnSelfHealthTask, SimpleTasks::ApplyMinionStatBuffTask, SimpleTasks::AttackingMinionBuffTask,
+                 SimpleTasks::PersistentRaceBuffTask, SimpleTasks::PersistentBeetleBuffTask, SimpleTasks::RandomChromadrakeToHandTask, SimpleTasks::BattlecryTavernSpellDiscountTask, SimpleTasks::EndTurnTavernSpellStatsTask, SimpleTasks::BattlecrySpentGoldRaceHealthTask, SimpleTasks::PersistentTavernTierBuffTask, SimpleTasks::ArmRefreshRandomShopStatsTask, SimpleTasks::ArmFodderRefreshTask, SimpleTasks::TriggerLeftmostDeathrattleTask, SimpleTasks::SummonTrackedAvengeCardsTask, SimpleTasks::SpellCastSelfScalingTask, SimpleTasks::SpellCastOnSelfHealthTask, SimpleTasks::ApplyMinionStatBuffTask, SimpleTasks::AttackingMinionBuffTask, SimpleTasks::AttackGainHealthTask,
                  SimpleTasks::OnePerTypeRallyBuffTask,
                  SimpleTasks::SummonedMinionStatMultiplierTask,
                  SimpleTasks::RallyTavernSpellHealthBonusTask,
@@ -163,6 +168,8 @@ using TaskType =
                  SimpleTasks::BattlecryTavernSpellDiscoverTask,
                  SimpleTasks::EndTurnConsumeHighestTavernTask,
                  SimpleTasks::ConsumeRandomTavernTask,
+                 SimpleTasks::ConsumeTavernForFriendlyDemonsTask,
+                 SimpleTasks::EndTurnGoldenCountSelfBuffTask,
                  SimpleTasks::NomiElementalTavernBuffTask,
                  SimpleTasks::SummonRecentDeadMinionsTask,
                  SimpleTasks::DestroyLastDamageSourceTask,

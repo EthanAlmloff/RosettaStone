@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -36,14 +37,9 @@ struct Season14HeroPowerBatch5Definition
     bool passive;
 };
 
-// The first draft of this batch registered eight rows with guessed
-// thresholds/effects.  The pinned card data disproves those semantics (for
-// example, Demon Hunter Training is 14 attacks and a first-buy-free trigger,
-// while the old resolver counted refreshes).  Keep the family types and
-// state-machine scaffolding available for the next implementation pass, but
-// do not expose any row as implemented until its Player lifecycle and bridge
-// application are complete.  An empty registry is intentional fail-closed
-// behavior and prevents coverage tooling from crediting partial effects.
+// These rows are exposed only after their lifecycle and bridge applications
+// are implemented against pinned card data.  Unlisted powers remain
+// fail-closed and are not credited by coverage tooling.
 inline constexpr std::array<Season14HeroPowerBatch5Definition, 3>
     SEASON14_HERO_POWER_BEHAVIORS_BATCH5 = {{
         {"BG28_HERO_400p2", 105395, Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN, 0, false},
@@ -87,6 +83,11 @@ struct Season14HeroPowerBatch5State
     std::int32_t combatDeaths = 0;
     std::int32_t enemyKills = 0;
     std::int32_t endTurnBuffLevel = 0;
+    std::int32_t friendlyAttacks = 0;
+    bool demonHunterTrainingUnlocked = false;
+    bool demonHunterTrainingUsedThisTurn = false;
+    std::vector<std::int32_t> glaivePurchaseDbfIDs;
+    std::int32_t glaiveUsesRemaining = 3;
 };
 
 enum class Season14HeroPowerBatch5Event : std::uint8_t
@@ -99,6 +100,7 @@ enum class Season14HeroPowerBatch5Event : std::uint8_t
     COMBAT_START,
     FRIENDLY_MINION_DIED,
     ENEMY_MINION_KILLED,
+    FRIENDLY_MINION_ATTACKED,
 };
 
 struct Season14HeroPowerBatch5Result
@@ -113,6 +115,47 @@ struct Season14HeroPowerBatch5Result
     std::int32_t summonHealth = 0;
     bool trigger = false;
 };
+
+constexpr bool Season14HeroPowerBatch5FirstBuyFree(
+    const Season14HeroPowerBatch5State& state) noexcept
+{
+    return state.demonHunterTrainingUnlocked &&
+           !state.demonHunterTrainingUsedThisTurn;
+}
+
+constexpr bool ConsumeSeason14HeroPowerBatch5FirstBuyFree(
+    std::int32_t dbfID, Season14HeroPowerBatch5State& state) noexcept
+{
+    if (dbfID != 61915 || !Season14HeroPowerBatch5FirstBuyFree(state))
+        return false;
+    state.demonHunterTrainingUsedThisTurn = true;
+    return true;
+}
+
+constexpr bool Season14HeroPowerBatch5GlaiveReady(
+    const Season14HeroPowerBatch5State& state) noexcept
+{
+    return state.glaiveUsesRemaining > 0 &&
+           state.glaivePurchaseDbfIDs.size() >= 3;
+}
+
+inline void RecordSeason14HeroPowerBatch5GlaivePurchase(
+    std::int32_t dbfID, Season14HeroPowerBatch5State& state)
+{
+    if (dbfID <= 0) return;
+    state.glaivePurchaseDbfIDs.push_back(dbfID);
+    if (state.glaivePurchaseDbfIDs.size() > 3)
+        state.glaivePurchaseDbfIDs.erase(state.glaivePurchaseDbfIDs.begin());
+}
+
+constexpr bool ConsumeSeason14HeroPowerBatch5Glaive(
+    Season14HeroPowerBatch5State& state) noexcept
+{
+    if (!Season14HeroPowerBatch5GlaiveReady(state)) return false;
+    --state.glaiveUsesRemaining;
+    state.glaivePurchaseDbfIDs.clear();
+    return true;
+}
 
 constexpr bool ResolveSeason14HeroPowerBatch5Activation(
     std::int32_t dbfID, Season14HeroPowerBatch5State& state,
@@ -168,6 +211,8 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
         state.sellsThisTurn = 0;
         if (state.rollCooldown > 0) --state.rollCooldown;
         state.usesThisTurn = 0;
+        state.demonHunterTrainingUsedThisTurn = false;
+        state.glaivePurchaseDbfIDs.clear();
         return;
     }
     if (event == Season14HeroPowerBatch5Event::REFRESH_TAVERN)
@@ -202,6 +247,12 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     if (event == Season14HeroPowerBatch5Event::FRIENDLY_MINION_DIED)
     {
         ++state.combatDeaths;
+    }
+    if (event == Season14HeroPowerBatch5Event::FRIENDLY_MINION_ATTACKED &&
+        dbfID == 61915 && !state.demonHunterTrainingUnlocked)
+    {
+        if (++state.friendlyAttacks >= 14)
+            state.demonHunterTrainingUnlocked = true;
     }
 }
 }  // namespace RosettaStone::Battlegrounds

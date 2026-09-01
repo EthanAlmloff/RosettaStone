@@ -22,5 +22,13 @@ void ModernMinionBehaviorsBatch6::AddAll(
     // snapshot. Their producers are registered in other behavior batches;
     // keeping their definitions here makes every generated entity that can
     // reach the simulator resolvable without duplicating producer effects.
+    AddStatic(cards, "BG31_HERO_801pt");
+    AddStatic(cards, "BG31_HERO_801pt_G");
+    AddStatic(cards, "BGS_115t");
+    AddStatic(cards, "BGS_115t_G");
+    AddStatic(cards, "BG_BOT_312t");
+    AddStatic(cards, "TB_BaconUps_032t");
+    AddStatic(cards, "BG_ICC_026t");
+    AddStatic(cards, "BG_ICC_026t_G");
 }
 }  // namespace RosettaStone::Battlegrounds

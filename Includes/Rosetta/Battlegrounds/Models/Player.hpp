@@ -167,6 +167,12 @@ class Player
 
     //! Creates up to `count` canonical Tavern Coin spells in hand.
     int AddTavernCoins(int count);
+    //! Resolves Mister Clocksworth's two-copy golden threshold.  The
+    //! consumed duplicate is replaced by one canonical Tavern Coin rather
+    //! than a normal Triple Reward.
+    bool ResolveDoubleTimeCopies();
+    //! Resolves Sneed's starting Shredder Deathrattle in combat.
+    bool ResolveSneedShredderDeathrattle(bool golden = false);
     //! Acquires a Trinket and applies any deterministic acquisition-time grant.
     //! This is the sole player-owned entry point for generated Trinket cards.
     bool AcquireTrinket(Season14PersistentEffect effect);
@@ -251,6 +257,9 @@ class Player
     void DispatchHeroDamage(const HeroDamageEvent& event);
     //! Dispatches damage dealt by a hero power to Buddy listeners.
     void DispatchHeroPowerDamage(int damage);
+    //! Dispatches a positive persistent attack gain to friendly listeners.
+    //! The event is emitted by Minion's explicit persistent-stat APIs only.
+    void DispatchMinionAttackGain(Minion& target, int amount);
     //! Commits a supported damaging hero-power activation and dispatches the
     //! actual damage exactly once. Generic card damage must not use this.
     bool ResolveDamagingHeroPower(int actualDamage);
@@ -298,6 +307,7 @@ class Player
     bool isInCombat = false;
     bool isFoughtGhostLastTurn = false;
     bool freezeTavern = false;
+    bool dispatchingMinionAttackGain = false;
     std::vector<std::pair<int, int>> nextBoughtStatsArms;
 };
 }  // namespace RosettaStone::Battlegrounds

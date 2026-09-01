@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <iterator>
 #include <set>
+#include <stdexcept>
 #include <vector>
 
 namespace RosettaStone::Battlegrounds
@@ -492,6 +493,18 @@ void Player::ApplyPersistentRaceStats(Race race, int attack, int health)
     });
 }
 
+void Player::DispatchMinionAttackGain(Minion& target, int amount)
+{
+    if (amount <= 0 || dispatchingMinionAttackGain) return;
+    dispatchingMinionAttackGain = true;
+    // Iterate the active zone only; combat copies must not notify recruit
+    // listeners, and recruit gains must not leak into combat copies.
+    GetField().ForEachAlive([&](MinionData& data) {
+        data.value().ActivateTrigger(TriggerType::GAIN_ATTACK, target);
+    });
+    dispatchingMinionAttackGain = false;
+}
+
 void Player::ApplyPersistentRaceStatsExcept(Race race, int attack, int health,
                                              std::uint64_t excludedEntityID)
 {
@@ -602,6 +615,25 @@ void Player::SelectHero(std::size_t idx)
     season14.SetHeroPower(hero.card.heroPowerDbfID, heroPowerCost,
                           hero.card.heroPowerDbfID != 0);
 
+    if (hero.card.heroPowerDbfID == 79720)
+        season14.BeginOfferingDecision(
+            Season14Decision::CHOICE, 0, 79720,
+            {{79721, 0}, {79722, 0}, {79723, 0}, {79724, 0}});
+
+    if (hero.card.heroPowerDbfID == 76520 &&
+        !recruitField.IsFull())
+    {
+        const auto shredderCard = Cards::FindCardByID("BG21_HERO_030t");
+        if (!shredderCard.id.empty())
+        {
+            Minion shredder(shredderCard);
+            if (getNextCardIndexCallback)
+                shredder.SetIndex(getNextCardIndexCallback());
+            shredder.getPlayerCallback = [this]() -> Player& { return *this; };
+            recruitField.Add(shredder, recruitField.GetCount());
+        }
+    }
+
     // Tests and bridge callers may pre-seed a player's hand/board before
     // selecting a hero.  Install an aura on those existing instances too;
     // the per-instance operation is idempotent and therefore safe for the
@@ -632,6 +664,54 @@ void Player::PrepareTavern()
         existingPoolIndices.insert(minion.value().GetPoolIndex());
     });
     prepareTavernMinionsCallback(*this);
+
+    // Time Twister Chromie's Mana Per Minute replaces the normal Tavern
+    // offer with Tavern spells whenever it is refreshed (including the
+    // turn-start preparation).  Keep this in the authoritative preparation
+    // path so both ordinary refreshes and lifecycle refreshes agree, and do
+    // not leave stale minion/spell slots mixed together.
+    if (season14.heroPowerDbfID == 126538)
+    {
+        // `clearTavernMinionsCallback` already returned every unfrozen
+        // minion and removed every unfrozen spell.  Preserve frozen entries
+        // exactly as the ordinary Tavern path does; this matters when a
+        // Mana Per Minute turn ends with FreezeAndEndTurn.
+        for (int i = tavern.fieldZone.GetCount() - 1; i >= 0; --i)
+        {
+            if (!tavern.fieldZone[static_cast<std::size_t>(i)].IsFrozen())
+            {
+                if (returnMinionCallback)
+                    returnMinionCallback(tavern.fieldZone[static_cast<std::size_t>(i)].GetPoolIndex());
+                tavern.fieldZone.Remove(tavern.fieldZone[static_cast<std::size_t>(i)]);
+            }
+        }
+
+        tavern.spellSlots.erase(
+            std::remove_if(tavern.spellSlots.begin(), tavern.spellSlots.end(),
+                           [](const TavernSlot& slot) { return !slot.IsFrozen(); }),
+            tavern.spellSlots.end());
+        std::vector<Card> candidates;
+        for (const auto& candidate : Cards::GetAllCards())
+        {
+            if (candidate.isBattlegroundsPoolSpell &&
+                candidate.normalDbfID == 0 &&
+                FindTavernSpellBehavior(candidate.id).effect !=
+                    TavernSpellEffect::NONE)
+                candidates.push_back(candidate);
+        }
+        if (candidates.empty())
+            throw std::invalid_argument(
+                "Mana Per Minute requires a non-empty supported Tavern spell pool");
+        Random::shuffle(candidates.begin(), candidates.end());
+        const auto capacity = season14.TavernOfferCount(MAX_FIELD_SIZE);
+        const auto count = std::min<std::size_t>(
+            capacity > tavern.SlotCount() ? capacity - tavern.SlotCount() : 0,
+            candidates.size());
+        for (std::size_t i = 0; i < count; ++i)
+            tavern.spellSlots.emplace_back(Spell(candidates[i]));
+        return;
+    }
+
     const auto batch4 = season14.HeroPowerBatch4PassiveModifiers();
     if (season14.persistentShopAttack != 0 ||
         season14.persistentShopHealth != 0 ||
@@ -821,6 +901,12 @@ void Player::RefreshSpellcraft()
         { "BG23_008_G", "BG23_008_Gt", 1 },
         { "BG31_830", "BG31_830t", 1 },
         { "BG31_830_G", "BG31_830_Gt", 1 },
+        { "BG31_924", "BG31_924t", 1 },
+        { "BG31_924_G", "BG31_924_Gt", 1 },
+        { "BG26_501", "BG26_501t", 1 },
+        { "BG26_501_G", "BG26_501_Gt", 1 },
+        { "BG29_879", "BG29_879t", 1 },
+        { "BG29_879_G", "BG29_879t_G", 1 },
         { "BG34_Giant_035", "BG34_Giant_035t", 1 },
         { "BG34_Giant_035_G", "BG34_Giant_035t_G", 1 },
         { "BGS_200", "BG28_810", 1 },
@@ -877,7 +963,14 @@ void Player::PurchaseMinion(std::size_t idx)
                                    Cards::FindCardByDbfID(trinket.dbfID).id)
                                    .effect == TrinketEffect::BATTLECRY_BUY_DISCOUNT;
                     });
-    const int cost = battlecryDiscount
+    // Demon Hunter Training makes only the first successful purchase of the
+    // turn free once fourteen friendly attacks have occurred.  Determine the
+    // entitlement before charging, but consume it only after the purchase
+    // actually reaches hand (a full hand must not burn the entitlement).
+    const bool demonHunterFreeBuy =
+        season14.heroPowerDbfID == 61915 &&
+        Season14HeroPowerBatch5FirstBuyFree(season14.heroPowerBatch5);
+    const int cost = battlecryDiscount || demonHunterFreeBuy
                          ? 0
                          : season14.MinionPurchaseCost(NUM_COIN_PURCHASE_MINION);
     if (remainCoin < cost)
@@ -892,9 +985,25 @@ void Player::PurchaseMinion(std::size_t idx)
 
     if (hand.GetCount() > handCountBeforePurchase)
     {
+        if (season14.heroPowerDbfID == 60218) {
+            auto& bought = std::get<Minion>(hand[hand.GetCount() - 1]);
+            if (bought.HasBattlecry() && !season14.battlecryRewardGiven &&
+                ++season14.battlecryRewardBuys >= 5) {
+                const Card brann = Cards::FindCardByID("BG_LOE_077");
+                if (!brann.id.empty() && !hand.IsFull()) {
+                    Minion generated(brann);
+                    ApplyFreshMinionModifiers(generated);
+                    hand.Add(CardData{std::move(generated)});
+                    season14.battlecryRewardGiven = true;
+                }
+            }
+        }
         if (battlecryDiscount) ++season14.battlecryBuysThisTurn;
         auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
         ApplyFreshMinionModifiers(purchased);
+        if (season14.heroPowerDbfID == 61915)
+            ConsumeSeason14HeroPowerBatch5FirstBuyFree(
+                season14.heroPowerDbfID, season14.heroPowerBatch5);
         const auto attack = season14.OnBuyMinionBatch4();
         purchased.SetAttack(purchased.GetAttack() + attack);
         if (attack > 0 && season14.heroPowerDbfID == 71455) {
@@ -1004,6 +1113,30 @@ void Player::PurchaseMinion(std::size_t idx)
             }
         }
     }
+    if (season14.heroPowerDbfID == 104875 &&
+        hand.GetCount() > handCountBeforePurchase)
+    {
+        const auto& purchased = std::get<Minion>(hand[hand.GetCount() - 1]);
+        RecordSeason14HeroPowerBatch5GlaivePurchase(
+            purchased.GetDbfID(), season14.heroPowerBatch5);
+        if (Season14HeroPowerBatch5GlaiveReady(season14.heroPowerBatch5) &&
+            !hand.IsFull())
+        {
+            const auto& ids = season14.heroPowerBatch5.glaivePurchaseDbfIDs;
+            const auto sourceID = ids[Random::get<std::size_t>(0, ids.size() - 1)];
+            const auto source = Cards::FindCardByDbfID(sourceID);
+            if (source.GetCardType() == CardType::MINION)
+            {
+                Minion copy(source);
+                if (getNextCardIndexCallback)
+                    copy.SetIndex(getNextCardIndexCallback());
+                hand.Add(CardData{copy});
+                ConsumeSeason14HeroPowerBatch5Glaive(
+                    season14.heroPowerBatch5);
+            }
+        }
+    }
+    ResolveDoubleTimeCopies();
 }
 
 bool Player::TakeTavernMinionToHand(std::size_t idx, int attack, int health)
@@ -1424,6 +1557,7 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
                 }
             });
         }
+        ResolveDoubleTimeCopies();
         ApplyAfterPlayCardTrinkets();
     }
     else
@@ -1475,8 +1609,10 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
     const bool powerOfStorm = season14.pendingSourceCardDbfID == 71909;
     const bool nagaConquest = season14.pendingSourceCardDbfID == 80007;
     const bool convictionImprovement = season14.pendingSourceCardDbfID == 73941;
+    const bool embraceElements = season14.pendingSourceCardDbfID == 79720;
     if (offeringIdx >= season14.pendingOfferings.size() ||
-        (!galakrondGreed && !dungarFlightpath && !convictionImprovement && hand.IsFull()))
+        (!galakrondGreed && !dungarFlightpath && !convictionImprovement &&
+         !embraceElements && hand.IsFull()))
     {
         return false;
     }
@@ -1496,6 +1632,14 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
     }
 
     const auto offering = season14.pendingOfferings[offeringIdx];
+
+    if (embraceElements)
+    {
+        if (offering.dbfID < 79721 || offering.dbfID > 79724)
+            return false;
+        season14.embraceElementDbfID = offering.dbfID;
+        return season14.SelectDecision(offeringIdx);
+    }
 
     // Conviction improvements are typed options, not cards.  Resolve them
     // before Card lookup so the negative sentinel IDs can never enter a hand
@@ -1792,8 +1936,8 @@ void Player::ApplyTavernSpellTrinkets()
                                      behavior.health);
         }
     }
-    ApplyAfterPlayCardTrinkets();
-}
+        ApplyAfterPlayCardTrinkets();
+    }
 
 void Player::ApplyAfterPlayCardTrinkets(Race playedRace)
 {
@@ -2473,6 +2617,148 @@ int Player::AddTavernCoins(int count)
     return added;
 }
 
+bool Player::ResolveSneedShredderDeathrattle(bool golden)
+{
+    const int wanted = golden ? 2 : 1;
+    const int available = static_cast<int>(MAX_FIELD_SIZE) - battleField.GetCount();
+    if (available < wanted) return false;
+    std::vector<int> candidates;
+    for (int i = 0; i < hand.GetCount(); ++i)
+    {
+        if (!std::holds_alternative<Minion>(hand[i])) continue;
+        candidates.push_back(i);
+    }
+    if (static_cast<int>(candidates.size()) < wanted) return false;
+    std::vector<int> selected;
+    for (int n = 0; n < wanted; ++n)
+    {
+        int bestHealth = -1;
+        for (const int index : candidates)
+            bestHealth = std::max(bestHealth,
+                                  std::get<Minion>(hand[index]).GetHealth());
+        std::vector<int> tied;
+        for (const int index : candidates)
+            if (std::get<Minion>(hand[index]).GetHealth() == bestHealth)
+                tied.push_back(index);
+        Random::shuffle(tied.begin(), tied.end());
+        const int chosen = tied.front();
+        selected.push_back(chosen);
+        candidates.erase(std::remove(candidates.begin(), candidates.end(), chosen),
+                         candidates.end());
+    }
+    std::sort(selected.rbegin(), selected.rend());
+    for (const int index : selected)
+    {
+        auto card = hand.Remove(hand[index]);
+        if (!std::holds_alternative<Minion>(card)) return false;
+        auto minion = std::get<Minion>(card);
+        minion.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+        if (!SummonCombatSnapshot(std::move(minion))) return false;
+    }
+    return true;
+}
+
+bool Player::ResolveDoubleTimeCopies()
+{
+    if (season14.heroPowerDbfID != 126533) return false;
+    // Completing a pair consumes one copy and grants a Tavern Coin.  Refuse
+    // the transition when the reward cannot fit so a full hand can never
+    // silently lose the duplicate or produce an incomplete golden result.
+    if (hand.IsFull()) return false;
+
+    auto family = [](const Minion& minion) {
+        const auto card = Cards::FindCardByDbfID(minion.GetDbfID());
+        return card.normalDbfID == 0 ? card.dbfID : card.normalDbfID;
+    };
+    std::vector<int> handMatches;
+    std::vector<int> boardMatches;
+    for (int i = 0; i < hand.GetCount(); ++i)
+    {
+        if (std::holds_alternative<Minion>(hand[i]))
+        {
+            const auto& minion = std::get<Minion>(hand[i]);
+            if (!minion.IsGolden()) handMatches.push_back(i);
+        }
+    }
+    for (int i = 0; i < recruitField.GetCount(); ++i)
+    {
+        const auto& minion = recruitField[i];
+        if (!minion.IsDestroyed() && !minion.IsGolden())
+            boardMatches.push_back(i);
+    }
+
+    // Resolve at most one family per acquisition event.  This keeps the
+    // operation idempotent when observers call it more than once.
+    std::vector<int> candidates;
+    for (const int index : handMatches)
+    {
+        const auto& minion = std::get<Minion>(hand[index]);
+        const int key = family(minion);
+        const auto count = static_cast<int>(std::count_if(
+            handMatches.begin(), handMatches.end(), [&](int other) {
+                return family(std::get<Minion>(hand[other])) == key;
+            })) + static_cast<int>(std::count_if(
+                boardMatches.begin(), boardMatches.end(), [&](int other) {
+                    return family(recruitField[other]) == key;
+                }));
+        if (count >= 2) candidates.push_back(key);
+    }
+    for (const int index : boardMatches)
+    {
+        const int key = family(recruitField[index]);
+        const auto count = static_cast<int>(std::count_if(
+            handMatches.begin(), handMatches.end(), [&](int other) {
+                return family(std::get<Minion>(hand[other])) == key;
+            })) + static_cast<int>(std::count_if(
+                boardMatches.begin(), boardMatches.end(), [&](int other) {
+                    return family(recruitField[other]) == key;
+                }));
+        if (count >= 2) candidates.push_back(key);
+    }
+    if (candidates.empty()) return false;
+    const int key = candidates.front();
+    if (!handMatches.empty() && family(std::get<Minion>(hand[handMatches.front()])) == key)
+    {
+        auto& first = std::get<Minion>(hand[handMatches.front()]);
+        if (!first.MakeGolden()) return false;
+        for (int i = hand.GetCount() - 1; i >= 0; --i)
+        {
+            if (i == handMatches.front() || !std::holds_alternative<Minion>(hand[i])) continue;
+            if (family(std::get<Minion>(hand[i])) == key)
+            {
+                hand.Remove(hand[i]);
+                AddTavernCoins(1);
+                return true;
+            }
+        }
+        for (int i = recruitField.GetCount() - 1; i >= 0; --i)
+        {
+            if (!recruitField[i].IsDestroyed() && !recruitField[i].IsGolden() && family(recruitField[i]) == key)
+            {
+                recruitField.Remove(recruitField[i]);
+                AddTavernCoins(1);
+                return true;
+            }
+        }
+    }
+    for (int i = recruitField.GetCount() - 1; i >= 0; --i)
+    {
+        if (recruitField[i].IsDestroyed() || recruitField[i].IsGolden() || family(recruitField[i]) != key) continue;
+        auto& first = recruitField[i];
+        if (!first.MakeGolden()) return false;
+        for (int j = i - 1; j >= 0; --j)
+        {
+            if (!recruitField[j].IsDestroyed() && !recruitField[j].IsGolden() && family(recruitField[j]) == key)
+            {
+                recruitField.Remove(recruitField[j]);
+                AddTavernCoins(1);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool Player::AcquireTrinket(Season14PersistentEffect effect)
 {
     if (!season14.CanAddTrinket() || effect.dbfID <= 0 || !effect.active ||
@@ -2920,6 +3206,20 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             });
             target.ApplyBloodGem(scaledAttack, scaledHealth);
 
+            // Groundshaker's linked enchantment is a temporary +2 Attack
+            // payload on every other friendly minion.  Resolve it through the
+            // shared typed lifecycle so it expires at the next recruit start.
+            if (target.GetCardID() == "BG20_106")
+            {
+                player.recruitField.ForEachAlive(
+                    [&target](MinionData& data) {
+                        Minion& observer = data.value();
+                        if (&observer != &target)
+                            observer.ApplyTemporaryEnchantment(
+                                Minion::TemporaryEnchantment::Stats, 2, 0);
+                    });
+            }
+
             // Tough Tusk gains a shield from the first gem played on it each
             // recruit turn.  The normal copy is temporary; the golden copy
             // keeps the keyword permanently.  The per-minion counter is
@@ -3107,12 +3407,36 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             Minion& minion =
                 player.recruitField[static_cast<std::size_t>(targetIdx)];
             if (temporary)
-                minion.ApplyTemporaryStats(effect.attack, effect.health);
+                minion.ApplyTemporaryEnchantment(
+                    Minion::TemporaryEnchantment::Stats, effect.attack,
+                    effect.health);
             else
             {
                 minion.SetAttack(minion.GetAttack() + effect.attack);
                 minion.SetHealth(minion.GetHealth() + effect.health);
             }
+            return;
+        }
+        case TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY:
+        {
+            if (targetIdx < 0 ||
+                targetIdx >= player.tavern.fieldZone.GetCount() ||
+                player.recruitField.GetCount() == 0)
+                return;
+            const Minion& source = player.tavern.fieldZone[
+                static_cast<std::size_t>(targetIdx)];
+            if (source.GetCardID().empty()) return;
+            std::vector<Minion*> recipients;
+            player.recruitField.ForEachAlive([&recipients](MinionData& data) {
+                recipients.push_back(&data.value());
+            });
+            if (recipients.empty()) return;
+            Random::shuffle(recipients.begin(), recipients.end());
+            Minion& target = *recipients.front();
+            const int multiplier = effect.value > 0 ? effect.value : 1;
+            target.ApplyTemporaryEnchantment(
+                Minion::TemporaryEnchantment::Stats,
+                multiplier * source.GetAttack(), multiplier * source.GetHealth());
             return;
         }
         case TavernSpellEffect::SET_TARGET_STATS:
@@ -3152,7 +3476,9 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             Minion& minion =
                 player.recruitField[static_cast<std::size_t>(targetIdx)];
             if (temporary)
-                minion.ApplyTemporaryStats(effect.attack, effect.health, true);
+                minion.ApplyTemporaryEnchantment(
+                    Minion::TemporaryEnchantment::StatsAndTaunt, effect.attack,
+                    effect.health);
             else
             {
                 minion.SetAttack(minion.GetAttack() + effect.attack);
@@ -3167,9 +3493,15 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             Minion& minion = player.recruitField[static_cast<std::size_t>(targetIdx)];
             if (temporary)
             {
-                minion.ApplyTemporaryStats(effect.attack, effect.health);
+                minion.ApplyTemporaryEnchantment(
+                    Minion::TemporaryEnchantment::Stats, effect.attack,
+                    effect.health);
                 if (minion.HasRace(effect.race))
-                    minion.ApplyTemporaryKeyword(effect.effect == TavernSpellEffect::TARGET_STATS_AND_WINDFURY ? GameTag::WINDFURY : GameTag::REBORN);
+                    minion.ApplyTemporaryEnchantment(
+                        effect.effect == TavernSpellEffect::TARGET_STATS_AND_WINDFURY
+                            ? Minion::TemporaryEnchantment::StatsAndWindfury
+                            : Minion::TemporaryEnchantment::StatsAndReborn,
+                        0, 0);
             }
             else
             {
@@ -3177,11 +3509,28 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
                 minion.SetHealth(minion.GetHealth() + effect.health);
             }
             return;
+        case TavernSpellEffect::TARGET_STATS_AND_STEALTH:
+        {
+            Minion& minion = player.recruitField[static_cast<std::size_t>(targetIdx)];
+            if (temporary)
+                minion.ApplyTemporaryEnchantment(
+                    Minion::TemporaryEnchantment::StatsAndStealth,
+                    effect.attack, effect.health);
+            else
+            {
+                minion.SetAttack(minion.GetAttack() + effect.attack);
+                minion.SetHealth(minion.GetHealth() + effect.health);
+                minion.SetGameTag(GameTag::STEALTH, 1);
+            }
+            return;
+        }
         }
         case TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP:
         {
             Minion& minion = player.recruitField[static_cast<std::size_t>(targetIdx)];
-            if (temporary) minion.ApplyTemporaryKeyword(GameTag::DIVINE_SHIELD);
+            if (temporary)
+                minion.ApplyTemporaryEnchantment(
+                    Minion::TemporaryEnchantment::DivineShield);
             else minion.SetGameTag(GameTag::DIVINE_SHIELD, 1);
             return;
         }
@@ -3723,16 +4072,21 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
             });
     }
     const TavernSpellBehavior behavior = FindTavernSpellBehavior(spell.GetID());
+    const bool shopTarget = behavior.effect ==
+                            TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY;
     if (behavior.gold < 0 ||
-        TavernSpellRequiresTarget(behavior.effect) != (targetIdx >= 0))
+        TavernSpellRequiresTarget(behavior.effect) != (targetIdx >= 0) ||
+        (shopTarget && (targetIdx < 0 || targetIdx >= tavern.fieldZone.GetCount() ||
+                        tavern.fieldZone[static_cast<std::size_t>(targetIdx)].GetCardID().empty() ||
+                        recruitField.GetCount() == 0)))
     {
         return false;
     }
-    if (targetIdx >= 0 && !ValidFriendlyBoardTarget(*this, targetIdx))
+    if (targetIdx >= 0 && !shopTarget && !ValidFriendlyBoardTarget(*this, targetIdx))
     {
         return false;
     }
-    if (targetIdx >= 0)
+    if (targetIdx >= 0 && !shopTarget)
     {
         const Minion& target = recruitField[static_cast<std::size_t>(targetIdx)];
         if (behavior.effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS &&
@@ -3983,6 +4337,21 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     const int sourceSpellDbfID = spell.GetDbfID();
     bool temporarySpell = spell.IsTemporary();
     TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
+    // Thaumaturgy scales by one stat point per three successful Tavern
+    // spells cast this game.  Keep the scaling at resolution so generated
+    // and refreshed Spellcraft copies observe the same counter.
+    if (spell.GetID() == "BG31_924t" || spell.GetID() == "BG31_924_Gt")
+    {
+        const int improvement = season14.SuccessfulSpellCount() / 3;
+        effect.attack += improvement;
+        effect.health += improvement;
+    }
+    if (spell.GetID() == "BG26_501t" || spell.GetID() == "BG26_501_Gt")
+    {
+        const int multiplier = spell.GetID() == "BG26_501_Gt" ? 2 : 1;
+        effect.attack = multiplier * currentTier;
+        effect.health = multiplier * currentTier;
+    }
     if (IsBountySpell(spell.GetID())) {
         int repeats = 1;
         recruitField.ForEachAlive([&](MinionData& data) {
@@ -4019,10 +4388,12 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     if (TavernSpellReceivesHealthBonus(effect.effect))
     {
         effect.health += season14.tavernSpellHealthBonus;
+        effect.health += season14.tavernLightingHealth;
     }
     if (TavernSpellReceivesAttackBonus(effect.effect))
     {
         effect.attack += season14.tavernSpellAttackBonus;
+        effect.attack += season14.tavernLightingAttack;
         effect.attack += season14.TemporaryTavernSpellStats().first;
     }
     if (TavernSpellReceivesHealthBonus(effect.effect))
@@ -4136,6 +4507,19 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     }
     ApplySpellBoardEffect(*this, effect, targetIdx, temporarySpell,
                           sourceSpellDbfID);
+    // Daggerspine Thrasher chooses one temporary keyword after every
+    // successfully resolved spell.  Keep this dispatch at the common spell
+    // resolution boundary so generated and hand spells share the lifecycle.
+    recruitField.ForEachAlive([](MinionData& data) {
+        Minion& minion = data.value();
+        if (minion.GetCardID() != "BG27_024" &&
+            minion.GetCardID() != "BG27_024_G") return;
+        switch (Random::get<int>(0, 2)) {
+            case 0: minion.ApplyTemporaryEnchantment(Minion::TemporaryEnchantment::DivineShield); break;
+            case 1: minion.ApplyTemporaryEnchantment(Minion::TemporaryEnchantment::StatsAndWindfury, 0, 0); break;
+            default: minion.ApplyTemporaryEnchantment(Minion::TemporaryEnchantment::Venomous); break;
+        }
+    });
     if (targetIdx >= 0 && targetIdx < recruitField.GetCount()) {
         auto& target = recruitField[static_cast<std::size_t>(targetIdx)];
         recruitField.ForEachAlive([&target](MinionData& data) {
@@ -4472,6 +4856,34 @@ void Player::SellMinion(std::size_t idx)
         remainCoin += soldID.ends_with("_G") ? 9 : 4;
     }
     season14.OnSellMinion();
+    if (season14.heroPowerDbfID == 60448 &&
+        season14.murlocRewardsRemaining > 0 && ++season14.murlocRewardSells >= 5 &&
+        !hand.IsFull())
+    {
+        season14.murlocRewardSells = 0;
+        --season14.murlocRewardsRemaining;
+        std::vector<Card> murlocs;
+        for (const auto& card : Cards::GetAllCards())
+            if (card.GetCardType() == CardType::MINION && card.normalDbfID == 0 &&
+                card.isBattlegroundsPoolMinion && card.hasBehavior &&
+                card.HasRace(Race::MURLOC)) murlocs.push_back(card);
+        if (!murlocs.empty()) {
+            const auto& card = murlocs[Random::get<std::size_t>(0, murlocs.size() - 1)];
+            hand.Add(CardData{Minion(card)});
+        }
+    }
+    if (season14.heroPowerDbfID == 59860)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            std::vector<Minion*> offers;
+            tavern.fieldZone.ForEachAlive([&](MinionData& data) { offers.push_back(&data.value()); });
+            if (offers.empty()) break;
+            Minion& target = *offers[Random::get<std::size_t>(0, offers.size() - 1)];
+            target.SetAttack(target.GetAttack() + 1);
+            target.SetHealth(target.GetHealth() + 1);
+        }
+    }
     int soldAttack = 0;
     int soldHealth = 0;
     for (const auto& trinket : season14.trinkets)
@@ -4523,6 +4935,7 @@ void Player::RefreshTavern(bool freeRefresh)
     }
 
     clearTavernMinionsCallback(*this);
+    season14.refreshInProgress = true;
     season14.refreshExtraShopSlots = 0;
     for (const auto& trinket : season14.trinkets)
     {
@@ -4541,6 +4954,7 @@ void Player::RefreshTavern(bool freeRefresh)
     }
 
     PrepareTavern();
+    season14.refreshInProgress = false;
     season14.refreshExtraShopSlots = 0;
     // Sold-count Tavern auras apply to every newly filled offer as well as
     // the offers present when each minion was sold.
@@ -4674,6 +5088,48 @@ void Player::RefreshTavern(bool freeRefresh)
             copy.SetAttack(sourceAttack + amount); copy.SetHealth(sourceHealth + amount);
             copy.SetFrozen(true); tavern.fieldZone[static_cast<std::size_t>(bestSlot)].SetFrozen(true);
             tavern.fieldZone.Add(copy);
+        }
+    }
+    // Twice as Nice copies the highest-Tier offer after every successful
+    // Tavern refresh and freezes both source and copy.  Resolve this after
+    // all refresh auras so the copy carries the authoritative current stats.
+    if (season14.heroPowerDbfID == 80539 && !tavern.fieldZone.IsFull())
+    {
+        int bestTier = -1;
+        std::vector<int> bestSlots;
+        for (int i = 0; i < tavern.fieldZone.GetCount(); ++i)
+        {
+            const auto& offer = tavern.fieldZone[static_cast<std::size_t>(i)];
+            if (!offer.IsDestroyed() && offer.GetTier() > bestTier)
+            {
+                bestTier = offer.GetTier();
+                bestSlots.clear();
+                bestSlots.push_back(i);
+            }
+            else if (!offer.IsDestroyed() && offer.GetTier() == bestTier)
+            {
+                bestSlots.push_back(i);
+            }
+        }
+        // The live effect chooses randomly among tied highest-tier offers.
+        // Use RosettaStone's shared RNG stream so seeded replays remain
+        // deterministic without imposing a slot-order bias.
+        if (!bestSlots.empty())
+        {
+            Random::shuffle(bestSlots.begin(), bestSlots.end());
+            const auto bestSlot = bestSlots.front();
+            auto& source = tavern.fieldZone[static_cast<std::size_t>(bestSlot)];
+            Minion copy(Cards::FindCardByID(source.GetCardID()));
+            if (copy.GetDbfID() != 0)
+            {
+                copy.SetAttack(source.GetAttack());
+                copy.SetHealth(source.GetHealth());
+                copy.SetFrozen(true);
+                if (getNextCardIndexCallback)
+                    copy.SetIndex(getNextCardIndexCallback());
+                source.SetFrozen(true);
+                tavern.fieldZone.Add(copy);
+            }
         }
     }
 }

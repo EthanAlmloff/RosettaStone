@@ -21,5 +21,7 @@ void ModernMinionBehaviorsBatch3::AddAll(
     // BG26_175 Elemental of Surprise is a static Divine Shield minion. Its
     // normal and golden forms share the same keyword behavior; their stats
     // and golden identity remain metadata-owned.
+    AddStatic(cards, "BG26_175");
+    AddStatic(cards, "BG26_175_G");
 }
 }  // namespace RosettaStone::Battlegrounds

@@ -292,6 +292,85 @@ void Battle::Initialize()
     m_player1.ApplyStartCombatTrinkets();
     m_player2.ApplyStartCombatTrinkets();
 
+    // Tentacular summons a combat-only 2/2 Taunt Tentacle at Start of
+    // Combat.  The token is omitted when the copied board is full; otherwise
+    // it enters at the right edge and SUMMON observers see the fresh entity.
+    const auto summonTentacle = [](Player& owner, FieldZone& field) {
+        if (owner.season14.heroPowerDbfID != 86014 || field.IsFull()) return;
+        const Card token = Cards::FindCardByDbfID(86227);
+        if (token.id.empty()) return;
+        Minion summoned(token);
+        summoned.SetAttack(summoned.GetAttack() + owner.season14.tentacularBonus);
+        summoned.SetHealth(summoned.GetHealth() + owner.season14.tentacularBonus);
+        summoned.getPlayerCallback = [&owner]() -> Player& { return owner; };
+        if (owner.getNextCardIndexCallback)
+            summoned.SetIndex(owner.getNextCardIndexCallback());
+        field.Add(summoned, field.GetCount());
+        Minion& added = field[field.GetCount() - 1];
+        field.ForEachAlive([&added](MinionData& data) {
+            data.value().ActivateTrigger(TriggerType::SUMMON, added);
+        });
+        owner.ApplySummonTrinkets(added);
+    };
+    summonTentacle(m_player1, m_p1Field);
+    summonTentacle(m_player2, m_p2Field);
+
+    const auto summonStartingAmalgam = [](Player& owner, FieldZone& field) {
+        if (owner.season14.heroPowerDbfID != 59201 || field.IsFull()) return;
+        const Card token = Cards::FindCardByDbfID(59202);
+        if (token.id.empty()) return;
+        Minion summoned(token);
+        summoned.getPlayerCallback = [&owner]() -> Player& { return owner; };
+        if (owner.getNextCardIndexCallback) summoned.SetIndex(owner.getNextCardIndexCallback());
+        field.Add(summoned, field.GetCount());
+        Minion& added = field[field.GetCount() - 1];
+        field.ForEachAlive([&added](MinionData& data) { data.value().ActivateTrigger(TriggerType::SUMMON, added); });
+        owner.ApplySummonTrinkets(added);
+    };
+    summonStartingAmalgam(m_player1, m_p1Field);
+    summonStartingAmalgam(m_player2, m_p2Field);
+
+    const auto applyLeftKeywords = [](Player& owner, FieldZone& field) {
+        if (owner.season14.heroPowerDbfID != 64402) return;
+        Minion* left = nullptr;
+        field.ForEachAlive([&](MinionData& data) { if (left == nullptr) left = &data.value(); });
+        if (left != nullptr) {
+            left->ApplyTemporaryKeyword(GameTag::WINDFURY);
+            left->ApplyTemporaryKeyword(GameTag::DIVINE_SHIELD);
+            left->SetTaunt(true);
+        }
+    };
+    applyLeftKeywords(m_player1, m_p1Field);
+    applyLeftKeywords(m_player2, m_p2Field);
+
+    const auto resolveEmbrace = [](Player& owner, FieldZone& friendly,
+                                   FieldZone& enemy) {
+        const auto element = owner.season14.embraceElementDbfID;
+        if (element == 79721) {
+            std::vector<Minion*> candidates;
+            friendly.ForEachAlive([&](MinionData& data) { candidates.push_back(&data.value()); });
+            Random::shuffle(candidates.begin(), candidates.end());
+            for (std::size_t i = 0; i < std::min<std::size_t>(4, candidates.size()); ++i)
+                candidates[i]->SetEarthElementalDeathrattle(true);
+        } else if (element == 79722) {
+            Minion* left = nullptr;
+            friendly.ForEachAlive([&](MinionData& data) { if (left == nullptr) left = &data.value(); });
+            if (left != nullptr) left->SetAttack(left->GetAttack() * 2);
+        } else if (element == 79723) {
+            Minion* right = nullptr;
+            friendly.ForEachAlive([&](MinionData& data) { right = &data.value(); });
+            if (right != nullptr) { right->SetHealth(right->GetHealth() + 3); right->SetTaunt(true); }
+        } else if (element == 79724) {
+            std::vector<Minion*> candidates;
+            enemy.ForEachAlive([&](MinionData& data) { candidates.push_back(&data.value()); });
+            Random::shuffle(candidates.begin(), candidates.end());
+            for (std::size_t i = 0; i < std::min<std::size_t>(5, candidates.size()); ++i)
+                candidates[i]->SetHealth(candidates[i]->GetHealth() - 1);
+        }
+    };
+    resolveEmbrace(m_player1, m_p1Field, m_p2Field);
+    resolveEmbrace(m_player2, m_p2Field, m_p1Field);
+
     // Determine the player attacks first
     // NOTE: The player with the greater number of minions attacks first.
     // If the number of minions is equal for both players, one of the players
@@ -328,6 +407,31 @@ void Battle::Initialize()
         minion.value().ResetFrenzyUses();
         minion.value().ApplyStartCombatStatMultipliers();
     });
+
+    // Fragrant Phylactery (BG20_HERO_282p) arms the lowest-Attack friendly
+    // combat copy with a one-shot stat-transfer Deathrattle.  Selection is
+    // made after combat-start stat modifiers and ties are random, while the
+    // transfer itself is resolved only when that selected minion dies.
+    const auto armFragrantPhylactery = [](Player& owner, FieldZone& field) {
+        if (owner.season14.heroPowerDbfID != 77911) return;
+        std::vector<Minion*> lowest;
+        int lowestAttack = 0;
+        field.ForEachAlive([&](MinionData& data) {
+            auto& minion = data.value();
+            if (lowest.empty() || minion.GetAttack() < lowestAttack) {
+                lowest.clear();
+                lowestAttack = minion.GetAttack();
+            }
+            if (minion.GetAttack() == lowestAttack)
+                lowest.push_back(&minion);
+        });
+        if (lowest.empty()) return;
+        Minion& selected = *lowest[Random::get<std::size_t>(0, lowest.size() - 1)];
+        selected.SetDeathrattleStatTransfer(selected.GetAttack(), selected.GetHealth());
+        selected.SetDeathrattleStatTransferToAll(true);
+    };
+    armFragrantPhylactery(m_player1, m_p1Field);
+    armFragrantPhylactery(m_player2, m_p2Field);
 
     // Jaws of Death is a Dark Gift state on the copied combat minion.  It
     // triggers that minion's own Deathrattle once, before ordinary
@@ -477,6 +581,7 @@ bool Battle::Attack()
     Minion& attacker = (m_turn == Turn::PLAYER1) ? m_p1Field[attackerIdx]
                                                  : m_p2Field[attackerIdx];
     auto& attackerOwner = (m_turn == Turn::PLAYER1) ? m_player1 : m_player2;
+    attackerOwner.season14.OnFriendlyMinionAttack();
     FieldZone& defendingField =
         (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
     if (!HasAttackableTarget(defendingField))
@@ -672,6 +777,19 @@ bool Battle::Attack()
             else if (id == "BG20_HERO_100_Buddy_G") buddyHealth += 2;
         });
         auto& owner = m_turn == Turn::PLAYER1 ? m_player1 : m_player2;
+        // The attacker-side field is authoritative for ownership: only a
+        // confirmed enemy death during attack resolution emits this event.
+        // Deathrattles and simultaneous cleanup therefore cannot fabricate a
+        // Sulfuras kill, and a killer dying in the same exchange still counts.
+        if (owner.season14.RecordFriendlyCombatKill()) {
+            const auto buff =
+                Season14HeroPowerBatch3CombatKillThresholdFor(
+                    owner.season14.heroPowerDbfID);
+            attackerField.ForEachAlive([&buff](MinionData& data) {
+                data.value().ApplyCombatPersistentStats(buff.attack,
+                                                         buff.health);
+            });
+        }
         if (owner.season14.heroPowerDbfID == 73941 && improvements > 0)
             owner.season14.QueueConvictionImprovements(improvements);
         if (buddyHealth > 0)
@@ -930,13 +1048,21 @@ void Battle::ProcessDestroy(bool beforeAttack)
             removedMinion = m_p2Field.Remove(minion);
         }
 
+        Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+        // Sneed's New Shredder is a pinned generated token whose card data is
+        // not a normal CardDef task. Resolve its exact highest-health hand
+        // summon through the owning Player lifecycle before generic tasks.
+        if (removedMinion.GetCardID() == "BG21_HERO_030t" ||
+            removedMinion.GetCardID() == "BG21_HERO_030t_G")
+            owner.ResolveSneedShredderDeathrattle(
+                removedMinion.GetCardID() == "BG21_HERO_030t_G");
+
         // Process deathrattle tasks
         if (removedMinion.HasDeathrattle())
         {
             removedMinion.ActivateTask(
                 PowerType::DEATHRATTLE,
-                std::get<0>(deadMinion) == 1 ? m_player1 : m_player2);
-            Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+                owner);
             // Unholy Sanctum resolves after the deathrattle and permanently
             // buffs the right-most surviving friendly minion.
             for (const auto& trinket : owner.season14.trinkets)
@@ -1076,15 +1202,38 @@ void Battle::ProcessDestroy(bool beforeAttack)
             FieldZone& ownerField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
             bool transferred = false;
             ownerField.ForEachAlive([&](MinionData& data) {
-                if (transferred) return;
+                if (transferred && !removedMinion.DeathrattleStatTransferToAll()) return;
                 auto& target = data.value();
                 target.SetAttack(target.GetAttack() + removedMinion.DeathrattleAttackTransfer());
                 target.SetHealth(target.GetHealth() + removedMinion.DeathrattleHealthTransfer());
-                // The gift specifies another friendly minion; the first live
-                // recipient is the deterministic simulator selection.
                 transferred = true;
             });
             removedMinion.SetDeathrattleStatTransfer(0, 0);
+            removedMinion.SetDeathrattleStatTransferToAll(false);
+        }
+
+        if (removedMinion.HasEarthElementalDeathrattle())
+        {
+            FieldZone& ownerField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
+            Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+            if (!ownerField.IsFull())
+            {
+                const Card token = Cards::FindCardByDbfID(79728);
+                if (!token.id.empty())
+                {
+                    Minion elemental(token);
+                    elemental.getPlayerCallback = [&owner]() -> Player& { return owner; };
+                    if (owner.getNextCardIndexCallback)
+                        elemental.SetIndex(owner.getNextCardIndexCallback());
+                    ownerField.Add(elemental, ownerField.GetCount());
+                    Minion& summoned = ownerField[ownerField.GetCount() - 1];
+                    ownerField.ForEachAlive([&summoned](MinionData& data) {
+                        data.value().ActivateTrigger(TriggerType::SUMMON, summoned);
+                    });
+                    owner.ApplySummonTrinkets(summoned);
+                }
+            }
+            removedMinion.SetEarthElementalDeathrattle(false);
         }
 
         if (removedMinion.HasReborn())

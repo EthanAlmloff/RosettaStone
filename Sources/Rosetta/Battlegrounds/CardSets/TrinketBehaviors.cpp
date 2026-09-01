@@ -5,9 +5,10 @@ namespace RosettaStone::Battlegrounds
 TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
 {
     if (id == "BG30_MagicItem_416") return {TrinketEffect::SPELLCRAFT_TRANSFORM_HIGHER_TIER};
-    // Ancient Wishbone says "Your Hero Power triggers twice." The current
-    // model only supports an extra paid/use gate, not duplicate resolution
-    // from one activation, so this remains fail-closed.
+    // Ancient Wishbone duplicates the resolved effect of one active Hero
+    // Power activation. The bridge executor owns the multiplier; this marker
+    // must never expand CanUseHeroPower or UseHeroPower.
+    if (id == "BG30_MagicItem_804") return {TrinketEffect::HERO_POWER_TWICE};
     // Only effects whose complete acquisition and lifecycle semantics are
     // implemented are registered here.  Nether Pendant and both Cheese
     // Wheel forms improve on a counter; Innkeeper's Stein and Minion Bait
@@ -80,7 +81,7 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG30_MagicItem_995") return {TrinketEffect::START_COMBAT_HEALTH_FROM_ATTACK};
     if (id == "BG32_MagicItem_270") return {TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK, 1, 0, 3};
     if (id == "BG30_MagicItem_973") return {TrinketEffect::REFRESH_EXTRA_SHOP_SLOTS, 0, 0, 2};
-    if (id == "BG30_MagicItem_934") return {TrinketEffect::SPELL_COUNT_MINION_ATTACK, 1, 0, 4};
+    if (id == "BG32_MagicItem_934") return {TrinketEffect::SPELL_COUNT_MINION_ATTACK, 1, 0, 4};
     if (id == "BG32_MagicItem_276") return {TrinketEffect::END_TURN_UNDEAD_ATTACK, 2, 0, 0, Race::UNDEAD};
     if (id == "BG35_MagicItem_814") return {TrinketEffect::REACH_TIER_GOLD, 0, 0, 12, Race::INVALID, 6};
     if (id == "BG32_MagicItem_428") return {TrinketEffect::DELAYED_GOLD, 0, 0, 10, Race::INVALID, 0, 2};
@@ -217,7 +218,7 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG30_MagicItem_995", CardDef{});
     cards.emplace("BG32_MagicItem_270", CardDef{});
     cards.emplace("BG30_MagicItem_973", CardDef{});
-    cards.emplace("BG30_MagicItem_934", CardDef{});
+    cards.emplace("BG32_MagicItem_934", CardDef{});
     cards.emplace("BG32_MagicItem_276", CardDef{});
     cards.emplace("BG35_MagicItem_814", CardDef{});
     cards.emplace("BG32_MagicItem_428", CardDef{});

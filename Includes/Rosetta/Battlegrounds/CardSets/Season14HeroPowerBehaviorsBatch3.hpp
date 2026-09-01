@@ -17,6 +17,7 @@ namespace RosettaStone::Battlegrounds
 enum class Season14HeroPowerBatch3Kind : std::uint8_t
 {
     COMBAT_KILL_ATTACK,
+    COMBAT_KILL_THRESHOLD_BUFF,
     CONVICTION_IMPROVEMENT,
 };
 
@@ -29,10 +30,12 @@ struct Season14HeroPowerBatch3Definition
     bool passive;
 };
 
-inline constexpr std::array<Season14HeroPowerBatch3Definition, 2>
+inline constexpr std::array<Season14HeroPowerBatch3Definition, 3>
     SEASON14_HERO_POWER_BEHAVIORS_BATCH3 = {{
         {"BG20_HERO_100p", 80229,
          Season14HeroPowerBatch3Kind::COMBAT_KILL_ATTACK, 0, true},
+        {"TB_BaconShop_HP_087t", 64426,
+         Season14HeroPowerBatch3Kind::COMBAT_KILL_THRESHOLD_BUFF, 0, false},
         {"BG21_HERO_000p", 73941,
          Season14HeroPowerBatch3Kind::CONVICTION_IMPROVEMENT, 0, false},
     }};
@@ -94,6 +97,21 @@ constexpr std::int32_t Season14HeroPowerBatch3CombatKillAttack(
     std::int32_t dbfID) noexcept
 {
     return dbfID == 80229 ? 1 : 0;
+}
+
+struct Season14HeroPowerBatch3CombatKillThreshold
+{
+    std::int32_t threshold = 0;
+    std::int32_t attack = 0;
+    std::int32_t health = 0;
+};
+
+constexpr Season14HeroPowerBatch3CombatKillThreshold
+Season14HeroPowerBatch3CombatKillThresholdFor(std::int32_t dbfID) noexcept
+{
+    return dbfID == 64426
+               ? Season14HeroPowerBatch3CombatKillThreshold{3, 5, 5}
+               : Season14HeroPowerBatch3CombatKillThreshold{};
 }
 }  // namespace RosettaStone::Battlegrounds
 

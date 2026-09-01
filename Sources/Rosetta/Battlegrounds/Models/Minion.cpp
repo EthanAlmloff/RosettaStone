@@ -35,7 +35,8 @@ Minion::Minion(Card card, int poolIdx)
     : m_card(std::move(card)),
       m_poolIdx(poolIdx),
       m_attack(m_card.GetAttack()),
-      m_health(m_card.GetHealth())
+      m_health(m_card.GetHealth()),
+      m_maxHealth(m_card.GetHealth())
 {
     if (GetCardID() == "BG23_009_G")
         m_spellcraftUsesRemaining = 2;
@@ -337,6 +338,8 @@ bool Minion::MakeGolden()
     const bool temporaryReborn = m_temporaryReborn;
     const bool temporaryWindfury = m_temporaryWindfury;
     const bool temporaryMegaWindfury = m_temporaryMegaWindfury;
+    const bool temporaryVenomous = m_temporaryVenomous;
+    const bool temporaryStealth = m_temporaryStealth;
     m_card = std::move(premium);
     m_card.Initialize();
     m_attack = currentAttack;
@@ -427,6 +430,8 @@ bool Minion::MakeGolden()
     m_temporaryReborn = temporaryReborn;
     m_temporaryWindfury = temporaryWindfury;
     m_temporaryMegaWindfury = temporaryMegaWindfury;
+    m_temporaryVenomous = temporaryVenomous;
+    m_temporaryStealth = temporaryStealth;
     return true;
 }
 
@@ -525,9 +530,11 @@ void Minion::ApplyFutureBallerStats(int attack, int health)
 
 void Minion::ApplyPersistentMinionStats(int attack, int health)
 {
+    int gainedAttack = 0;
     if (attack > m_persistentMinionAttack)
     {
-        m_attack += attack - m_persistentMinionAttack;
+        gainedAttack = attack - m_persistentMinionAttack;
+        m_attack += gainedAttack;
         m_persistentMinionAttack = attack;
     }
     if (health > m_persistentMinionHealth)
@@ -535,14 +542,17 @@ void Minion::ApplyPersistentMinionStats(int attack, int health)
         m_health += health - m_persistentMinionHealth;
         m_persistentMinionHealth = health;
     }
+    NotifyPersistentAttackGain(gainedAttack);
 }
 
 void Minion::ApplyPersistentTierMinionStats(int tier, int attack, int health)
 {
     if (GetTier() > tier) return;
+    int gainedAttack = 0;
     if (attack > m_persistentTierMinionAttack)
     {
-        m_attack += attack - m_persistentTierMinionAttack;
+        gainedAttack = attack - m_persistentTierMinionAttack;
+        m_attack += gainedAttack;
         m_persistentTierMinionAttack = attack;
     }
     if (health > m_persistentTierMinionHealth)
@@ -550,15 +560,18 @@ void Minion::ApplyPersistentTierMinionStats(int tier, int attack, int health)
         m_health += health - m_persistentTierMinionHealth;
         m_persistentTierMinionHealth = health;
     }
+    NotifyPersistentAttackGain(gainedAttack);
 }
 
 void Minion::ApplyPersistentRaceStats(Race race, int attack, int health)
 {
     const auto index = static_cast<std::size_t>(race);
     if (index >= m_persistentRaceAttack.size() || !HasRace(race)) return;
+    int gainedAttack = 0;
     if (attack > m_persistentRaceAttack[index])
     {
-        m_attack += attack - m_persistentRaceAttack[index];
+        gainedAttack = attack - m_persistentRaceAttack[index];
+        m_attack += gainedAttack;
         m_persistentRaceAttack[index] = attack;
     }
     if (health > m_persistentRaceHealth[index])
@@ -566,6 +579,7 @@ void Minion::ApplyPersistentRaceStats(Race race, int attack, int health)
         m_health += health - m_persistentRaceHealth[index];
         m_persistentRaceHealth[index] = health;
     }
+    NotifyPersistentAttackGain(gainedAttack);
 }
 
 void Minion::ApplyBloodGem(int attack, int health)
@@ -607,8 +621,15 @@ int Minion::GetHealth() const
     return m_health;
 }
 
+int Minion::GetMaxHealth() const
+{
+    return m_maxHealth;
+}
+
 void Minion::SetHealth(int val)
 {
+    if (val > m_health)
+        m_maxHealth += val - m_health;
     m_health = val;
 }
 
@@ -645,6 +666,13 @@ void Minion::ApplyCombatPersistentStats(int attack, int health)
     SetHealth(GetHealth() + health);
     m_combatPersistentAttack += attack;
     m_combatPersistentHealth += health;
+    NotifyPersistentAttackGain(attack);
+}
+
+void Minion::NotifyPersistentAttackGain(int amount)
+{
+    if (amount > 0 && getPlayerCallback)
+        getPlayerCallback().DispatchMinionAttackGain(*this, amount);
 }
 
 void Minion::ApplyCombatPersistentKeyword(GameTag tag)
@@ -712,7 +740,46 @@ void Minion::ApplyTemporaryKeyword(GameTag tag)
         case GameTag::MEGA_WINDFURY:
             if (!HasWindfury()) { SetGameTag(tag, 1); m_temporaryMegaWindfury = true; }
             break;
+        case GameTag::POISONOUS:
+        case GameTag::VENOMOUS:
+            if (!HasVenomous()) { SetGameTag(GameTag::POISONOUS, 1); m_temporaryVenomous = true; }
+            break;
+        case GameTag::STEALTH:
+            if (!m_hasStealth) { SetGameTag(GameTag::STEALTH, 1); m_temporaryStealth = true; }
+            break;
         default:
+            break;
+    }
+}
+
+void Minion::ApplyTemporaryEnchantment(TemporaryEnchantment kind, int attack,
+                                       int health)
+{
+    switch (kind)
+    {
+        case TemporaryEnchantment::Stats:
+            ApplyTemporaryStats(attack, health);
+            break;
+        case TemporaryEnchantment::StatsAndTaunt:
+            ApplyTemporaryStats(attack, health, true);
+            break;
+        case TemporaryEnchantment::StatsAndWindfury:
+            ApplyTemporaryStats(attack, health);
+            ApplyTemporaryKeyword(GameTag::WINDFURY);
+            break;
+        case TemporaryEnchantment::StatsAndReborn:
+            ApplyTemporaryStats(attack, health);
+            ApplyTemporaryKeyword(GameTag::REBORN);
+            break;
+        case TemporaryEnchantment::DivineShield:
+            ApplyTemporaryKeyword(GameTag::DIVINE_SHIELD);
+            break;
+        case TemporaryEnchantment::Venomous:
+            ApplyTemporaryKeyword(GameTag::VENOMOUS);
+            break;
+        case TemporaryEnchantment::StatsAndStealth:
+            ApplyTemporaryStats(attack, health);
+            ApplyTemporaryKeyword(GameTag::STEALTH);
             break;
     }
 }
@@ -731,6 +798,10 @@ void Minion::ExpireTemporaryEffects()
         SetGameTag(GameTag::WINDFURY, 0);
     if (m_temporaryMegaWindfury)
         SetGameTag(GameTag::MEGA_WINDFURY, 0);
+    if (m_temporaryVenomous)
+        SetGameTag(GameTag::POISONOUS, 0);
+    if (m_temporaryStealth)
+        SetGameTag(GameTag::STEALTH, 0);
     m_temporaryAttack = 0;
     m_temporaryHealth = 0;
     m_temporaryTaunt = false;
@@ -738,6 +809,8 @@ void Minion::ExpireTemporaryEffects()
     m_temporaryReborn = false;
     m_temporaryWindfury = false;
     m_temporaryMegaWindfury = false;
+    m_temporaryVenomous = false;
+    m_temporaryStealth = false;
 }
 
 bool Minion::IsLavaLurker() const noexcept
@@ -1268,6 +1341,26 @@ void Minion::SetDeathrattleStatTransfer(int attack, int health)
 {
     m_deathrattleAttackTransfer = attack;
     m_deathrattleHealthTransfer = health;
+}
+
+void Minion::SetDeathrattleStatTransferToAll(bool enabled)
+{
+    m_deathrattleStatTransferToAll = enabled;
+}
+
+bool Minion::DeathrattleStatTransferToAll() const
+{
+    return m_deathrattleStatTransferToAll;
+}
+
+void Minion::SetEarthElementalDeathrattle(bool enabled)
+{
+    m_earthElementalDeathrattle = enabled;
+}
+
+bool Minion::HasEarthElementalDeathrattle() const
+{
+    return m_earthElementalDeathrattle;
 }
 
 void Minion::ApplySkyGolemDeathrattleCount(int count)

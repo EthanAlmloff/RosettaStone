@@ -89,6 +89,12 @@ TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
     CHECK(seeLight->kind == Season14HeroPowerKind::SEE_THE_LIGHT);
     CHECK(seeLight->cost == 2);
     CHECK(!seeLight->passive);
+    const auto* luckyRoll = FindSeason14HeroPowerBehavior("BG28_HERO_400p");
+    REQUIRE(luckyRoll != nullptr);
+    CHECK(luckyRoll->dbfID == 105315);
+    CHECK(luckyRoll->kind == Season14HeroPowerKind::LUCKY_ROLL);
+    CHECK(luckyRoll->cost == 1);
+    CHECK(!luckyRoll->passive);
     const auto* brick = FindSeason14HeroPowerBehavior("TB_BaconShop_HP_040");
     REQUIRE(brick != nullptr);
     CHECK(brick->dbfID == 59832);

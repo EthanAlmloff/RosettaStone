@@ -39,6 +39,8 @@ enum class TavernSpellEffect
     TARGET_STATS_AND_WINDFURY,
     TARGET_DIVINE_SHIELD_TEMP,
     TARGET_STATS_AND_REBORN,
+    TARGET_STATS_AND_STEALTH,
+    SHOP_STATS_TO_RANDOM_FRIENDLY,
     TARGET_DIVINE_SHIELD,
     TARGET_STATS_TOGGLE_TAUNT,
     SET_PLAYER_ARMOR,
@@ -139,6 +141,11 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     if (id == "BG23_008_Gt") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP };
     if (id == "BG31_830t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
     if (id == "BG31_830_Gt") return { 0, 4, 4, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
+    if (id == "BG31_924t") return { 0, 1, 1, TavernSpellEffect::TARGET_STATS };
+    if (id == "BG31_924_Gt") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS };
+    if (id == "BG26_501t") return { 0, 0, 0, TavernSpellEffect::TARGET_STATS };
+    if (id == "BG26_171t") return { 0, 3, 4, TavernSpellEffect::TARGET_STATS_AND_STEALTH };
+    if (id == "BG26_171_Gt") return { 0, 6, 8, TavernSpellEffect::TARGET_STATS_AND_STEALTH };
     if (id == "BG34_Giant_035t" || id == "BG34_Giant_035t_G")
         return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD };
     if (id == "BG28_168") // Shiny Ring: Give your minions +1/+1.
@@ -444,6 +451,8 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::TARGET_STATS_AND_WINDFURY ||
            effect == TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP ||
            effect == TavernSpellEffect::TARGET_STATS_AND_REBORN ||
+           effect == TavernSpellEffect::TARGET_STATS_AND_STEALTH ||
+           effect == TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY ||
            effect == TavernSpellEffect::TARGET_DIVINE_SHIELD ||
            effect == TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT ||
            effect == TavernSpellEffect::TARGET_SHARED_RACE_STATS ||

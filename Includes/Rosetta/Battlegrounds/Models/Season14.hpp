@@ -169,6 +169,10 @@ class Season14State
     std::int32_t convictionExtraTargets = 0;
     std::int32_t convictionPendingImprovements = 0;
     std::int32_t buddyCombatKillHealth = 0;
+    // Friendly combat-kill progress is reset at COMBAT_START.  This is
+    // player-owned state; it is never reconstructed from hidden opponent data.
+    std::int32_t combatKillProgress = 0;
+    bool combatKillThresholdTriggered = false;
     std::int32_t buddyAvengeDeaths = 0;
     void ImproveConviction(std::int32_t choice) noexcept { if (choice == 0) ++convictionAttackBonus; else if (choice == 1) ++convictionHealthBonus; else ++convictionExtraTargets; }
     std::int32_t ConvictionAttackBonus() const noexcept { return convictionAttackBonus; }
@@ -243,8 +247,6 @@ class Season14State
     bool heroPowerAvailable = false;
     bool heroPowerUsed = false;
     std::int32_t buddyExtraHeroPowerUses = 0;
-    std::int32_t trinketHeroPowerRepeats = 0;
-    std::int32_t trinketHeroPowerRepeatSources = 0;
     void EnableBuddyExtraHeroPowerUses(std::int32_t n) noexcept { buddyExtraHeroPowerUses = std::max(buddyExtraHeroPowerUses, n); }
     void ResetBuddyExtraHeroPowerUses() noexcept { buddyExtraHeroPowerUses = 0; }
     bool powerOfStormActive = false;
@@ -267,6 +269,13 @@ class Season14State
     std::int32_t imprisonedEntityID = -1;
     std::int32_t imprisonedTurns = 0;
     std::int32_t mechGyverDeaths = 0;
+    //! Persistent +1/+1 earned by Tentacular's combat-start Tentacle per sale.
+    std::int32_t tentacularBonus = 0;
+    std::int32_t embraceElementDbfID = 0;
+    std::int32_t murlocRewardSells = 0;
+    std::int32_t murlocRewardsRemaining = 5;
+    std::int32_t battlecryRewardBuys = 0;
+    bool battlecryRewardGiven = false;
     bool AdvanceMechGyverDeath() noexcept
     {
         if (++mechGyverDeaths < 9) return false;
@@ -362,6 +371,9 @@ class Season14State
     std::int32_t futureBallerHealth = 0;
     std::int32_t trinketExtraShopSlots = 0;
     std::int32_t refreshExtraShopSlots = 0;
+    // True only while a player-initiated Tavern refresh is filling offers;
+    // refresh-triggered hero powers must not apply during turn-start setup.
+    bool refreshInProgress = false;
     std::int32_t spellMinionAttackProgress = 0;
     //! Number of successfully resolved spells this game.
     std::int32_t successfulSpellCount = 0;
@@ -393,6 +405,9 @@ class Season14State
     std::int32_t tavernSpellHealthBonus = 0;
     //! Cumulative attack added by future Tavern spells this game.
     std::int32_t tavernSpellAttackBonus = 0;
+    std::int32_t tavernLightingAttack = 1;
+    std::int32_t tavernLightingHealth = 1;
+    std::int32_t tavernLightingTurns = 0;
     std::int32_t deferredMinionAttack = 0;
     std::int32_t deferredMinionHealth = 0;
     std::uint8_t deferredMinionStatTurns = 0;
@@ -596,6 +611,7 @@ class Season14State
     std::pair<std::int32_t, std::int32_t> OnTrinketFriendlyMinionDied();
     void ResetTrinketAvengeProgress() noexcept;
     void OnFriendlyPirateAttack();
+    void OnFriendlyMinionAttack();
 
     //! Records a successfully resolved Tavern spell.
     void OnTavernSpellResolved(bool spellResolved, std::int32_t sourceDbfID = 0);
@@ -748,6 +764,9 @@ class Season14State
 
     //! Returns a passive combat-kill bonus owned by this hero, if any.
     std::int32_t HeroPowerBatch3CombatKillAttackBonus() const noexcept;
+    //! Record one confirmed friendly-owned enemy kill. Returns true exactly
+    //! when Sulfuras reaches its once-per-combat threshold.
+    bool RecordFriendlyCombatKill() noexcept;
 
     //! Returns whether the player can pay and use the power this turn.
     bool CanUseHeroPower(std::int32_t availableGold) const;

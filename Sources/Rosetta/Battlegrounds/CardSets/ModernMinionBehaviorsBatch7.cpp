@@ -37,5 +37,7 @@ void ModernMinionBehaviorsBatch7::AddAll(
     // in the parent project, but that catalog is never loaded by CardDefs.
     // In particular, Eternal Knight is summoned from Card metadata by
     // SummonTask, while its unresolved aura remains launch-blocking.
+    AddDeathrattleSummon(cards, "BG25_009", "BG25_008", 1);
+    AddDeathrattleSummon(cards, "BG25_009_G", "BG25_008_G", 1);
 }
 }  // namespace RosettaStone::Battlegrounds

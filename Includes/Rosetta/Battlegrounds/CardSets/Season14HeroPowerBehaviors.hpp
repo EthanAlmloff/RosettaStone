@@ -148,7 +148,7 @@ constexpr std::string_view GeneratedQuestRewardMissingLinkReason(
 }
 
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 51>
+inline constexpr std::array<Season14HeroPowerDefinition, 39>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},

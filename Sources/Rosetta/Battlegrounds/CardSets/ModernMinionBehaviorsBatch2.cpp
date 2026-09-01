@@ -44,6 +44,10 @@ void ModernMinionBehaviorsBatch2::AddAll(
     // Half-Shell token, including the golden pair.
     cards.emplace("BG19_010t", CardDef{});
     cards.emplace("BG19_010_Gt", CardDef{});
+    AddDeathrattleSummon(cards, "BG19_010", "BG19_010t", 2);
+    AddDeathrattleSummon(cards, "BG19_010_G", "BG19_010_Gt", 2);
+    AddStatic(cards, "BG32_236");
+    AddStatic(cards, "BG32_236_G");
 
     // Aureate Laureate is always golden but has no distinct behavior beyond
     // the Divine Shield keyword represented by the pinned metadata.

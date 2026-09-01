@@ -1,19 +1,22 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/OnePerTypeRallyBuffTask.hpp>
+#include <effolkronium/random.hpp>
+#include <vector>
 
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus OnePerTypeRallyBuffTask::Run(Player& player, Minion&) {
   auto& field = player.GetField();
   for (int repeat = 0; repeat < m_repeats; ++repeat) {
     for (const Race race : RACES_IN_BATTLEGROUNDS) {
-      Minion* selected = nullptr;
+      std::vector<Minion*> candidates;
       field.ForEachAlive([&](MinionData& data) {
-        if (selected == nullptr && data.value().HasRace(race))
-          selected = &data.value();
+        if (data.value().HasRace(race)) candidates.push_back(&data.value());
       });
-      if (selected == nullptr)
+      if (candidates.empty())
         continue;
+      auto* selected = candidates[effolkronium::random_thread_local::get<std::size_t>(
+          0, candidates.size() - 1)];
       if (player.isInCombat)
         selected->ApplyCombatPersistentStats(m_attack, m_health);
       else {
