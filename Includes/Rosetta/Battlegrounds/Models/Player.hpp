@@ -80,6 +80,13 @@ class Player
     //! The call is made by every authoritative summon path after insertion
     //! and ordinary SUMMON observers have seen the entity.
     void ApplySummonTrinkets(Minion& summoned);
+    //! Applies Ancestral Automaton's lifetime "other summoned" scaling and
+    //! records the summon for this player.  The counter is player-local and
+    //! therefore survives zone changes while remaining isolated per opponent.
+    void RecordAncestralAutomatonSummon(Minion& summoned);
+    //! Resolves Mechagnome Interpreter for a successfully played or
+    //! magnetized friendly Mech.
+    void ApplyMechagnomeInterpreterBonus(Minion& target);
     void RefreshSousChefHeroPowerUses();
     //! Applies Watfin only after Detective for Hire commits a correct guess.
     void ResolveWatfinGuess(bool correct, const Card& guessedMinion);
@@ -112,6 +119,21 @@ class Player
     //! powers that acquire a shop entity directly; pool ownership remains
     //! with the moved instance.
     bool TakeTavernMinionToHand(std::size_t idx, int attack, int health);
+    //! Steal live Tavern minions in slot order until hand capacity is reached;
+    //! remaining offers stay in the Tavern and stolen entities are never
+    //! returned to the pool.
+    bool StealAllTavernMinionsToHand();
+    //! Resolve Teron's scheduled destroy/resummon at combat start.
+    bool ResolveRapidReanimationStartCombat();
+    //! Observer used after a death/summon opens a board slot.
+    // Resolve the queued exact copy against the field that is currently
+    // authoritative (recruit field before Battle copies it, combat field
+    // thereafter).  Keeping the field explicit prevents a stale/empty combat
+    // snapshot from consuming the queued resurrection during start-of-combat.
+    bool TryResolveRapidReanimationIfSpace(FieldZone& field);
+    bool BeginFantasticTreasureOffer();
+    bool BeginWarpGateChoice();
+    bool TryResolveWarpGateReward();
     //! Each friendly Demon consumes one random Tavern minion for its stats.
     bool DevourRandomTavernForDemons(int multiplier);
     void UpdateSkyGolemsForDeathrattle();
@@ -203,6 +225,7 @@ class Player
     bool ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx);
     //! Resolves a pending Tavern-spell modal without re-paying the spell.
     bool ApplySpellChoice(std::size_t offeringIdx);
+    bool ApplySpellChoice(std::size_t offeringIdx, std::size_t targetIdx);
     //! Resolves persistent Trinket effects after any successful Tavern spell,
     //! including modal/Choose-One completion paths.
     void ApplyTavernSpellTrinkets();
@@ -245,6 +268,7 @@ class Player
     //! for the refresh (for example Temporal Tavern).
     void RefreshTavern(bool freeRefresh = false);
     void RecordGoldSpent(std::int32_t amount);
+    void RecordTreasureParrotDamage(Minion& source, int amount);
 
     //! Freezes a list of minions in Tavern's field.
     void FreezeTavern();
@@ -297,6 +321,7 @@ class Player
     Hero hero;
 
     int remainCoin = 0;
+    std::string lastBoughtTavernSpellID;
     int totalCoin = 0;
     int armor = 0;
     int currentTier = 0;
@@ -320,6 +345,9 @@ class Player
     //! Lifetime friendly Eternal Knight deaths used by its wherever-this-is
     //! aura; incremented only by authoritative death processing.
     int eternalKnightsDiedThisGame = 0;
+    //! Lifetime Ancestral Automatons summoned by this player, including
+    //! entities that subsequently died or moved to another zone.
+    int ancestralAutomatonsSummonedThisGame = 0;
 
     std::function<void(Player&)> selectHeroCallback;
     std::function<void(Player&)> prepareTavernMinionsCallback;

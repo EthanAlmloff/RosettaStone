@@ -290,6 +290,7 @@ class Minion
     void ResetZestyShakerUse() noexcept { m_zestyShakerUsed = false; }
     bool ConsumeZestyShakerUse() noexcept { if (m_zestyShakerUsed) return false; m_zestyShakerUsed = true; return true; }
     bool AdvanceFelboarSpellCounter() noexcept { return ++m_felboarSpellCounter % 3 == 0; }
+    bool ConsumeKodoSummonUse() noexcept { if (m_kodoSummonUses >= 3) return false; ++m_kodoSummonUses; return true; }
     void SetPermanentSpellcraft(bool enabled = true) noexcept { m_permanentSpellcraft = enabled; }
     bool HasPermanentSpellcraft() const noexcept { return m_permanentSpellcraft; }
     bool IsLavaLurker() const noexcept;
@@ -367,9 +368,17 @@ class Minion
     void SetEndTurnBattlecryTrigger(bool enabled);
     void SetSpendGoldThresholdFired(bool fired) noexcept { m_spendGoldThresholdFired = fired; }
     bool SpendGoldThresholdFired() const noexcept { return m_spendGoldThresholdFired; }
+    void SetSpendGoldThresholdCount(int count) noexcept { m_spendGoldThresholdCount = count; }
+    int SpendGoldThresholdCount() const noexcept { return m_spendGoldThresholdCount; }
+    void AddDamageDealt(int amount) noexcept { m_damageDealt += std::max(0, amount); }
+    int DamageDealt() const noexcept { return m_damageDealt; }
+    bool TreasureParrotRewarded() const noexcept { return m_treasureParrotRewarded; }
+    void SetTreasureParrotRewarded(bool value) noexcept { m_treasureParrotRewarded = value; }
     void SetHeroDamageThresholdFired(bool fired) noexcept { m_heroDamageThresholdFired = fired; }
     bool HeroDamageThresholdFired() const noexcept { return m_heroDamageThresholdFired; }
     bool HasEndTurnBattlecryTrigger() const;
+    void SetTaughtTavernSpell(std::string spellID) { m_taughtTavernSpell = std::move(spellID); }
+    const std::string& TaughtTavernSpell() const noexcept { return m_taughtTavernSpell; }
     bool HasBattlecry() const;
     void SetDeathrattleStatTransfer(int attack, int health);
     //! Configures the transfer to affect every surviving friendly minion.
@@ -559,6 +568,10 @@ class Minion
     bool m_attackThresholdTriggered = false;
     bool m_endTurnBattlecryTrigger = false;
     bool m_spendGoldThresholdFired = false;
+    int m_spendGoldThresholdCount = 0;
+    int m_damageDealt = 0;
+    bool m_treasureParrotRewarded = false;
+    std::string m_taughtTavernSpell;
     bool m_heroDamageThresholdFired = false;
     int m_deathrattleAttackTransfer = 0;
     int m_deathrattleHealthTransfer = 0;
@@ -593,6 +606,7 @@ class Minion
     bool m_permanentSpellcraft = false;
     bool m_zestyShakerUsed = false;
     int m_felboarSpellCounter = 0;
+    int m_kodoSummonUses = 0;
     bool m_hasVenomous = false;
     bool m_hasStealth = false;
     bool m_isFrozen = false;

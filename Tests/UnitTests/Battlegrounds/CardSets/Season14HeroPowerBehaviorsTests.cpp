@@ -62,7 +62,46 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Void Power has turn-seven Discover pay
 
 TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 24);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 45);
+
+    const auto* perfectCrime = FindSeason14HeroPowerBehavior("BG23_HERO_305p");
+    REQUIRE(perfectCrime != nullptr);
+    CHECK(perfectCrime->dbfID == 86292);
+    CHECK(perfectCrime->kind == Season14HeroPowerKind::PERFECT_CRIME);
+    CHECK(perfectCrime->cost == 11);
+    CHECK(!perfectCrime->passive);
+
+    const auto* detective = FindSeason14HeroPowerBehavior("BG23_HERO_303p2");
+    REQUIRE(detective != nullptr);
+    CHECK(detective->dbfID == 90403);
+    CHECK(detective->kind == Season14HeroPowerKind::DETECTIVE_FOR_HIRE);
+    CHECK(detective->cost == 0);
+    CHECK(!detective->passive);
+
+    const auto* rapid = FindSeason14HeroPowerBehavior("BG25_HERO_103p");
+    REQUIRE(rapid != nullptr);
+    CHECK(rapid->dbfID == 98728);
+    CHECK(rapid->kind == Season14HeroPowerKind::RAPID_REANIMATION);
+    CHECK(rapid->cost == 3);
+    CHECK(!rapid->passive);
+
+    const auto* treasure = FindSeason14HeroPowerBehavior("BG30_HERO_304p");
+    REQUIRE(treasure != nullptr);
+    CHECK(treasure->dbfID == 113311);
+    CHECK(treasure->kind == Season14HeroPowerKind::FANTASTIC_TREASURE);
+    CHECK(treasure->cost == 0);
+    CHECK(!treasure->passive);
+
+    const auto* liftOff = FindSeason14HeroPowerBehavior("BG31_HERO_801p");
+    REQUIRE(liftOff != nullptr);
+    CHECK(liftOff->dbfID == 118681);
+    CHECK(liftOff->kind == Season14HeroPowerKind::LIFT_OFF);
+    CHECK(liftOff->passive);
+    const auto* warpGate = FindSeason14HeroPowerBehavior("BG31_HERO_802p");
+    REQUIRE(warpGate != nullptr);
+    CHECK(warpGate->dbfID == 119196);
+    CHECK(warpGate->kind == Season14HeroPowerKind::WARP_GATE);
+    CHECK(warpGate->passive);
 
     const auto* boon = FindSeason14HeroPowerBehavior(57562);
     REQUIRE(boon != nullptr);

@@ -88,6 +88,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemAttackerTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastAdjacentBloodGemTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpendGoldThresholdSpellTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpendGoldThresholdBountyTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BuyTavernSpellMurlocTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCountRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatSpellScaledRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DistinctSpellRaceBuffTask.hpp>
@@ -183,6 +185,8 @@ using TaskType =
                  SimpleTasks::RallyBloodGemAttackerTask,
                  SimpleTasks::SpellCastAdjacentBloodGemTask,
                  SimpleTasks::SpendGoldThresholdSpellTask,
+                 SimpleTasks::SpendGoldThresholdBountyTask,
+                 SimpleTasks::BuyTavernSpellMurlocTask,
                  SimpleTasks::SpellCountRaceBuffTask,
                  SimpleTasks::StartCombatSpellScaledRaceBuffTask,
                  SimpleTasks::DistinctSpellRaceBuffTask,

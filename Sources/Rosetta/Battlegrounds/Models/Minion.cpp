@@ -1093,6 +1093,8 @@ void Minion::TakeDamage(Minion& source)
     SetLastDamageSource(source);
     const int damage = source.GetAttack();
     m_health -= damage;
+    if (source.getPlayerCallback)
+        source.getPlayerCallback().RecordTreasureParrotDamage(source, damage);
     if (m_health <= 0 || (source.HasVenomous() && damage > 0))
     {
         // Venomous applies only after actual damage. Divine Shield returned
@@ -1268,6 +1270,20 @@ void Minion::ActivateTrigger(TriggerType type, Minion& source)
 
 void Minion::ActivateTask(PowerType type, Player& player)
 {
+    if (type == PowerType::POWER && !TaughtTavernSpell().empty()) {
+        const auto spell = Cards::FindCardByID(TaughtTavernSpell());
+        const auto behavior = FindTavernSpellBehavior(TaughtTavernSpell());
+        // Generated taught spells are resolved only through the canonical
+        // Tavern resolver. Unknown/unimplemented identities fail closed.
+        if (spell.id.empty() || behavior.effect == TavernSpellEffect::NONE)
+            return;
+        player.season14.pendingTaughtSpell =
+            {true, static_cast<std::uint64_t>(GetIndex()), spell.dbfID};
+        (void)player.CastTavernSpellFree(TaughtTavernSpell(), 1);
+        if (player.season14.pendingDecision != Season14Decision::CHOOSE_ONE)
+            player.season14.pendingTaughtSpell = {};
+        return;
+    }
     auto tasks = GetTasks(type);
     if (tasks.empty())
     {

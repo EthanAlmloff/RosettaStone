@@ -26,5 +26,11 @@ void ModernMinionBehaviorsBatch36::AddAll(
     cards.emplace("BG36_330_Gt", CardDef{});
     cards.emplace("BG36_330t2", CardDef{});
     cards.emplace("BG36_330_Gt2", CardDef{});
+    cards.emplace("BG36_341", CardDef{});
+    cards.emplace("BG36_341_G", CardDef{});
+    cards.emplace("BG36_341t", CardDef{});
+    cards.emplace("BG36_341_Gt", CardDef{});
+    cards.emplace("BG36_341t2", CardDef{});
+    cards.emplace("BG36_341_Gt2", CardDef{});
 }
 }  // namespace RosettaStone::Battlegrounds

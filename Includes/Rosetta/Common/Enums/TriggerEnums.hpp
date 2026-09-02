@@ -66,6 +66,8 @@ enum class TriggerType
     SELL_MINION, //!< The effect triggers after a minion is sold.
     BUY_MINION,  //!< The effect triggers after a minion is bought.
     SPEND_GOLD,  //!< The effect triggers after each 5 Gold spent.
+    SPEND_GOLD_EXACT, //!< The effect observes each spend for its own threshold.
+    BUY_TAVERN_SPELL, //!< A player bought a Tavern spell.
     AFTER_CAST_SPELL, //!< The effect triggers after a targeted Tavern spell resolves.
     HERO_DAMAGE, //!< The effect triggers after this player's hero loses Health.
 };

@@ -46,6 +46,7 @@ class Spell
 
     //! Returns the source card text used for diagnostics only.
     const std::string& GetText() const;
+    TargetingType GetTargetingType() const noexcept { return m_card.targetingType; }
 
     //! Sets the value of zone type.
     //! \param type The value of zone type.

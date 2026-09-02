@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <utility>
 #include <vector>
+#include <cstdint>
 
 namespace RosettaStone::Battlegrounds
 {

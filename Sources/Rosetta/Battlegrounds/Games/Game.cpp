@@ -340,6 +340,7 @@ void Game::Recruit()
         player.season14.heroPowerBatch3State = 0;
         player.recruitField.ForEach([](MinionData& minion) {
             minion.value().ResetActivateUses();
+            minion.value().ResetBuyTriggerUses();
         });
 
         // Assign the index of the player to fight next.
@@ -396,6 +397,8 @@ void Game::Recruit()
         player.RefreshSousChefHeroPowerUses();
         player.remainCoin += heroPowerResult.goldDelta;
         player.ResolveStartTurnTrinkets();
+        player.TryResolveWarpGateReward();
+        player.BeginFantasticTreasureOffer();
         player.recruitField.ForEachAlive([](MinionData& data) {
             if (data.value().HasTimeTurning())
                 data.value().ActivateTrigger(TriggerType::TURN_END, data.value());
@@ -734,7 +737,29 @@ void Game::Combat()
         Player& player1 = m_gameState.players.at(std::get<0>(pair));
         Player& player2 = m_gameState.players.at(std::get<1>(pair));
 
+        // Teron's Rapid Reanimation resolves before combat copies are made;
+        // this preserves recruit ordering and gives the resurrected instance
+        // its fresh entity identity.
+        player1.ResolveRapidReanimationStartCombat();
+        player2.ResolveRapidReanimationStartCombat();
+
         Battle battle(player1, player2);
+
+        // Detective for Hire may reveal only the public minion identities
+        // from the next opponent's most recent combat.  Snapshot before the
+        // combat mutates either field; no hand, RNG, or hidden pool state is
+        // copied into the information set.
+        auto snapshotPublicBoard = [](const Player& player) {
+            std::vector<std::int32_t> ids;
+            player.recruitField.ForEachAlive([&ids](const MinionData& data) {
+                ids.push_back(data.value().GetDbfID());
+            });
+            return ids;
+        };
+        player1.season14.RecordLastOpponentCombatMinions(
+            snapshotPublicBoard(player2));
+        player2.season14.RecordLastOpponentCombatMinions(
+            snapshotPublicBoard(player1));
 
         // Create callback to get battle
         player1.getBattleCallback = [&battle]() -> Battle& { return battle; };

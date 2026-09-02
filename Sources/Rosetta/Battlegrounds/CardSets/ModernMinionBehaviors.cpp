@@ -79,6 +79,8 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BG31_327_G");
     AddStatic(cards, "BG32_237");
     AddStatic(cards, "BG32_237_G");
+    AddStatic(cards, "BG32_873"); AddStatic(cards, "BG32_873_G");
+    AddStatic(cards, "BG34_322"); AddStatic(cards, "BG34_322_G");
     struct DeathrattleSummonSpec { const char* id; int count; };
     constexpr DeathrattleSummonSpec handSpecs[] = {
         {"BG26_350", 1}, {"BG26_350_G", 2},

@@ -22,6 +22,9 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellAttackBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomGoldenTierMinionToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmFodderRefreshTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpendGoldThresholdBountyTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastTavernSpellOnAdjacentTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BuyTavernSpellMurlocTask.hpp>
 
 using namespace RosettaStone::Battlegrounds;
 
@@ -393,6 +396,52 @@ TEST_CASE("[Generated mappings] - spend gold family uses threshold trigger")
         CHECK(trigger->GetTriggerType() == TriggerType::SPEND_GOLD);
         CHECK(trigger->GetTriggerSource() == TriggerSource::SELF);
         CHECK(trigger->GetTasks().size() == (std::string_view(id) == "BG26_810_G" ? 2 : 1));
+    }
+}
+
+TEST_CASE("[Generated mappings] - Sky Admiral Rogers awards threshold Bounties")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG33_823", "BG33_823_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& trigger = cards.at(id).power.GetTrigger();
+        REQUIRE(trigger.has_value());
+        CHECK(trigger->GetTriggerType() == TriggerType::SPEND_GOLD_EXACT);
+        REQUIRE(trigger->GetTasks().size() == 1);
+        CHECK(std::holds_alternative<SimpleTasks::SpendGoldThresholdBountyTask>(
+            trigger->GetTasks().front()));
+    }
+}
+
+TEST_CASE("[Generated mappings] - Seafloor Recruiter casts Chef's Choice to the right")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG34_925", "BG34_925_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& rally = cards.at(id).power.GetRallyTask();
+        REQUIRE(rally.size() == 1);
+        CHECK(std::holds_alternative<SimpleTasks::CastTavernSpellOnAdjacentTask>(
+            rally.front()));
+    }
+}
+
+TEST_CASE("[Generated mappings] - Magicfin listens for Tavern spell purchases")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG33_891", "BG33_891_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& trigger = cards.at(id).power.GetTrigger();
+        REQUIRE(trigger.has_value());
+        CHECK(trigger->GetTriggerType() == TriggerType::BUY_TAVERN_SPELL);
+        REQUIRE(trigger->GetTasks().size() == 1);
+        CHECK(std::holds_alternative<SimpleTasks::BuyTavernSpellMurlocTask>(
+            trigger->GetTasks().front()));
     }
 }
 

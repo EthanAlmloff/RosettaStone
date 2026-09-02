@@ -323,7 +323,7 @@ void Battle::Initialize()
         Minion& projectile = own[own.GetCount() - 1];
         std::vector<Minion*> targets;
         enemy.ForEachAlive([&targets](MinionData& data) {
-            if (!data.value().IsStealthed()) targets.push_back(&data.value());
+            if (!data.value().HasStealth()) targets.push_back(&data.value());
         });
         if (targets.empty()) return;
         auto& target = *targets[Random::get<std::size_t>(0, targets.size() - 1)];
@@ -1026,7 +1026,7 @@ void Battle::TryFireQueuedLockAndLoad()
         if (own.GetCount() <= before) return;
         std::vector<Minion*> targets;
         enemy.ForEachAlive([&targets](MinionData& data) {
-            if (!data.value().IsStealthed()) targets.push_back(&data.value());
+        if (!data.value().HasStealth()) targets.push_back(&data.value());
         });
         if (targets.empty()) return;
         auto& projectile = own[own.GetCount() - 1];
@@ -1550,6 +1550,12 @@ void Battle::ProcessDestroy(bool beforeAttack)
             m_p2NextAttackerIdx %= std::max(1, m_p2Field.GetCount());
         }
     }
+    // Rapid Reanimation is a delayed observer: its target's Deathrattle may
+    // have filled the freed slot. Re-check after the complete death batch,
+    // and against the combat field so a later death in this combat can open
+    // space for the exact snapshot.
+    (void)m_player1.TryResolveRapidReanimationIfSpace(m_p1Field);
+    (void)m_player2.TryResolveRapidReanimationIfSpace(m_p2Field);
     TryFireQueuedLockAndLoad();
 }
 

@@ -96,6 +96,16 @@ struct Season14SpellModalState {
     std::int32_t secondAttack = 0, secondHealth = 0;
     bool secondBranchDelayed = false;
     std::string offeringFilter;
+    std::uint32_t legalTargetMask = 0;
+    std::array<std::uint64_t, 7> legalTargetEntityIDs{};
+};
+//! A generated Mycologist token may carry a Tavern spell.  Keep its source
+//! identity while the free cast is being resolved so a future target/modal
+//! continuation cannot be replayed against another token.
+struct Season14PendingTaughtSpell {
+    bool pending = false;
+    std::uint64_t sourceEntityID = 0;
+    std::int32_t spellDbfID = 0;
 };
 //! Two-stage transform modal state. Stage one selects a stable board entity;
 //! stage two exposes only active normal minions from the next Tavern tier.
@@ -230,6 +240,7 @@ class Season14State
     std::int32_t pendingTavernReplacementTier = 0;
     Season14ChooseOneState chooseOne;
     Season14SpellModalState spellModal;
+    Season14PendingTaughtSpell pendingTaughtSpell;
     Season14TransformState transformModal;
     std::vector<Season14PersistentEffect> trinkets;
     std::vector<Season14PersistentEffect> darkGifts;
@@ -274,6 +285,17 @@ class Season14State
 
     std::int32_t heroPowerDbfID = 0;
     std::int32_t heroPowerCost = 0;
+    //! The Perfect Crime's persistent one-gold-per-recruit discount.  It is
+    //! deliberately separate from the one-shot Galaxy's Lens discount.
+    std::int32_t perfectCrimeDiscount = 0;
+    //! Public information retained from the opponent's most recent combat;
+    //! Detective for Hire only receives this through its two-card choice.
+    std::vector<std::int32_t> lastOpponentCombatMinionDbfIDs;
+    std::int32_t detectiveCorrectDbfID = 0;
+    bool rapidReanimationArmed = false;
+    std::uint64_t rapidReanimationTargetEntityID = 0;
+    std::int32_t rapidReanimationTargetSlot = -1;
+    std::optional<Minion> rapidReanimationSnapshot;
     bool heroPowerAvailable = false;
     bool heroPowerUsed = false;
     std::int32_t buddyExtraHeroPowerUses = 0;
@@ -319,6 +341,11 @@ class Season14State
     //! is kept as an explicit state member for schema clarity and future
     //! counters, while all unsupported families remain fail-closed.
     std::uint8_t heroPowerBatch3State = 0;
+    std::int32_t recruitTurnNumber = 0;
+    std::int32_t warpGateBuyCount = 0;
+    std::int32_t warpGateSelectedDbfID = 0;
+    std::int32_t warpGateRewardDbfID = 0;
+    std::uint64_t liftOffBattlecruiserEntityID = 0;
     //! Reserved fixed-capacity payload for delayed end-turn effects.  HP104
     //! deliberately leaves it empty: recipients are chosen at end turn.
     std::array<std::uint64_t, 32> cthunEndTurnTargets{};
@@ -860,6 +887,10 @@ class Season14State
 
     //! Returns the current cost after deterministic hero-power discounts.
     std::int32_t EffectiveHeroPowerCost() const;
+    void RecordLastOpponentCombatMinions(
+        const std::vector<std::int32_t>& dbfIDs);
+    bool ArmRapidReanimation(std::uint64_t entityID, Minion snapshot);
+    bool TakeRapidReanimationSnapshot(Minion& out) noexcept;
 
     //! Consumes the power for this turn.
     bool UseHeroPower();

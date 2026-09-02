@@ -55,6 +55,12 @@ enum class Season14HeroPowerKind : std::uint8_t
     IMPRISON,
     SIGN_NEW_ARTIST,
     CONVICTION,
+    PERFECT_CRIME,
+    DETECTIVE_FOR_HIRE,
+    RAPID_REANIMATION,
+    FANTASTIC_TREASURE,
+    LIFT_OFF,
+    WARP_GATE,
 };
 
 struct Season14HeroPowerDefinition
@@ -148,7 +154,7 @@ constexpr std::string_view GeneratedQuestRewardMissingLinkReason(
 }
 
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 39>
+inline constexpr std::array<Season14HeroPowerDefinition, 45>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},
@@ -228,6 +234,21 @@ inline constexpr std::array<Season14HeroPowerDefinition, 39>
          Season14HeroPowerKind::IMPRISON, 1, false},
         {"BG25_HERO_105p", 101346,
          Season14HeroPowerKind::SIGN_NEW_ARTIST, 3, false, 101349},
+        // The metadata text says 10, but the Patch 36.4 rules contract uses
+        // the 11-cost starting value; one point is discounted at each
+        // recruit boundary before the next activation.
+        {"BG23_HERO_305p", 86292,
+         Season14HeroPowerKind::PERFECT_CRIME, 11, false},
+        {"BG23_HERO_303p2", 90403,
+         Season14HeroPowerKind::DETECTIVE_FOR_HIRE, 0, false},
+        {"BG25_HERO_103p", 98728,
+         Season14HeroPowerKind::RAPID_REANIMATION, 3, false},
+        {"BG30_HERO_304p", 113311,
+         Season14HeroPowerKind::FANTASTIC_TREASURE, 0, false},
+        {"BG31_HERO_801p", 118681,
+         Season14HeroPowerKind::LIFT_OFF, 0, true},
+        {"BG31_HERO_802p", 119196,
+         Season14HeroPowerKind::WARP_GATE, 0, true},
     }};
 
 constexpr const Season14HeroPowerDefinition* FindSeason14HeroPowerBehavior(

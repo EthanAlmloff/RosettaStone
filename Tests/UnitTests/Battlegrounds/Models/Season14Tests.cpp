@@ -2,6 +2,7 @@
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
 
 #include <doctest/doctest.h>
 
@@ -21,6 +22,23 @@ TEST_CASE("[Season14] - Public decisions validate and clear")
     CHECK(state.SelectDecision(1));
     CHECK(state.pendingDecision == Season14Decision::NONE);
     CHECK(state.pendingOfferings.empty());
+}
+
+TEST_CASE("[Season14] - Perfect Crime cost discounts once per recruit turn")
+{
+    const auto* definition = FindSeason14HeroPowerBehavior("BG23_HERO_305p");
+    REQUIRE(definition != nullptr);
+    CHECK(definition->kind == Season14HeroPowerKind::PERFECT_CRIME);
+    CHECK(definition->cost == 11);
+    Season14State state;
+    state.SetHeroPower(86292, 11, true);
+    CHECK(state.EffectiveHeroPowerCost() == 11);
+    state.BeginRecruitTurn();
+    CHECK(state.EffectiveHeroPowerCost() == 10);
+    state.BeginRecruitTurn();
+    CHECK(state.EffectiveHeroPowerCost() == 9);
+    state.BeginRecruitTurn();
+    CHECK(state.EffectiveHeroPowerCost() == 8);
 }
 
 TEST_CASE("[Season14] - Tavern spell modal retains source and branches")

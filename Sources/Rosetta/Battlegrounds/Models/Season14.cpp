@@ -222,6 +222,12 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     if (dbfID == 71909) powerOfStormActive = true;
     heroPowerDbfID = dbfID;
     heroPowerCost = std::max<std::int32_t>(0, cost);
+    perfectCrimeDiscount = 0;
+    detectiveCorrectDbfID = 0;
+    rapidReanimationArmed = false;
+    rapidReanimationTargetEntityID = 0;
+    rapidReanimationTargetSlot = -1;
+    rapidReanimationSnapshot.reset();
     heroPowerAvailable = available;
     heroPowerUsed = false;
     luckyRollCooldown = 0;
@@ -229,6 +235,11 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     heroPowerBatch2 = {};
     heroPowerBatch4 = {};
     heroPowerBatch3State = 0;
+    recruitTurnNumber = 0;
+    warpGateBuyCount = 0;
+    warpGateSelectedDbfID = 0;
+    warpGateRewardDbfID = 0;
+    liftOffBattlecruiserEntityID = 0;
     heroPowerBatch5 = {};
     heroPowerBatch6 = {};
     sharpenBladesPurchases = 0;
@@ -240,6 +251,36 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     tavernLightingAttack = dbfID == 122960 ? 1 : 0;
     tavernLightingHealth = dbfID == 122960 ? 1 : 0;
     tavernLightingTurns = 0;
+}
+
+bool Season14State::ArmRapidReanimation(std::uint64_t entityID,
+                                        Minion snapshot)
+{
+    if (heroPowerDbfID != 98728 || rapidReanimationArmed || entityID == 0)
+        return false;
+    rapidReanimationTargetEntityID = entityID;
+    rapidReanimationSnapshot = std::move(snapshot);
+    rapidReanimationArmed = true;
+    return true;
+}
+
+bool Season14State::TakeRapidReanimationSnapshot(Minion& out) noexcept
+{
+    if (!rapidReanimationArmed || !rapidReanimationSnapshot.has_value()) return false;
+    out = std::move(*rapidReanimationSnapshot);
+    rapidReanimationSnapshot.reset();
+    rapidReanimationArmed = false;
+    rapidReanimationTargetEntityID = 0;
+    return true;
+}
+
+void Season14State::RecordLastOpponentCombatMinions(
+    const std::vector<std::int32_t>& dbfIDs)
+{
+    lastOpponentCombatMinionDbfIDs.clear();
+    for (const auto dbfID : dbfIDs)
+        if (dbfID > 0)
+            lastOpponentCombatMinionDbfIDs.push_back(dbfID);
 }
 
 bool Season14State::BeginTransformDecision(std::uint64_t sourceEntityID,
@@ -312,6 +353,7 @@ void Season14State::RecordReclaimedSoulsDeath(const Minion& minion)
 
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
 {
+    ++recruitTurnNumber;
     ResetDistinctSpells();
     generatedRewardConchUsedThisTurn = false;
     trinketFreeSpellUses = trinketFreeSpellUsesPerTurn;
@@ -341,6 +383,8 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     ResolveSeason14HeroPowerBatch1Event(
         heroPowerDbfID, Season14HeroPowerBatch1Event::BEGIN_TURN,
         heroPowerBatch1);
+    if (heroPowerDbfID == 86292)
+        ++perfectCrimeDiscount;
     ResolveUpbeatHarmonyBeginTurn(heroPowerDbfID, heroPowerBatch1);
 
     Season14HeroPowerBatch2Result result{};
@@ -1319,7 +1363,8 @@ std::int32_t Season14State::EffectiveHeroPowerCost() const
 {
     return std::max<std::int32_t>(
         0, heroPowerCost + heroPowerBatch1.leadExplorerCostDelta -
-               (heroPowerBatch2.nextHeroPowerDiscount ? 1 : 0));
+               (heroPowerBatch2.nextHeroPowerDiscount ? 1 : 0) -
+               perfectCrimeDiscount);
 }
 
 bool Season14State::UseHeroPower()
