@@ -152,6 +152,7 @@ class Minion
     //! attachment's stats, supported keywords, and deathrattle tasks are
     //! transferred; the attachment itself is not placed on the board.
     void MagnetizeOnto(Minion& target) const;
+    int GetMagnetizationCount() const noexcept { return m_magnetizationCount; }
 
     //! Returns the value of zone type.
     //! \return The value of zone type.
@@ -223,6 +224,13 @@ class Minion
     void ApplyPersistentTierMinionStats(int tier, int attack, int health);
     void ApplyPersistentRaceStats(Race race, int attack, int health);
 
+    //! Fire-forged Evoker's lifetime Tavern-spell improvement, copied with
+    //! the entity into combat and consumed by its Start of Combat task.
+    void IncrementStartCombatSpellImprovement() noexcept
+    { ++m_startCombatSpellImprovement; }
+    int StartCombatSpellImprovement() const noexcept
+    { return m_startCombatSpellImprovement; }
+
     //! Applies one Blood Gem's resolved stats and records the permanent
     //! instance count used by observation/diagnostics.
     void ApplyBloodGem(int attack, int health);
@@ -255,6 +263,12 @@ class Minion
     void ApplyCombatPersistentKeyword(GameTag tag);
     //! Commits only explicitly persistent combat deltas from a matching copy.
     void ReconcileCombatPersistentState(const Minion& combatCopy);
+    void BeginPoetCombatSnapshot(bool eligible, int multiplier = 1) noexcept;
+    bool IsPoetCombatEligible() const noexcept { return m_poetCombatEligible; }
+    int PoetCombatAttack() const noexcept { return m_poetCombatAttack; }
+    int PoetCombatHealth() const noexcept { return m_poetCombatHealth; }
+    std::uint32_t PoetCombatKeywords() const noexcept { return m_poetCombatKeywords; }
+    int PoetCombatMultiplier() const noexcept { return m_poetCombatMultiplier; }
     void ApplyTemporaryKeyword(GameTag tag);
     //! Apply one typed temporary enchantment payload.  Keeping the lifecycle
     //! choice in Minion prevents individual Tavern spells from duplicating
@@ -265,11 +279,17 @@ class Minion
     //! per observed deathrattle.  The applied count is instance state so an
     //! existing minion can safely pass through fresh-modifier setup again.
     void ApplySkyGolemDeathrattleCount(int count);
+    //! Applies the owning player's cumulative Eternal Knight death aura
+    //! exactly once per newly observed friendly Knight death.
+    void ApplyEternalKnightDeathCount(int count);
     void ExpireTemporaryEffects();
     //! Resets the per-recruit-turn Lava Lurker Spellcraft allowance.
     void ResetSpellcraftUses() noexcept;
     bool ConsumeSpellcraftUse() noexcept;
     int GetSpellcraftUsesRemaining() const noexcept { return m_spellcraftUsesRemaining; }
+    void ResetZestyShakerUse() noexcept { m_zestyShakerUsed = false; }
+    bool ConsumeZestyShakerUse() noexcept { if (m_zestyShakerUsed) return false; m_zestyShakerUsed = true; return true; }
+    bool AdvanceFelboarSpellCounter() noexcept { return ++m_felboarSpellCounter % 3 == 0; }
     void SetPermanentSpellcraft(bool enabled = true) noexcept { m_permanentSpellcraft = enabled; }
     bool HasPermanentSpellcraft() const noexcept { return m_permanentSpellcraft; }
     bool IsLavaLurker() const noexcept;
@@ -308,6 +328,7 @@ class Minion
     //! Returns whether this minion has Windfury.
     //! \return true when the minion attacks twice in a combat turn.
     bool HasWindfury() const;
+    bool HasMegaWindfury() const { return m_hasMegaWindfury; }
 
     //! Returns whether this minion has the Battlegrounds Venomous keyword.
     //! \return true when damage from this minion destroys its target.
@@ -511,6 +532,7 @@ class Minion
     int m_persistentTierMinionHealth = 0;
     std::array<int, 40> m_persistentRaceAttack{};
     std::array<int, 40> m_persistentRaceHealth{};
+    int m_startCombatSpellImprovement = 0;
     int m_buyTriggerUses = 0;
     int m_bloodGemCount = 0;
     int m_bloodGemCountThisTurn = 0;
@@ -519,6 +541,11 @@ class Minion
     int m_combatPersistentAttack = 0;
     int m_combatPersistentHealth = 0;
     std::uint32_t m_combatPersistentKeywords = 0;
+    int m_poetCombatAttack = 0;
+    int m_poetCombatHealth = 0;
+    std::uint32_t m_poetCombatKeywords = 0;
+    bool m_poetCombatEligible = false;
+    int m_poetCombatMultiplier = 1;
     bool m_tarecgosaBlessing = false;
     int m_steadyGrowthAttack = 0;
     int m_steadyGrowthHealth = 0;
@@ -538,6 +565,7 @@ class Minion
     bool m_deathrattleStatTransferToAll = false;
     bool m_earthElementalDeathrattle = false;
     int m_skyGolemDeathrattleCount = 0;
+    int m_eternalKnightDeathCountApplied = 0;
     int m_darkGiftCounterAttack = 0;
     int m_darkGiftCounterHealth = 0;
     int m_darkGiftCounterKind = 0;
@@ -563,11 +591,14 @@ class Minion
     bool m_temporaryStealth = false;
     int m_spellcraftUsesRemaining = 0;
     bool m_permanentSpellcraft = false;
+    bool m_zestyShakerUsed = false;
+    int m_felboarSpellCounter = 0;
     bool m_hasVenomous = false;
     bool m_hasStealth = false;
     bool m_isFrozen = false;
     bool m_isDestroyed = false;
     bool m_magnetizationArmed = false;
+    int m_magnetizationCount = 0;
     bool m_handLocked = false;
     bool m_combinedChooseOne = false;
     bool m_diesAtRecruitEnd = false;

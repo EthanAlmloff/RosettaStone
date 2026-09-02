@@ -111,7 +111,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 		$<$<CONFIG:Release>:
 		/Gw           # -> whole program global optimization
 		/GS-          # -> buffer security check: no
-		/GL           # -> whole program optimization: enable link-time code generation (disables Zi)
+		# /GL omitted for the isolated archive audit: MSVC lib.exe cannot archive the
+		# whole-program IR image produced by the complete Battlegrounds source set.
 		/GF           # -> enable string pooling
 		>
 

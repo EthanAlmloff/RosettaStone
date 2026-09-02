@@ -56,6 +56,8 @@ class Player
     //! Applies fresh-instance passives plus persistent Tavern-offer auras.
     //! Shop-only auras never leak onto hand or board summons.
     void ApplyFreshTavernMinionModifiers(Minion& minion);
+    //! Increments lifetime Start-of-Combat spell improvements on owned cards.
+    void IncrementStartCombatSpellImprovements();
     //! Installs the supported generated quest-reward aura on a fresh or
     //! existing minion. Unsupported modal options remain fail-closed.
     bool ApplyGeneratedQuestReward(std::int32_t dbfID);
@@ -216,6 +218,17 @@ class Player
     //! Random recipient selection uses RosettaStone's shared RNG stream.
     bool ApplySeason14HeroPowerBatch3Activation(
         const Season14HeroPowerBatch3Activation& activation);
+    //! Applies a Batch-3 activation to the entity IDs selected during
+    //! resolution.  The bridge uses this replay-safe path for effects whose
+    //! random recipients must remain stable across duplicated resolution.
+    bool ApplySeason14HeroPowerBatch3ResolvedTargets(
+        const Season14HeroPowerBatch3Activation& activation,
+        const std::array<std::uint64_t, 32>& entityIDs,
+        std::uint8_t entityCount);
+    bool ApplyArcaneAlteration(std::size_t slot, std::uint64_t entityID,
+                               std::int32_t replacementDbfID);
+    bool ApplySwapShopMinion(std::size_t boardSlot, std::uint64_t boardEntityID,
+                             std::size_t tavernSlot, std::uint64_t tavernEntityID);
 
     //! Applies a manual Activate action from a recruit-board minion.
     bool ActivateMinion(std::size_t boardIdx, int targetIdx = -1);
@@ -245,6 +258,18 @@ class Player
     void CompleteRecruit();
     void ResolveRecruitEndDeaths();
     void ResolveDarkGiftEndTurnTriggers();
+    //! Resolve Sulfuras' end-of-recruit trigger on the left/right edges.
+    void ResolveSulfurasEndTurn();
+    void ResolveCthunEndTurn();
+    void AdvanceCthunUpgrade() noexcept;
+    void ResolveTierMinionStartCombat();
+    void TryDeliverChampionReward();
+    void TryDeliverHeroicInspirationReward();
+    void MaybeBeginExpeditionDiscovery();
+    bool ArmLockAndLoad(std::size_t tavernIndex);
+    void ResolveLockAndLoad();
+    void BeginExpeditionDiscoveryForTier(int tier);
+    void DeliverExpeditionReward();
     //! Advances all per-minion Dark Gift counters after a matching event.
     void AdvanceDarkGiftCounters(int kind);
 
@@ -260,6 +285,7 @@ class Player
     //! Dispatches a positive persistent attack gain to friendly listeners.
     //! The event is emitted by Minion's explicit persistent-stat APIs only.
     void DispatchMinionAttackGain(Minion& target, int amount);
+    void CheckAzsharaAmbition();
     //! Commits a supported damaging hero-power activation and dispatches the
     //! actual damage exactly once. Generic card damage must not use this.
     bool ResolveDamagingHeroPower(int actualDamage);
@@ -283,6 +309,17 @@ class Player
 
     TaskStack taskStack;
     Season14State season14;
+    //! Lifetime successful magnetizations, visible to supported scaling
+    //! combat effects (never incremented for rejected/stale actions).
+    int magnetizationsThisGame = 0;
+    //! Prevents Beatboxer mirror applications from recursively mirroring.
+    bool magnetizationMirrorInProgress = false;
+    int malchezaarRefreshesRemaining = 0;
+    int gemDays = 0;
+    int combinedChooseOneUses = 0;
+    //! Lifetime friendly Eternal Knight deaths used by its wherever-this-is
+    //! aura; incremented only by authoritative death processing.
+    int eternalKnightsDiedThisGame = 0;
 
     std::function<void(Player&)> selectHeroCallback;
     std::function<void(Player&)> prepareTavernMinionsCallback;

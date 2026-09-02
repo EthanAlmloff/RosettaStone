@@ -7,6 +7,7 @@
 using Random = effolkronium::random_thread_local;
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus RandomGoldenTierMinionToHandTask::Run(Player& p, Minion&) {
+ // Eligibility: card.normalDbfID!=0 is excluded and card.GetTier()==4 is required.
  if(m_amount<=0 || p.hand.IsFull()) return TaskStatus::STOP;
  std::vector<const Card*> candidates;
  for(const auto& card: Cards::GetAllCards())

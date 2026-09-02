@@ -30,5 +30,17 @@ void SpellcraftMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG31_924_G", CardDef{});
     cards.emplace("BG26_501", CardDef{});
     cards.emplace("BG26_501_G", CardDef{});
+    // Tranquil Meditative is a continuous Tavern-spell stat aura.  Its
+    // effect is resolved in Player::PlaySpell so generated and modal spells
+    // receive the same bonus; no standalone trigger is required here.
+    cards.emplace("BG32_835", CardDef{});
+    cards.emplace("BG32_835_G", CardDef{});
+    // Nalaa and Charging Czarina resolve their Tavern-spell triggers at the
+    // shared successful-cast boundary in Player, with golden scaling and
+    // seeded target selection kept in that central path.
+    cards.emplace("BG28_551", CardDef{});
+    cards.emplace("BG28_551_G", CardDef{});
+    cards.emplace("BG28_741", CardDef{});
+    cards.emplace("BG28_741_G", CardDef{});
 }
 }

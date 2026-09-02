@@ -22,6 +22,8 @@ using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds
 {
+// Patient Scout progression is advanced by Player at recruit end through the
+// Minion::AdvancePatientScout lifecycle hook declared on the entity.
 bool Minion::IsSameInstance(const Minion& other) const noexcept
 {
     if (m_index >= 0 && other.m_index >= 0)
@@ -203,12 +205,15 @@ void Minion::MagnetizeOnto(Minion& target) const
         return;
     const bool doubled = target.ConsumeMagnetizationArm();
     const int multiplier = doubled ? 2 : 1;
+    ++target.m_magnetizationCount;
+    if (target.getPlayerCallback) ++target.getPlayerCallback().magnetizationsThisGame;
     target.SetAttack(target.GetAttack() + GetAttack() * multiplier);
     target.SetHealth(target.GetHealth() + GetHealth() * multiplier);
     if (HasTaunt()) target.SetTaunt(true);
     if (HasDivineShield()) target.SetGameTag(GameTag::DIVINE_SHIELD, 1);
     if (HasReborn()) target.SetReborn(true);
     if (HasWindfury()) target.SetGameTag(GameTag::WINDFURY, 1);
+    if (HasVenomous()) target.SetGameTag(GameTag::POISONOUS, 1);
     if (m_card.gameTags.contains(GameTag::MEGA_WINDFURY))
         target.SetGameTag(GameTag::MEGA_WINDFURY, 1);
     if (HasDeathrattle())
@@ -216,6 +221,30 @@ void Minion::MagnetizeOnto(Minion& target) const
         for (const auto& task : m_card.power.GetDeathrattleTask())
             target.m_card.power.AddDeathrattleTask(TaskType{ task });
         target.m_hasDeathrattle = true;
+    }
+
+    // Beatboxer mirrors only a successful attachment, after the original
+    // target has received its complete stat/keyword/deathrattle payload.
+    // Reusing MagnetizeOnto preserves that payload and its exact ordering;
+    // the owner guard prevents mirrored applications from recursing.
+    if (target.getPlayerCallback && !target.getPlayerCallback().magnetizationMirrorInProgress) {
+        auto& owner = target.getPlayerCallback();
+        std::vector<Minion*> mirrors;
+        owner.recruitField.ForEachAlive([&](MinionData& data) {
+            auto& candidate = data.value();
+            if (&candidate != &target &&
+                (candidate.GetCardID() == "BG26_149" ||
+                 candidate.GetCardID() == "BG26_149_G"))
+                mirrors.push_back(&candidate);
+        });
+        if (!mirrors.empty()) {
+            owner.magnetizationMirrorInProgress = true;
+            for (auto* mirror : mirrors) {
+                const int repeats = mirror->GetCardID() == "BG26_149_G" ? 2 : 1;
+                for (int i = 0; i < repeats; ++i) MagnetizeOnto(*mirror);
+            }
+            owner.magnetizationMirrorInProgress = false;
+        }
     }
 }
 
@@ -312,6 +341,7 @@ bool Minion::MakeGolden()
     const int bloodGemAttack = m_bloodGemAttack;
     const int bloodGemHealth = m_bloodGemHealth;
     const int skyGolemDeathrattleCount = m_skyGolemDeathrattleCount;
+    const int eternalKnightDeathCountApplied = m_eternalKnightDeathCountApplied;
     // The premium card supplies the new identity and its static keywords,
     // but conversion must not erase state accumulated by this particular
     // instance.  Dark Gifts and other recruit effects mutate these fields
@@ -360,6 +390,11 @@ bool Minion::MakeGolden()
     m_bloodGemAttack = bloodGemAttack;
     m_bloodGemHealth = bloodGemHealth;
     m_skyGolemDeathrattleCount = skyGolemDeathrattleCount;
+    // A normal Knight that becomes golden keeps its already-realized aura;
+    // only future deaths use the golden multiplier.
+    m_eternalKnightDeathCountApplied = eternalKnightDeathCountApplied;
+    if (m_card.id == "BG25_008_G")
+        m_eternalKnightDeathCountApplied = eternalKnightDeathCountApplied;
 
     m_hasDeathrattle = false;
     m_hasTaunt = false;
@@ -459,6 +494,18 @@ void Minion::SetAttack(int val)
         m_attackThresholdTriggered = true;
         SetGameTag(GameTag::DIVINE_SHIELD, 1);
     }
+}
+
+void Minion::ApplyEternalKnightDeathCount(int count)
+{
+    if (count <= m_eternalKnightDeathCountApplied ||
+        (m_card.id != "BG25_008" && m_card.id != "BG25_008_G"))
+        return;
+    const int multiplier = m_card.id == "BG25_008_G" ? 2 : 1;
+    const int delta = count - m_eternalKnightDeathCountApplied;
+    m_attack += 4 * multiplier * delta;
+    m_health += 2 * multiplier * delta;
+    m_eternalKnightDeathCountApplied = count;
 }
 
 bool Minion::TransformTo(Card replacement)
@@ -724,10 +771,28 @@ void Minion::ReconcileCombatPersistentState(const Minion& combatCopy)
     }
 }
 
+void Minion::BeginPoetCombatSnapshot(bool eligible, int multiplier) noexcept
+{
+    m_poetCombatEligible = eligible;
+    m_poetCombatMultiplier = multiplier;
+    m_poetCombatAttack = GetAttack();
+    m_poetCombatHealth = GetHealth();
+    m_poetCombatKeywords = 0;
+    if (HasTaunt()) m_poetCombatKeywords |= 1u << 0;
+    if (HasDivineShield()) m_poetCombatKeywords |= 1u << 1;
+    if (HasReborn()) m_poetCombatKeywords |= 1u << 2;
+    if (HasWindfury()) m_poetCombatKeywords |= 1u << 3;
+    if (HasMegaWindfury()) m_poetCombatKeywords |= 1u << 4;
+    if (HasVenomous()) m_poetCombatKeywords |= 1u << 5;
+}
+
 void Minion::ApplyTemporaryKeyword(GameTag tag)
 {
     switch (tag)
     {
+        case GameTag::TAUNT:
+            if (!HasTaunt()) { SetTaunt(true); m_temporaryTaunt = true; }
+            break;
         case GameTag::DIVINE_SHIELD:
             if (!HasDivineShield()) { SetGameTag(tag, 1); m_temporaryDivineShield = true; }
             break;
@@ -1671,6 +1736,11 @@ int Minion::TriggerAvenge(Player& player)
                 if (std::holds_alternative<Minion>(player.hand[i]) && std::get<Minion>(player.hand[i]).HasRace(Race::UNDEAD))
                     ++after[std::string(std::get<Minion>(player.hand[i]).GetCardID())];
             for (const auto& [id, count] : after) for (int n = 0; n < count - before[id]; ++n) player.season14.TrackCombatAvengeCard(id);
+        }
+        else if (definition->effect == AvengeEffect::PROGRESSIVE_END_TURN)
+        {
+            player.season14.progressiveAvengeAttack += definition->attack;
+            player.season14.progressiveAvengeHealth += definition->health;
         }
     }
     if (definition->permanent && activations > 0)

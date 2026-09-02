@@ -312,6 +312,7 @@ void Season14State::RecordReclaimedSoulsDeath(const Minion& minion)
 
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
 {
+    ResetDistinctSpells();
     generatedRewardConchUsedThisTurn = false;
     trinketFreeSpellUses = trinketFreeSpellUsesPerTurn;
     if (luckyRollCooldown > 0) --luckyRollCooldown;
@@ -376,6 +377,14 @@ void Season14State::BeginRecruitTurnBatch5()
     Season14HeroPowerBatch5Result result{};
     ResolveSeason14HeroPowerBatch5Event(
         heroPowerDbfID, Season14HeroPowerBatch5Event::BEGIN_TURN,
+        heroPowerBatch5, result);
+}
+
+void Season14State::RecordRefreshBatch5()
+{
+    Season14HeroPowerBatch5Result result{};
+    ResolveSeason14HeroPowerBatch5Event(
+        heroPowerDbfID, Season14HeroPowerBatch5Event::REFRESH_TAVERN,
         heroPowerBatch5, result);
 }
 
@@ -502,9 +511,6 @@ Season14HeroPowerBatch2Result Season14State::OnUpgradeTavern()
 
 std::int32_t Season14State::MinionPurchaseCost(std::int32_t baseCost) const
 {
-    if (heroPowerDbfID == 61915 &&
-        Season14HeroPowerBatch5FirstBuyFree(heroPowerBatch5))
-        return 0;
     const auto withBatch1 = heroPowerBatch1.MinionCost(baseCost);
     const auto batch2 = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
     return std::max<std::int32_t>(0, withBatch1 + batch2.minionCost);
@@ -533,12 +539,17 @@ std::size_t Season14State::TavernOfferCount(std::size_t baseCount) const
                        trinketExtraShopSlots +
                        refreshExtraShopSlots +
                        HeroPowerBatch4PassiveModifiers().tavernSlotsDelta;
-    if (delta < 0)
+    const auto extraTrainingSlots =
+        heroPowerDbfID == 61915 && heroPowerBatch5.demonHunterTrainingUnlocked
+            ? 2
+            : 0;
+    const auto adjustedDelta = delta + extraTrainingSlots;
+    if (adjustedDelta < 0)
     {
-        const auto reduction = static_cast<std::size_t>(-delta);
+        const auto reduction = static_cast<std::size_t>(-adjustedDelta);
         return reduction >= baseCount ? 0 : baseCount - reduction;
     }
-    return baseCount + static_cast<std::size_t>(delta);
+    return baseCount + static_cast<std::size_t>(adjustedDelta);
 }
 
 Season14HeroPowerBatch4PassiveModifiers
@@ -868,10 +879,29 @@ void Season14State::OnFriendlyPirateAttack()
 
 void Season14State::OnFriendlyMinionAttack()
 {
+    // BG33 Heroic Inspiration is a persistent, cross-combat counter. Count
+    // each legal attack declaration (including Windfury/immediate attacks),
+    // and hold the reward until Player can put it in hand.
+    if (heroPowerDbfID == 129164 && !heroicInspirationRewardPending &&
+        heroicInspirationAttacks < 15)
+    {
+        if (++heroicInspirationAttacks == 15)
+            heroicInspirationRewardPending = true;
+    }
     Season14HeroPowerBatch5Result result{};
     ResolveSeason14HeroPowerBatch5Event(
         heroPowerDbfID, Season14HeroPowerBatch5Event::FRIENDLY_MINION_ATTACKED,
         heroPowerBatch5, result);
+}
+
+bool Season14State::MaybeBeginNagaConquest(std::int32_t totalAttack) noexcept
+{
+    if (heroPowerDbfID != 79619 || azsharaConquestStarted) return false;
+    azsharaWarbandAttack = std::max<std::int32_t>(0, totalAttack);
+    if (azsharaWarbandAttack < 30) return false;
+    azsharaConquestStarted = true;
+    SetHeroPower(80007, 1, true);
+    return true;
 }
 
 std::pair<std::int32_t, std::int32_t>
@@ -907,6 +937,7 @@ void Season14State::OnTavernSpellResolved(bool spellResolved,
     if (!spellResolved)
         return;
     ++successfulSpellCount;
+    RecordDistinctSpell(sourceDbfID);
     for (auto& trinket : trinkets)
     {
         if (!trinket.active || trinket.remainingUses == 0) continue;
@@ -1232,6 +1263,19 @@ bool Season14State::ResolveHeroPowerBatch3Activation(
         heroPowerDbfID, currentTier, result);
 }
 
+void Season14State::ArmCthunEndTurnTargets(
+    const std::array<std::uint64_t, 32>& ids, std::uint8_t count,
+    std::uint8_t applications) noexcept
+{
+    cthunEndTurnTargets.fill(0);
+    cthunEndTurnTargetCount = std::min<std::uint8_t>(
+        count, static_cast<std::uint8_t>(cthunEndTurnTargets.size()));
+    for (std::uint8_t i = 0; i < cthunEndTurnTargetCount; ++i)
+        cthunEndTurnTargets[i] = ids[i];
+    cthunEndTurnPending = true;
+    cthunEndTurnApplications = applications;
+}
+
 std::int32_t Season14State::HeroPowerBatch3CombatKillAttackBonus() const noexcept
 {
     return Season14HeroPowerBatch3CombatKillAttack(
@@ -1248,6 +1292,9 @@ bool Season14State::RecordFriendlyCombatKill() noexcept
     if (combatKillProgress < threshold.threshold)
         return false;
     combatKillThresholdTriggered = true;
+    // DBF 64424 is the invocation power ("After you kill 25 enemy minions,
+    // get Sulfuras").  DBF 64426 is the generated persistent replacement.
+    SetHeroPower(64426, 0, true);
     return true;
 }
 
@@ -1261,7 +1308,9 @@ bool Season14State::CanUseHeroPower(std::int32_t availableGold) const
         return false;
     const bool bloodboundSecondUse =
         heroPowerDbfID == 71459 && heroPowerBatch2.bloodboundUsesThisTurn < 2;
-    return heroPowerAvailable && (bloodboundSecondUse || !heroPowerUsed || buddyExtraHeroPowerUses > 0) &&
+    const bool arcaneAlterationSecondUse =
+        heroPowerDbfID == 60378 && heroPowerBatch3State < 2;
+    return heroPowerAvailable && (bloodboundSecondUse || arcaneAlterationSecondUse || !heroPowerUsed || buddyExtraHeroPowerUses > 0) &&
            heroPowerDbfID != 0 &&
            availableGold >= EffectiveHeroPowerCost();
 }
@@ -1277,14 +1326,18 @@ bool Season14State::UseHeroPower()
 {
     if (!heroPowerAvailable ||
         (heroPowerUsed &&
-         !(heroPowerDbfID == 71459 &&
-           heroPowerBatch2.bloodboundUsesThisTurn < 2)) ||
+        !(heroPowerDbfID == 71459 && heroPowerBatch2.bloodboundUsesThisTurn < 2) &&
+         !(heroPowerDbfID == 60378 && heroPowerBatch3State < 2)) ||
         heroPowerDbfID == 0)
     {
         return false;
     }
 
-    if (heroPowerDbfID != 71459)
+    if (heroPowerDbfID == 60378)
+    {
+        ++heroPowerBatch3State;
+    }
+    else if (heroPowerDbfID != 71459)
     {
         if (heroPowerUsed && buddyExtraHeroPowerUses > 0)
             --buddyExtraHeroPowerUses;

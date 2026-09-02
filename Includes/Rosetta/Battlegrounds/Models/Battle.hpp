@@ -64,6 +64,7 @@ class Battle
     //! Processes a list of minions that are destroyed.
     //! \param beforeAttack The flag that indicates it is called before attack.
     void ProcessDestroy(bool beforeAttack);
+    void TryFireQueuedLockAndLoad();
 
     //! Checks it is done.
     //! \return true if it is done, false otherwise.
@@ -117,6 +118,7 @@ class Battle
     // Combat alternates players, so this state belongs to each side.
     int m_p1PendingAttacks = 0;
     int m_p2PendingAttacks = 0;
+    bool m_lockAndLoadResolving = false;
 
     Turn m_turn = Turn::DONE;
     BattleResult m_result = BattleResult::DRAW;

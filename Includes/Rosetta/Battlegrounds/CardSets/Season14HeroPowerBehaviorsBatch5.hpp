@@ -26,6 +26,18 @@ enum class Season14HeroPowerBatch5Kind : std::uint8_t
     AVENGE_WHELP,
     ENEMY_KILL_COUNTER,
     TARGET_TIER_ATTACK,
+    COMBAT_START_KEYWORDS,
+    BATTLECRY_BRANN_REWARD,
+    SELL_MURLOC_REWARD,
+    STARTING_AMALGAM,
+    EMBRACE_ELEMENTS,
+    STARTING_SHREDDER,
+    FRAGRANT_PHYLACTERY,
+    TENTACULAR,
+    REFRESH_SEVEN_TAVERN,
+    TWICE_NICE_COPY,
+    COPY_HIGHEST_REFRESH,
+    GLAIVE_RICOCHET,
 };
 
 struct Season14HeroPowerBatch5Definition
@@ -40,11 +52,24 @@ struct Season14HeroPowerBatch5Definition
 // These rows are exposed only after their lifecycle and bridge applications
 // are implemented against pinned card data.  Unlisted powers remain
 // fail-closed and are not credited by coverage tooling.
-inline constexpr std::array<Season14HeroPowerBatch5Definition, 3>
+inline constexpr std::array<Season14HeroPowerBatch5Definition, 16>
     SEASON14_HERO_POWER_BEHAVIORS_BATCH5 = {{
         {"BG28_HERO_400p2", 105395, Season14HeroPowerBatch5Kind::REFRESH_THEN_SEVEN, 0, false},
         {"BG26_HERO_102p", 103501, Season14HeroPowerBatch5Kind::TARGET_TIER_ATTACK, 0, false},
         {"BG26_HERO_102p2", 103503, Season14HeroPowerBatch5Kind::TARGET_TIER_ATTACK, 0, false},
+        {"TB_BaconShop_HP_042", 59860, Season14HeroPowerBatch5Kind::SELL_TAVERN_BUFF, 0, true},
+        {"TB_BaconShop_HP_086", 64402, Season14HeroPowerBatch5Kind::COMBAT_START_KEYWORDS, 0, true},
+        {"TB_BaconShop_HP_048", 60218, Season14HeroPowerBatch5Kind::BATTLECRY_BRANN_REWARD, 0, true},
+        {"TB_BaconShop_HP_056", 60448, Season14HeroPowerBatch5Kind::SELL_MURLOC_REWARD, 0, true},
+        {"TB_BaconShop_HP_033", 59201, Season14HeroPowerBatch5Kind::STARTING_AMALGAM, 0, true},
+        {"BG22_HERO_001p", 79720, Season14HeroPowerBatch5Kind::EMBRACE_ELEMENTS, 0, false},
+        {"BG21_HERO_030p", 76520, Season14HeroPowerBatch5Kind::STARTING_SHREDDER, 0, true},
+        {"BG20_HERO_282p", 77911, Season14HeroPowerBatch5Kind::FRAGRANT_PHYLACTERY, 0, true},
+        {"BG23_HERO_201p", 86014, Season14HeroPowerBatch5Kind::TENTACULAR, 0, true},
+        {"TB_BaconShop_HP_062", 61408, Season14HeroPowerBatch5Kind::EXTRA_DRAGON_REFRESH, 0, true},
+        {"TB_BaconShop_HP_065", 61915, Season14HeroPowerBatch5Kind::REFRESH_SEVEN_TAVERN, 0, true},
+        {"BG22_HERO_004p", 80539, Season14HeroPowerBatch5Kind::COPY_HIGHEST_REFRESH, 0, true},
+        {"BG20_HERO_280p5", 104875, Season14HeroPowerBatch5Kind::GLAIVE_RICOCHET, 0, true},
     }};
 
 constexpr const Season14HeroPowerBatch5Definition*
@@ -207,7 +232,8 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     }
     if (event == Season14HeroPowerBatch5Event::BEGIN_TURN)
     {
-        state.refreshesThisTurn = 0;
+        // Aranna's five-refresh progress is game-wide; only the free-buy
+        // consumption marker resets each recruit turn.
         state.sellsThisTurn = 0;
         if (state.rollCooldown > 0) --state.rollCooldown;
         state.usesThisTurn = 0;
@@ -218,6 +244,9 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     if (event == Season14HeroPowerBatch5Event::REFRESH_TAVERN)
     {
         ++state.refreshesThisTurn;
+        if (dbfID == 61915 && !state.demonHunterTrainingUnlocked &&
+            state.refreshesThisTurn >= 5)
+            state.demonHunterTrainingUnlocked = true;
         return;
     }
     if (event == Season14HeroPowerBatch5Event::SELL_MINION)
@@ -247,12 +276,6 @@ constexpr void ResolveSeason14HeroPowerBatch5Event(
     if (event == Season14HeroPowerBatch5Event::FRIENDLY_MINION_DIED)
     {
         ++state.combatDeaths;
-    }
-    if (event == Season14HeroPowerBatch5Event::FRIENDLY_MINION_ATTACKED &&
-        dbfID == 61915 && !state.demonHunterTrainingUnlocked)
-    {
-        if (++state.friendlyAttacks >= 14)
-            state.demonHunterTrainingUnlocked = true;
     }
 }
 }  // namespace RosettaStone::Battlegrounds

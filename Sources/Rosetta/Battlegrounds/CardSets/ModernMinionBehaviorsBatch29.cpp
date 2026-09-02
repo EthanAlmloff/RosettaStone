@@ -3,6 +3,7 @@
 #include <Rosetta/Battlegrounds/Enchants/Enchant.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SetGameTagTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MechDiscoverMagnetizeTask.hpp>
 #include <Rosetta/Battlegrounds/Triggers/Trigger.hpp>
 #include <utility>
 #include <vector>
@@ -40,6 +41,19 @@ void AddShieldFrenzy(std::map<std::string, CardDef>& cards, const char* id, int 
 }
 void ModernMinionBehaviorsBatch29::AddAll(std::map<std::string, CardDef>& cards)
 {
+    // Clunker Junker uses a typed target followed by a public Mech Discover.
+    // The modal is committed by Player::ApplyChoice so the selected option
+    // is magnetized onto the exact target selected for the Battlecry.
+    {
+        Power power;
+        power.AddBattlecryTask(SimpleTasks::MechDiscoverMagnetizeTask{1});
+        cards.emplace("BG29_503", CardDef{std::move(power)});
+    }
+    {
+        Power power;
+        power.AddBattlecryTask(SimpleTasks::MechDiscoverMagnetizeTask{2});
+        cards.emplace("BG29_503_G", CardDef{std::move(power)});
+    }
     AddShieldFrenzy(cards, "BG20_204", 1); AddShieldFrenzy(cards, "BG20_204_G", 2);
     AddEnchant(cards, "BG29_800e", 1, 0); AddFrenzyBuff(cards, "BG29_800", "BG29_800e", EntityType::SOURCE);
     AddEnchant(cards, "BG29_800Ge", 2, 0); AddFrenzyBuff(cards, "BG29_800_G", "BG29_800Ge", EntityType::SOURCE);

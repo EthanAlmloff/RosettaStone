@@ -337,6 +337,7 @@ void Game::Recruit()
         player.season14.battlecryBuysThisTurn = 0;
         player.season14.minionsPlayedThisTurn = 0;
         player.season14.heroPowerUsed = false;
+        player.season14.heroPowerBatch3State = 0;
         player.recruitField.ForEach([](MinionData& minion) {
             minion.value().ResetActivateUses();
         });
@@ -470,12 +471,14 @@ void Game::Recruit()
             }
             player.PrepareTavern();
         }
+        player.MaybeBeginExpeditionDiscovery();
 
         // Consume the one-turn frozen state.
         player.tavern.fieldZone.ForEach(
             [](MinionData& minion) { minion.value().SetFrozen(false); });
         for (auto &slot : player.tavern.spellSlots) slot.SetFrozen(false);
         player.freezeTavern = false;
+        player.season14.ConsumeFirstRecruitTurnSkip();
     }
 }
 
@@ -497,7 +500,19 @@ void Game::CompleteRecruitPhase()
             player.ResolveGeneratedQuestRewardSnickerSnacks();
             // Advance persistent end-of-turn counters (including Patient
             // Scout's tier improvement) before combat begins.
-            player.ResolveDarkGiftEndTurnTriggers();
+            // Drakkari Enchanter multiplies minion end-of-turn effects. The
+            // strongest copy controls the multiplier: normal is 2x and golden
+            // is 3x; duplicate copies do not compound the same aura.
+            int endTurnPasses = 1;
+            player.recruitField.ForEachAlive([&endTurnPasses](MinionData& data) {
+                if (data.value().GetCardID() == "BG26_ICC_901") endTurnPasses = std::max(endTurnPasses, 2);
+                else if (data.value().GetCardID() == "BG26_ICC_901_G") endTurnPasses = std::max(endTurnPasses, 3);
+            });
+            for (int pass = 0; pass < endTurnPasses; ++pass)
+                player.ResolveDarkGiftEndTurnTriggers();
+            player.ResolveSulfurasEndTurn();
+            player.ResolveCthunEndTurn();
+            player.AdvanceCthunUpgrade();
             if (player.season14.ShouldFreezeRemainingTavern())
             {
                 player.tavern.fieldZone.ForEach(
@@ -510,6 +525,7 @@ void Game::CompleteRecruitPhase()
             // Wallet increases the cap for subsequent turns, while Gilded
             // Anchor buffs only Golden minions currently in the warband.
             const auto endTurnMaxGold = player.season14.TakeEndTurnMaxGold();
+            // trinketEndTurnMaxGold is consumed here before RECRUIT_END.
             if (endTurnMaxGold > 0)
                 player.season14.trinketMaxGoldDelta += endTurnMaxGold;
             for (const auto& trinket : player.season14.trinkets)

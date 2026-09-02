@@ -29,6 +29,65 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Embrace the Elements pins four i
     CHECK(!entry->passive);
 }
 
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Hat Trick and Swatting Insects have executable lifecycle entries")
+{
+    const auto* hat = FindSeason14HeroPowerBehaviorBatch5(59860);
+    REQUIRE(hat != nullptr);
+    CHECK(hat->kind == Season14HeroPowerBatch5Kind::SELL_TAVERN_BUFF);
+    CHECK(hat->passive);
+    const auto* swatting = FindSeason14HeroPowerBehaviorBatch5(64402);
+    REQUIRE(swatting != nullptr);
+    CHECK(swatting->kind == Season14HeroPowerBatch5Kind::COMBAT_START_KEYWORDS);
+    CHECK(swatting->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Brann and Gone Fishing lifecycle entries")
+{
+    const auto* brann = FindSeason14HeroPowerBehaviorBatch5(60218);
+    REQUIRE(brann != nullptr);
+    CHECK(brann->kind == Season14HeroPowerBatch5Kind::BATTLECRY_BRANN_REWARD);
+    CHECK(brann->passive);
+    const auto* murloc = FindSeason14HeroPowerBehaviorBatch5(60448);
+    REQUIRE(murloc != nullptr);
+    CHECK(murloc->kind == Season14HeroPowerBatch5Kind::SELL_MURLOC_REWARD);
+    CHECK(murloc->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Menagerist and Embrace have resolver-backed entries")
+{
+    const auto* menagerist = FindSeason14HeroPowerBehaviorBatch5(59201);
+    REQUIRE(menagerist != nullptr);
+    CHECK(menagerist->kind == Season14HeroPowerBatch5Kind::STARTING_AMALGAM);
+    CHECK(menagerist->passive);
+    const auto* embrace = FindSeason14HeroPowerBehaviorBatch5(79720);
+    REQUIRE(embrace != nullptr);
+    CHECK(embrace->kind == Season14HeroPowerBatch5Kind::EMBRACE_ELEMENTS);
+    CHECK(!embrace->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - combat lifecycle powers have exact entries")
+{
+    const auto* shredder = FindSeason14HeroPowerBehaviorBatch5(76520);
+    REQUIRE(shredder != nullptr);
+    CHECK(shredder->kind == Season14HeroPowerBatch5Kind::STARTING_SHREDDER);
+    const auto* phylactery = FindSeason14HeroPowerBehaviorBatch5(77911);
+    REQUIRE(phylactery != nullptr);
+    CHECK(phylactery->kind == Season14HeroPowerBatch5Kind::FRAGRANT_PHYLACTERY);
+    const auto* tentacular = FindSeason14HeroPowerBehaviorBatch5(86014);
+    REQUIRE(tentacular != nullptr);
+    CHECK(tentacular->kind == Season14HeroPowerBatch5Kind::TENTACULAR);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - refresh lifecycle powers have exact entries")
+{
+    const auto* dragon = FindSeason14HeroPowerBehaviorBatch5(61408);
+    REQUIRE(dragon != nullptr);
+    CHECK(dragon->kind == Season14HeroPowerBatch5Kind::EXTRA_DRAGON_REFRESH_POWER);
+    const auto* twice = FindSeason14HeroPowerBehaviorBatch5(80539);
+    REQUIRE(twice != nullptr);
+    CHECK(twice->kind == Season14HeroPowerBatch5Kind::COPY_HIGHEST_REFRESH);
+}
+
 TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Tentacular scales its combat token after sales")
 {
     const auto* entry = FindSeason14HeroPowerBehaviorBatch5(86014);
@@ -76,23 +135,24 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Dream Portal is extra Dragon ref
     CHECK(entry->passive);
 }
 
-TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Demon Hunter Training unlocks after fourteen attacks")
+TEST_CASE("[Season14HeroPowerBehaviorsBatch5] - Demon Hunter Training unlocks after five refreshes")
 {
     Season14HeroPowerBatch5State state{};
     Season14HeroPowerBatch5Result result{};
-    for (int i = 0; i < 13; ++i)
+    for (int i = 0; i < 4; ++i)
         ResolveSeason14HeroPowerBatch5Event(
-            61915, Season14HeroPowerBatch5Event::FRIENDLY_MINION_ATTACKED,
+            61915, Season14HeroPowerBatch5Event::REFRESH_TAVERN,
             state, result);
     CHECK(!Season14HeroPowerBatch5FirstBuyFree(state));
     ResolveSeason14HeroPowerBatch5Event(
-        61915, Season14HeroPowerBatch5Event::FRIENDLY_MINION_ATTACKED,
+        61915, Season14HeroPowerBatch5Event::REFRESH_TAVERN,
         state, result);
     CHECK(Season14HeroPowerBatch5FirstBuyFree(state));
     CHECK(ConsumeSeason14HeroPowerBatch5FirstBuyFree(61915, state));
     CHECK(!Season14HeroPowerBatch5FirstBuyFree(state));
     ResolveSeason14HeroPowerBatch5Event(
-        61915, Season14HeroPowerBatch5Event::BEGIN_TURN, state, result);
+        61915, Season14HeroPowerBatch5Event::BEGIN_TURN,
+        state, result);
     CHECK(Season14HeroPowerBatch5FirstBuyFree(state));
 }
 

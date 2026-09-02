@@ -20,10 +20,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <algorithm>
 #include <optional>
 
 namespace RosettaStone::Battlegrounds
 {
+class Player;
 //! Public modal decisions introduced by modern Battlegrounds content.
 enum class Season14Decision : std::int32_t
 {
@@ -173,7 +175,25 @@ class Season14State
     // player-owned state; it is never reconstructed from hidden opponent data.
     std::int32_t combatKillProgress = 0;
     bool combatKillThresholdTriggered = false;
+    std::int32_t azsharaWarbandAttack = 0;
+    bool azsharaConquestStarted = false;
+    bool expeditionFirstTurnSkipped = false;
+    bool expeditionSkipFirstRecruitTurn = false;
+    std::uint8_t expeditionDiscoverMask = 0;
+    std::array<std::int32_t, 3> expeditionRewardDbfIDs{};
+    //! Heroic Inspiration counts friendly attack declarations across combats.
+    //! Once 15 are reached the counter stays complete while the generated
+    //! Triple Reward waits for hand space (the reward is not burned).
+    std::uint8_t heroicInspirationAttacks = 0;
+    bool heroicInspirationRewardPending = false;
     std::int32_t buddyAvengeDeaths = 0;
+    std::int32_t broodmotherAvengeDeaths = 0;
+    std::int32_t broodmotherWhelpBonus = 0;
+    std::optional<Minion> lockAndLoadProjectile;
+    void ResetBroodmotherAvenge() noexcept { broodmotherAvengeDeaths = 0; }
+    bool AdvanceBroodmotherAvenge() noexcept
+    { return ++broodmotherAvengeDeaths >= 4 ? (broodmotherAvengeDeaths = 0, true) : false; }
+    void ImproveBroodmotherWhelp() noexcept { ++broodmotherWhelpBonus; }
     void ImproveConviction(std::int32_t choice) noexcept { if (choice == 0) ++convictionAttackBonus; else if (choice == 1) ++convictionHealthBonus; else ++convictionExtraTargets; }
     std::int32_t ConvictionAttackBonus() const noexcept { return convictionAttackBonus; }
     std::int32_t ConvictionHealthBonus() const noexcept { return convictionHealthBonus; }
@@ -189,6 +209,16 @@ class Season14State
     bool ConsumeDetectiveGuessResult() noexcept { const bool r = detectiveGuessCorrect; detectiveGuessCorrect = false; detectiveLastGuessDbfID = 0; return r; }
     std::vector<Season14Offering> choiceOfferings;
     std::vector<Season14Offering> pendingOfferings;
+    std::uint64_t pendingGoldenizeSourceEntityID = 0;
+    std::uint64_t pendingGoldenizeFirstTargetEntityID = 0;
+    std::vector<std::uint64_t> pendingGoldenizeTargets;
+    std::uint64_t pendingDemonDiscoverSourceEntityID = 0;
+    std::int32_t pendingDemonDiscoverRemaining = 0;
+    std::uint64_t pendingUndeadDiscoverSourceEntityID = 0;
+    std::int32_t pendingUndeadDiscoverRemaining = 0;
+    std::uint64_t pendingMechMagnetizeSourceEntityID = 0;
+    std::uint64_t pendingMechMagnetizeTargetEntityID = 0;
+    std::int32_t pendingMechMagnetizeRemaining = 0;
     //! Identity of the effect that created the public offering. These fields
     //! make a pending modal replayable and prevent callers from treating an
     //! offering as an anonymous global random result.
@@ -289,6 +319,17 @@ class Season14State
     //! is kept as an explicit state member for schema clarity and future
     //! counters, while all unsupported families remain fail-closed.
     std::uint8_t heroPowerBatch3State = 0;
+    //! Reserved fixed-capacity payload for delayed end-turn effects.  HP104
+    //! deliberately leaves it empty: recipients are chosen at end turn.
+    std::array<std::uint64_t, 32> cthunEndTurnTargets{};
+    std::uint8_t cthunEndTurnTargetCount = 0;
+    bool cthunEndTurnPending = false;
+    std::uint8_t cthunEndTurnApplications = 0;
+    std::uint8_t cthunRepeatCount = 0;
+    bool tierMinionStartCombatPending = false;
+    std::int32_t tierMinionStartCombatTier = 0;
+    std::int32_t championRewardDbfID = 0;
+    bool championRewardReady = false;
 
     //! Hooks for effects whose entity behavior is implemented elsewhere.
     bool lockboxActive = false;
@@ -337,6 +378,8 @@ class Season14State
     bool firstMinionPlayedThisTurn = false;
     std::int32_t battlecryBuysThisTurn = 0;
     std::int32_t minionsPlayedThisTurn = 0;
+    std::int32_t progressiveAvengeAttack = 1;
+    std::int32_t progressiveAvengeHealth = 1;
     std::int32_t battlecriesTriggered = 0;
     std::int32_t deathrattlesTriggered = 0;
     std::int32_t maxGoldDelta = 0;
@@ -377,6 +420,12 @@ class Season14State
     std::int32_t spellMinionAttackProgress = 0;
     //! Number of successfully resolved spells this game.
     std::int32_t successfulSpellCount = 0;
+    std::vector<std::int32_t> distinctSpellsThisTurn;
+    void RecordDistinctSpell(std::int32_t dbfID) {
+        if (dbfID > 0 && std::find(distinctSpellsThisTurn.begin(), distinctSpellsThisTurn.end(), dbfID) == distinctSpellsThisTurn.end()) distinctSpellsThisTurn.push_back(dbfID);
+    }
+    void ResetDistinctSpells() noexcept { distinctSpellsThisTurn.clear(); }
+    std::size_t DistinctSpellsThisTurn() const noexcept { return distinctSpellsThisTurn.size(); }
     std::int32_t spellMinionAttackDelta = 0;
     bool tierSixGoldClaimed = false;
     std::int32_t treasureMapTurns = 0;
@@ -497,6 +546,7 @@ class Season14State
     //! Advances target-free Batch-4 lifecycle state at recruit start.
     void BeginRecruitTurnBatch4();
     void BeginRecruitTurnBatch5();
+    void RecordRefreshBatch5();
 
     //! Resets per-combat Avenge progress before combat starts.
     void BeginCombatBatch4();
@@ -612,6 +662,27 @@ class Season14State
     void ResetTrinketAvengeProgress() noexcept;
     void OnFriendlyPirateAttack();
     void OnFriendlyMinionAttack();
+    bool MaybeBeginNagaConquest(std::int32_t totalAttack) noexcept;
+    std::int32_t AzsharaWarbandAttack() const noexcept { return azsharaWarbandAttack; }
+    bool AzsharaConquestStarted() const noexcept { return azsharaConquestStarted; }
+    bool ExpeditionTierPending(int tier) const noexcept
+    { return tier == 2 || tier == 4 || tier == 6 ? (expeditionDiscoverMask & (1u << tier)) == 0 : false; }
+    void MarkExpeditionTierDiscovered(int tier) noexcept
+    { if (tier == 2 || tier == 4 || tier == 6) expeditionDiscoverMask |= static_cast<std::uint8_t>(1u << tier); }
+    void SetExpeditionReward(int tier, std::int32_t dbfID) noexcept
+    { if (tier == 2) expeditionRewardDbfIDs[0] = dbfID; else if (tier == 4) expeditionRewardDbfIDs[1] = dbfID; else if (tier == 6) expeditionRewardDbfIDs[2] = dbfID; }
+    std::int32_t ExpeditionReward(int tier) const noexcept
+    { return tier == 2 ? expeditionRewardDbfIDs[0] : tier == 4 ? expeditionRewardDbfIDs[1] : tier == 6 ? expeditionRewardDbfIDs[2] : 0; }
+    void ClearExpeditionReward(int tier) noexcept
+    { if (tier == 2) expeditionRewardDbfIDs[0] = 0; else if (tier == 4) expeditionRewardDbfIDs[1] = 0; else if (tier == 6) expeditionRewardDbfIDs[2] = 0; }
+    bool SkipFirstRecruitTurn() const noexcept { return expeditionSkipFirstRecruitTurn; }
+    void ConsumeFirstRecruitTurnSkip() noexcept { expeditionSkipFirstRecruitTurn = false; }
+    std::uint8_t HeroicInspirationProgress() const noexcept
+    { return heroicInspirationAttacks; }
+    bool HeroicInspirationRewardPending() const noexcept
+    { return heroicInspirationRewardPending; }
+    void ClearHeroicInspirationReward() noexcept
+    { heroicInspirationRewardPending = false; heroicInspirationAttacks = 0; }
 
     //! Records a successfully resolved Tavern spell.
     void OnTavernSpellResolved(bool spellResolved, std::int32_t sourceDbfID = 0);
@@ -687,6 +758,8 @@ class Season14State
     }
     void RecordBattlecry() noexcept { ++battlecriesTriggered; }
     int RecordGoldSpent(std::int32_t amount) noexcept;
+    void SetChampionReward(std::int32_t dbfID) noexcept { championRewardDbfID = dbfID; }
+    bool ChampionRewardPending() const noexcept { return championRewardDbfID != 0; }
     std::int32_t GoldSpentThisGame() const noexcept { return goldSpentThisGame; }
 
     //! Returns and clears deferred next-turn gold.
@@ -761,6 +834,20 @@ class Season14State
     bool ResolveHeroPowerBatch3Activation(
         std::int32_t currentTier,
         Season14HeroPowerBatch3Activation& result) const noexcept;
+    void ArmCthunEndTurnTargets(const std::array<std::uint64_t, 32>& ids,
+                                std::uint8_t count, std::uint8_t applications) noexcept;
+    void ArmTierMinionStartCombat(std::int32_t tier) noexcept {
+        tierMinionStartCombatPending = true;
+        tierMinionStartCombatTier = tier;
+    }
+    bool TakeTierMinionStartCombat(std::int32_t& tier) noexcept {
+        if (!tierMinionStartCombatPending) return false;
+        tier = tierMinionStartCombatTier;
+        tierMinionStartCombatPending = false;
+        tierMinionStartCombatTier = 0;
+        return true;
+    }
+    bool HasCthunEndTurnTargets() const noexcept { return cthunEndTurnPending; }
 
     //! Returns a passive combat-kill bonus owned by this hero, if any.
     std::int32_t HeroPowerBatch3CombatKillAttackBonus() const noexcept;

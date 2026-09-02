@@ -123,8 +123,29 @@ Battle::Battle(Player& player1, Player& player2)
     m_player2.season14.ClearCombatExactCopySnapshots();
     m_player1.season14.ClearCombatDeadMinions();
     m_player2.season14.ClearCombatDeadMinions();
+    m_player1.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
+    m_player2.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
+    const auto snapshotPoets = [](FieldZone& field) {
+        std::vector<Minion*> minions;
+        field.ForEachAlive([&](MinionData& data) { minions.push_back(&data.value()); });
+        for (auto* minion : minions) {
+            bool eligible = false;
+            int multiplier = 1;
+            for (auto* candidate : minions) {
+                if (candidate->GetCardID() != "BG29_813" && candidate->GetCardID() != "BG29_813_G") continue;
+                if (std::abs(candidate->GetZonePosition() - minion->GetZonePosition()) != 1) continue;
+                if (minion->HasRace(Race::DRAGON)) {
+                    eligible = true;
+                    if (candidate->GetCardID() == "BG29_813_G") multiplier = 2;
+                }
+            }
+            minion->BeginPoetCombatSnapshot(eligible, multiplier);
+        }
+    };
+    snapshotPoets(m_p1Field);
+    snapshotPoets(m_p2Field);
     const auto summonHandSnapshot = [](Player& owner, FieldZone& field) {
         auto snapshots = owner.season14.TakeCombatHandSummons();
         for (auto& [snapshot, count] : snapshots) {
@@ -268,7 +289,24 @@ void Battle::CommitPersistentState()
                     combat = &combatData.value();
             });
             if (combat != nullptr)
+            {
                 recruit.ReconcileCombatPersistentState(*combat);
+                if (combat->IsPoetCombatEligible()) {
+                    const int attackGain = std::max(0, combat->GetAttack() - combat->PoetCombatAttack()) * combat->PoetCombatMultiplier();
+                    const int healthGain = std::max(0, combat->GetHealth() - combat->PoetCombatHealth()) * combat->PoetCombatMultiplier();
+                    if (attackGain || healthGain)
+                        recruit.ApplyPersistentMinionStats(attackGain, healthGain);
+                    const auto newlyGained = combat->PoetCombatKeywords();
+                    const auto baseline = recruit.PoetCombatKeywords();
+                    const auto keywords = newlyGained & ~baseline;
+                    if (keywords & (1u << 0)) recruit.ApplyCombatPersistentKeyword(GameTag::TAUNT);
+                    if (keywords & (1u << 1)) recruit.ApplyCombatPersistentKeyword(GameTag::DIVINE_SHIELD);
+                    if (keywords & (1u << 2)) recruit.ApplyCombatPersistentKeyword(GameTag::REBORN);
+                    if (keywords & (1u << 3)) recruit.ApplyCombatPersistentKeyword(GameTag::WINDFURY);
+                    if (keywords & (1u << 4)) recruit.ApplyCombatPersistentKeyword(GameTag::MEGA_WINDFURY);
+                    if (keywords & (1u << 5)) recruit.ApplyCombatPersistentKeyword(GameTag::VENOMOUS);
+                }
+            }
         });
     };
     commit(m_player1, m_p1Field);
@@ -277,6 +315,25 @@ void Battle::CommitPersistentState()
 
 void Battle::Initialize()
 {
+    const auto fireLockAndLoad = [this](Player& owner, FieldZone& own,
+                                        FieldZone& enemy) {
+        const auto before = own.GetCount();
+        owner.ResolveLockAndLoad();
+        if (own.GetCount() <= before || !HasAttackableTarget(enemy)) return;
+        Minion& projectile = own[own.GetCount() - 1];
+        std::vector<Minion*> targets;
+        enemy.ForEachAlive([&targets](MinionData& data) {
+            if (!data.value().IsStealthed()) targets.push_back(&data.value());
+        });
+        if (targets.empty()) return;
+        auto& target = *targets[Random::get<std::size_t>(0, targets.size() - 1)];
+        AttackingStateGuard attacking(projectile);
+        target.TakeDamage(projectile);
+        projectile.TakeDamage(target);
+        ProcessDestroy(false);
+    };
+    fireLockAndLoad(m_player1, m_p1Field, m_p2Field);
+    fireLockAndLoad(m_player2, m_p2Field, m_p1Field);
     // Stolen Gold is a player-owned quest reward.  Resolve it on the combat
     // copies so the temporary golden conversion cannot mutate recruit state.
     m_player1.ResolveGeneratedQuestRewardStartCombat(m_p1Field);
@@ -289,6 +346,8 @@ void Battle::Initialize()
     m_player2.season14.BeginCombatBatch4();
     m_player1.season14.ResetTrinketAvengeProgress();
     m_player2.season14.ResetTrinketAvengeProgress();
+    m_player1.season14.ResetBroodmotherAvenge();
+    m_player2.season14.ResetBroodmotherAvenge();
     m_player1.ApplyStartCombatTrinkets();
     m_player2.ApplyStartCombatTrinkets();
 
@@ -314,21 +373,6 @@ void Battle::Initialize()
     };
     summonTentacle(m_player1, m_p1Field);
     summonTentacle(m_player2, m_p2Field);
-
-    const auto summonStartingAmalgam = [](Player& owner, FieldZone& field) {
-        if (owner.season14.heroPowerDbfID != 59201 || field.IsFull()) return;
-        const Card token = Cards::FindCardByDbfID(59202);
-        if (token.id.empty()) return;
-        Minion summoned(token);
-        summoned.getPlayerCallback = [&owner]() -> Player& { return owner; };
-        if (owner.getNextCardIndexCallback) summoned.SetIndex(owner.getNextCardIndexCallback());
-        field.Add(summoned, field.GetCount());
-        Minion& added = field[field.GetCount() - 1];
-        field.ForEachAlive([&added](MinionData& data) { data.value().ActivateTrigger(TriggerType::SUMMON, added); });
-        owner.ApplySummonTrinkets(added);
-    };
-    summonStartingAmalgam(m_player1, m_p1Field);
-    summonStartingAmalgam(m_player2, m_p2Field);
 
     const auto applyLeftKeywords = [](Player& owner, FieldZone& field) {
         if (owner.season14.heroPowerDbfID != 64402) return;
@@ -489,6 +533,51 @@ void Battle::Initialize()
         });
     }
 
+    m_player1.ResolveTierMinionStartCombat();
+    m_player2.ResolveTierMinionStartCombat();
+
+    // Illidan's start-of-combat power buffs the current edge minions and
+    // queues each edge for one immediate attack.  Resolve these attacks after
+    // all start-of-combat tasks, using stable entity IDs so death cleanup can
+    // safely remove either edge before the next one is reacquired.
+    const auto resolveYoHoOgre = [this](Player& owner, FieldZone& friendly,
+                                        FieldZone& enemy, Turn turn) {
+        if (owner.season14.heroPowerDbfID != 61851) return;
+        std::vector<std::uint64_t> edges;
+        friendly.ForEachAlive([&](MinionData& data) {
+            edges.push_back(static_cast<std::uint64_t>(data.value().GetIndex()));
+        });
+        if (edges.empty()) return;
+        if (edges.size() > 1) {
+            const auto right = edges.back();
+            edges.resize(2);
+            edges[1] = right;
+        }
+        m_turn = turn;
+        for (const auto entityID : edges) {
+            Minion* attacker = nullptr;
+            friendly.ForEachAlive([&](MinionData& data) {
+                if (static_cast<std::uint64_t>(data.value().GetIndex()) == entityID)
+                    attacker = &data.value();
+            });
+            if (!attacker) continue;
+            attacker->SetAttack(attacker->GetAttack() + 2);
+            attacker->SetHealth(attacker->GetHealth() + 1);
+            if (!HasAttackableTarget(enemy)) continue;
+            auto& target = GetProperTarget(*attacker);
+            {
+                AttackingStateGuard attacking(*attacker);
+                owner.season14.OnFriendlyMinionAttack();
+                owner.TryDeliverHeroicInspirationReward();
+                target.TakeDamage(*attacker);
+                attacker->TakeDamage(target);
+            }
+            ProcessDestroy(false);
+        }
+    };
+    resolveYoHoOgre(m_player1, m_p1Field, m_p2Field, Turn::PLAYER1);
+    resolveYoHoOgre(m_player2, m_p2Field, m_p1Field, Turn::PLAYER2);
+
     ProcessDestroy(true);
 }
 
@@ -581,7 +670,6 @@ bool Battle::Attack()
     Minion& attacker = (m_turn == Turn::PLAYER1) ? m_p1Field[attackerIdx]
                                                  : m_p2Field[attackerIdx];
     auto& attackerOwner = (m_turn == Turn::PLAYER1) ? m_player1 : m_player2;
-    attackerOwner.season14.OnFriendlyMinionAttack();
     FieldZone& defendingField =
         (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
     if (!HasAttackableTarget(defendingField))
@@ -602,6 +690,8 @@ bool Battle::Attack()
     }
     if (attacker.HasRace(Race::PIRATE))
             attackerOwner.season14.OnFriendlyPirateAttack();
+    attackerOwner.season14.OnFriendlyMinionAttack();
+    attackerOwner.TryDeliverHeroicInspirationReward();
             for (auto& trinket : attackerOwner.season14.trinkets)
             {
                 if (!trinket.active || trinket.remainingUses == 0) continue;
@@ -703,6 +793,22 @@ bool Battle::Attack()
     // ordinary attack target only after that exchange and cleanup.
     Minion& nextTarget = GetProperTarget(attackerAfterRally);
     const int targetHealthBeforeAttack = nextTarget.GetHealth();
+    // Blade Collector's attack is a cleave: damage adjacent enemies of the
+    // selected target before the ordinary exchange, so all damage participates
+    // in the same subsequent death/trigger cleanup.
+    const bool bladeCollector = attackerAfterRally.GetCardID() == "BG26_817" ||
+                                attackerAfterRally.GetCardID() == "BG26_817_G";
+    if (bladeCollector) {
+        const int position = nextTarget.GetZonePosition();
+        std::vector<Minion*> adjacent;
+        defendingField.ForEachAlive([&](MinionData& data) {
+            const int candidate = data.value().GetZonePosition();
+            if (candidate == position - 1 || candidate == position + 1)
+                adjacent.push_back(&data.value());
+        });
+        for (auto* adjacentTarget : adjacent)
+            adjacentTarget->TakeDamage(attackerAfterRally.GetAttack());
+    }
     {
         AttackingStateGuard attacking(attackerAfterRally);
         nextTarget.TakeDamage(attackerAfterRally);
@@ -781,15 +887,7 @@ bool Battle::Attack()
         // confirmed enemy death during attack resolution emits this event.
         // Deathrattles and simultaneous cleanup therefore cannot fabricate a
         // Sulfuras kill, and a killer dying in the same exchange still counts.
-        if (owner.season14.RecordFriendlyCombatKill()) {
-            const auto buff =
-                Season14HeroPowerBatch3CombatKillThresholdFor(
-                    owner.season14.heroPowerDbfID);
-            attackerField.ForEachAlive([&buff](MinionData& data) {
-                data.value().ApplyCombatPersistentStats(buff.attack,
-                                                         buff.health);
-            });
-        }
+        (void)owner.season14.RecordFriendlyCombatKill();
         if (owner.season14.heroPowerDbfID == 73941 && improvements > 0)
             owner.season14.QueueConvictionImprovements(improvements);
         if (buddyHealth > 0)
@@ -915,6 +1013,31 @@ Minion& Battle::GetProperTarget([[maybe_unused]] Minion& attacker)
 
     const auto idx = Random::get<std::size_t>(0, attackableMinions.size() - 1);
     return minions[attackableMinions[idx]];
+}
+
+void Battle::TryFireQueuedLockAndLoad()
+{
+    if (m_lockAndLoadResolving) return;
+    m_lockAndLoadResolving = true;
+    const auto fire = [this](Player& owner, FieldZone& own, FieldZone& enemy) {
+        if (own.IsFull() || !HasAttackableTarget(enemy)) return;
+        const auto before = own.GetCount();
+        owner.ResolveLockAndLoad();
+        if (own.GetCount() <= before) return;
+        std::vector<Minion*> targets;
+        enemy.ForEachAlive([&targets](MinionData& data) {
+            if (!data.value().IsStealthed()) targets.push_back(&data.value());
+        });
+        if (targets.empty()) return;
+        auto& projectile = own[own.GetCount() - 1];
+        auto& target = *targets[Random::get<std::size_t>(0, targets.size() - 1)];
+        AttackingStateGuard attacking(projectile);
+        target.TakeDamage(projectile);
+        projectile.TakeDamage(target);
+    };
+    fire(m_player1, m_p1Field, m_p2Field);
+    fire(m_player2, m_p2Field, m_p1Field);
+    m_lockAndLoadResolving = false;
 }
 
 void Battle::ProcessDestroy(bool beforeAttack)
@@ -1049,6 +1172,44 @@ void Battle::ProcessDestroy(bool beforeAttack)
         }
 
         Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+        // Rot Hide Gnoll counts every friendly minion death in this combat.
+        // The battle snapshot is intentionally the only state mutated: the
+        // recruit board is the next-turn baseline and must not retain this
+        // combat-only attack bonus.
+        owner.battleField.ForEachAlive([](MinionData& data) {
+            auto& gnoll = data.value();
+            if (gnoll.GetCardID() == "BG25_013")
+                gnoll.SetAttack(gnoll.GetAttack() + 1);
+            else if (gnoll.GetCardID() == "BG25_013_G")
+                gnoll.SetAttack(gnoll.GetAttack() + 2);
+        });
+        if (removedMinion.GetCardID() == "BG25_008" ||
+            removedMinion.GetCardID() == "BG25_008_G")
+            ++owner.eternalKnightsDiedThisGame;
+        // Eternal Knight is a dynamic wherever-this-is aura. Re-apply only
+        // the newly earned delta to every surviving copy in both snapshots.
+        if (removedMinion.GetCardID() == "BG25_008" ||
+            removedMinion.GetCardID() == "BG25_008_G") {
+            owner.battleField.ForEachAlive([&owner](MinionData& data) {
+                data.value().ApplyEternalKnightDeathCount(
+                    owner.eternalKnightsDiedThisGame);
+            });
+            owner.recruitField.ForEachAlive([&owner](MinionData& data) {
+                data.value().ApplyEternalKnightDeathCount(
+                    owner.eternalKnightsDiedThisGame);
+            });
+        }
+        if (owner.season14.heroPowerDbfID == 66484 &&
+            removedMinion.GetCardID() != "TB_BaconShop_HP_105t" &&
+            removedMinion.GetCardID() != "TB_BaconShop_HP_105t_SKIN_A" &&
+            removedMinion.GetCardID() != "TB_BaconShop_HP_105t_SKIN_A_G")
+        {
+            owner.battleField.ForEachAlive([&](MinionData& data) {
+                if (data.value().GetCardID() == "TB_BaconShop_HP_105t" ||
+                    data.value().GetCardID() == "TB_BaconShop_HP_105t_SKIN_A")
+                    removedMinion.CopyDeathrattleTo(data.value());
+            });
+        }
         // Sneed's New Shredder is a pinned generated token whose card data is
         // not a normal CardDef task. Resolve its exact highest-health hand
         // summon through the owning Player lifecycle before generic tasks.
@@ -1279,7 +1440,6 @@ void Battle::ProcessDestroy(bool beforeAttack)
         // Lead the Frostwolves/Stormpikes use the same deterministic Avenge
         // lifecycle.  Resolve it only after deathrattle and Reborn handling so
         // a newly reborn friendly minion also receives the permanent bonus.
-        Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
         auto& combatField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
         bool hasBuddyAvenge = false;
         combatField.ForEachAlive([&hasBuddyAvenge](const MinionData& data) {
@@ -1326,6 +1486,29 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field,
                 avenger.attack, avenger.health);
         }
+        if (owner.season14.heroPowerDbfID == 82114 &&
+            owner.season14.AdvanceBroodmotherAvenge())
+        {
+            if (!combatField.IsFull()) {
+                const auto token = Cards::FindCardByDbfID(82117);
+                Minion whelp(token);
+                const int whelpStats = 1 + owner.season14.broodmotherWhelpBonus;
+                whelp.SetAttack(whelpStats);
+                whelp.SetHealth(whelpStats);
+                if (owner.SummonCombatSnapshot(std::move(whelp))) {
+                auto& enemy = (&combatField == &m_p1Field) ? m_p2Field : m_p1Field;
+                if (HasAttackableTarget(enemy)) {
+                    Minion& summoned = combatField[combatField.GetCount() - 1];
+                    Minion& target = GetProperTarget(summoned);
+                    AttackingStateGuard attacking(summoned);
+                    target.TakeDamage(summoned);
+                    summoned.TakeDamage(target);
+                    ProcessDestroy(false);
+                }
+                }
+            }
+            owner.season14.ImproveBroodmotherWhelp();
+        }
         const auto trinketAvenger = owner.season14.OnTrinketFriendlyMinionDied();
         if (trinketAvenger.first != 0 || trinketAvenger.second != 0)
         {
@@ -1367,6 +1550,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
             m_p2NextAttackerIdx %= std::max(1, m_p2Field.GetCount());
         }
     }
+    TryFireQueuedLockAndLoad();
 }
 
 bool Battle::IsDone() const

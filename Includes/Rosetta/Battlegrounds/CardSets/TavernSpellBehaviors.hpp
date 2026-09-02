@@ -74,6 +74,7 @@ enum class TavernSpellEffect
     TRANSFORM_HIGHER_TIER,
     DISCOVER_DIFFERENT_RACE,
     RANDOM_MINION_AND_COPY,
+    TARGET_SHOP_COPY,
     FIXED_CARDS,
     BLOOD_GEM_TRANSFER,
     RANDOM_SPELLCRAFT,
@@ -409,6 +410,12 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     {
         return { 0, 0, 0, TavernSpellEffect::STEAL_RANDOM_SHOP_MINION };
     }
+    if (id == "BG27_514t") // Sea Witch: copy a chosen Tavern minion.
+        return { 0, 0, 0, TavernSpellEffect::TARGET_SHOP_COPY,
+                 Race::INVALID, 0, 1 };
+    if (id == "BG27_514t_G")
+        return { 0, 0, 0, TavernSpellEffect::TARGET_SHOP_COPY,
+                 Race::INVALID, 0, 2 };
     if (id == "BG34_444") // Easterly Winds: future refreshes buff one minion.
     {
         return { 0, 8, 8, TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH };
@@ -453,6 +460,7 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::TARGET_STATS_AND_REBORN ||
            effect == TavernSpellEffect::TARGET_STATS_AND_STEALTH ||
            effect == TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY ||
+           effect == TavernSpellEffect::TARGET_SHOP_COPY ||
            effect == TavernSpellEffect::TARGET_DIVINE_SHIELD ||
            effect == TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT ||
            effect == TavernSpellEffect::TARGET_SHARED_RACE_STATS ||
