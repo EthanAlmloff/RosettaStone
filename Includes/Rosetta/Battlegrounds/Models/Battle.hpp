@@ -22,6 +22,22 @@ struct CombatResult
     BattleResult GetResult() const noexcept { return outcome; }
     bool IsDraw() const noexcept { return outcome == BattleResult::DRAW; }
 };
+
+//! Attribution carried through one attack's destruction pass.  A deathrattle
+//! can enqueue additional deaths, so a bare ``ProcessDestroy(false)`` flag is
+//! not enough to decide whether an enemy was actually killed by an attacker.
+struct KillContext
+{
+    std::int32_t attackerEntityID = -1;
+    int attackerOwner = 0;
+    bool attackResolution = false;
+
+    bool KilledEnemy(int deadOwner) const noexcept
+    {
+        return attackResolution && attackerEntityID >= 0 &&
+               attackerOwner != 0 && attackerOwner != deadOwner;
+    }
+};
 //!
 //! \brief Battle class.
 //!
@@ -119,6 +135,7 @@ class Battle
     int m_p1PendingAttacks = 0;
     int m_p2PendingAttacks = 0;
     bool m_lockAndLoadResolving = false;
+    KillContext m_killContext;
 
     Turn m_turn = Turn::DONE;
     BattleResult m_result = BattleResult::DRAW;

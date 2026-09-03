@@ -41,7 +41,7 @@ enum class ActivateEffect : unsigned char
     ACTIVATE_FISHBAIT,
     ACTIVATE_RANDOM_TAVERN_SPELLS,
 };
-enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD, PROGRESSIVE_END_TURN };
+enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD, PROGRESSIVE_END_TURN, PLAY_BLOOD_GEMS_RACE };
 struct AvengeDefinition
 {
     AvengeEffect effect = AvengeEffect::NONE;

@@ -62,6 +62,7 @@ enum class TavernSpellEffect
     TARGET_GOLDEN,
     RANDOM_SHOP_GOLDEN,
     RANDOM_MINION_TO_HAND,
+    RANDOM_NAGA_MINION_TO_HAND,
     RANDOM_COMMON_RACE_MINION_TO_HAND,
     STEAL_RANDOM_SHOP_MINION,
     RANDOM_SHOP_STATS_ON_REFRESH,
@@ -355,6 +356,8 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     {
         return { 0, 0, 0, TavernSpellEffect::RANDOM_MINION_TO_HAND };
     }
+    if (id == "BG31_920t") return { 0, 0, 0, TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND };
+    if (id == "BG31_920_Gt") return { 0, 0, 0, TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND, Race::NAGA, 2 };
     if (id == "BG33_814") // Friendly Bounty: random most-common-type minion.
     {
         return { 0, 0, 0,

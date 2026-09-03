@@ -62,6 +62,9 @@ class Spell
 
     bool IsTemporary() const noexcept { return m_temporary; }
     void SetTemporary(bool value) noexcept { m_temporary = value; }
+    //! Tier selected when a progressive Spellcraft card is emitted.
+    int GetDynamicTier() const noexcept { return m_dynamicTier; }
+    void SetDynamicTier(int tier) noexcept { m_dynamicTier = tier; }
 
  private:
     Card m_card;
@@ -69,6 +72,7 @@ class Spell
     ZoneType m_zoneType = ZoneType::INVALID;
     int m_zonePos = -1;
     bool m_temporary = false;
+    int m_dynamicTier = 1;
 };
 }  // namespace RosettaStone::Battlegrounds
 

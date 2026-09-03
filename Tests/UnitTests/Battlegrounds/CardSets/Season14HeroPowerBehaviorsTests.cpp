@@ -5,6 +5,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch6.hpp>
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
+#include <Rosetta/Battlegrounds/Models/Battle.hpp>
 
 using namespace RosettaStone::Battlegrounds;
 
@@ -16,6 +17,78 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Nine Frogs is registered")
     CHECK(entry->kind == Season14HeroPowerKind::RANDOM_TAVERN_SPELL);
     CHECK(entry->cost == 1);
     CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Warp Gate has a pinned Protoss pool")
+{
+    CHECK(WARP_GATE_PROTOSS_DBF_IDS.size() == 9);
+    CHECK(IsWarpGateProtossDbfID(WARP_GATE_PROTOSS_DBF_IDS[0]));
+    CHECK(IsWarpGateProtossDbfID(WARP_GATE_PROTOSS_DBF_IDS[8]));
+    CHECK(!IsWarpGateProtossDbfID(0));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Whodunit has an exact quest pool")
+{
+    CHECK(WHODUNIT_QUEST_DBF_IDS.size() == 17);
+    CHECK(IsWhodunitQuestDbfID(89641));
+    CHECK(IsWhodunitQuestDbfID(96152));
+    CHECK(IsWhodunitQuestDbfID(97743));
+    CHECK(!IsWhodunitQuestDbfID(93324));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Spawning Pool has a pinned Zerg pool")
+{
+    CHECK(SPAWNING_POOL_ZERG_DBF_IDS.size() == 9);
+    CHECK(IsSpawningPoolZergDbfID(120365));
+    CHECK(IsSpawningPoolZergDbfID(120386));
+    CHECK(!IsSpawningPoolZergDbfID(120359));
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Zerg payload table is complete and fail-closed")
+{
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS.size() == 9);
+    for (const auto& spec : SPAWNING_POOL_ZERG_BEHAVIORS) {
+        CHECK(IsSpawningPoolZergDbfID(spec.dbfID));
+        CHECK(spec.goldenDbfID != spec.dbfID);
+    }
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[0].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[1].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[2].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[3].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[4].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[5].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[6].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[7].executable);
+    CHECK(SPAWNING_POOL_ZERG_BEHAVIORS[8].executable);
+    CHECK(IsExecutableSpawningPoolZergDbfID(120375));
+    CHECK(!IsExecutableSpawningPoolZergDbfID(120359));
+    CHECK(SpawningPoolZergTier(120365) == 1);
+    CHECK(SpawningPoolZergTier(120386) == 3);
+    CHECK(SpawningPoolZergTier(120359) == 0);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Zerg rows preserve normal/golden contracts")
+{
+    const auto& rows = SPAWNING_POOL_ZERG_BEHAVIORS;
+    CHECK(rows[4].goldenDbfID == 120377);
+    CHECK(rows[4].effect == SpawningPoolZergEffect::KILL_ATTACK);
+    CHECK(rows[5].goldenDbfID == 120380);
+    CHECK(rows[5].effect == SpawningPoolZergEffect::AVENGE_STATS);
+    CHECK(rows[6].goldenDbfID == 120382);
+    CHECK(rows[6].effect == SpawningPoolZergEffect::ATTACKING_VENOMOUS);
+    CHECK(rows[7].goldenDbfID == 120385);
+    CHECK(rows[7].effect == SpawningPoolZergEffect::PLAY_CARD_BUFF);
+    CHECK(rows[8].goldenDbfID == 120388);
+    CHECK(rows[8].effect == SpawningPoolZergEffect::START_COMBAT_DOUBLE_STATS);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - kill attribution is enemy-only")
+{
+    const KillContext attack{42, 1, true};
+    CHECK(attack.KilledEnemy(2));
+    CHECK(!attack.KilledEnemy(1));
+    CHECK(!KillContext{42, 1, false}.KilledEnemy(2));
+    CHECK(!KillContext{-1, 1, true}.KilledEnemy(2));
 }
 
 TEST_CASE("[Season14HeroPowerBehaviors] - Void Power has turn-seven Discover payload")
@@ -62,7 +135,7 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Void Power has turn-seven Discover pay
 
 TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 45);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS.size() == 46);
 
     const auto* perfectCrime = FindSeason14HeroPowerBehavior("BG23_HERO_305p");
     REQUIRE(perfectCrime != nullptr);
@@ -102,6 +175,12 @@ TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")
     CHECK(warpGate->dbfID == 119196);
     CHECK(warpGate->kind == Season14HeroPowerKind::WARP_GATE);
     CHECK(warpGate->passive);
+    const auto* spawningPool = FindSeason14HeroPowerBehavior("BG31_HERO_811p");
+    REQUIRE(spawningPool != nullptr);
+    CHECK(spawningPool->dbfID == 120362);
+    CHECK(spawningPool->kind == Season14HeroPowerKind::SPAWNING_POOL);
+    CHECK(spawningPool->cost == 6);
+    CHECK(spawningPool->passive);
 
     const auto* boon = FindSeason14HeroPowerBehavior(57562);
     REQUIRE(boon != nullptr);

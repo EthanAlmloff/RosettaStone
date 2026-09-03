@@ -97,6 +97,10 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ProgressiveAvengeEndTurnTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/HeroDamageThresholdSpellTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyGainTargetAttackTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatSelfCopyTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnTierHealthTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTierAttackTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DeathrattleAttackDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRemoveKeywordsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRandomRaceKeywordTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomBountyToHandTask.hpp>
@@ -194,6 +198,10 @@ using TaskType =
                  SimpleTasks::ProgressiveAvengeEndTurnTask,
                  SimpleTasks::HeroDamageThresholdSpellTask,
                  SimpleTasks::RallyGainTargetAttackTask,
+                 SimpleTasks::StartCombatSelfCopyTask,
+                 SimpleTasks::EndTurnTierHealthTask,
+                 SimpleTasks::RallyTierAttackTask,
+                 SimpleTasks::DeathrattleAttackDamageTask,
                  SimpleTasks::RallyRemoveKeywordsTask,
                  SimpleTasks::RallyRandomRaceKeywordTask,
                  SimpleTasks::RandomBountyToHandTask,

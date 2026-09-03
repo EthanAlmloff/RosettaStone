@@ -345,6 +345,10 @@ class Season14State
     std::int32_t warpGateBuyCount = 0;
     std::int32_t warpGateSelectedDbfID = 0;
     std::int32_t warpGateRewardDbfID = 0;
+    //! Spawning Pool's turn-based cost reduction, capped at its printed cost.
+    std::int32_t spawningPoolDiscount = 0;
+    std::uint64_t spawningPoolLarvaEntityID = 0;
+    bool spawningPoolUnlocked = false;
     std::uint64_t liftOffBattlecruiserEntityID = 0;
     //! Reserved fixed-capacity payload for delayed end-turn effects.  HP104
     //! deliberately leaves it empty: recipients are chosen at end turn.

@@ -61,6 +61,7 @@ enum class Season14HeroPowerKind : std::uint8_t
     FANTASTIC_TREASURE,
     LIFT_OFF,
     WARP_GATE,
+    SPAWNING_POOL,
 };
 
 struct Season14HeroPowerDefinition
@@ -73,6 +74,93 @@ struct Season14HeroPowerDefinition
     // Optional linked Buddy DBF ID from the pinned hero metadata.
     std::int32_t buddyDbfID = 0;
 };
+
+// Protoss rewards are hero-generated and therefore are not required to be in
+// the ordinary Tavern pool. Keep the pinned DBF boundary explicit: a missing
+// generated behavior must fail closed instead of substituting another race.
+inline constexpr std::array<std::int32_t, 9> WARP_GATE_PROTOSS_DBF_IDS = {
+    113732, 113165, 113174, 113177, 113203,
+    113735, 113738, 113739, 113733};
+
+constexpr bool IsWarpGateProtossDbfID(std::int32_t dbfID) noexcept
+{
+    for (const auto id : WARP_GATE_PROTOSS_DBF_IDS)
+        if (id == dbfID) return true;
+    return false;
+}
+
+// Whodunit's public start-game pool is the authoritative Season 14 quest
+// token set. BG24_Quest_Bob is the generic quest-system prompt and must not be
+// offered as a selectable quest itself.
+inline constexpr std::array<std::int32_t, 17> WHODUNIT_QUEST_DBF_IDS = {
+    89641, 89643, 89958, 92548, 92549, 92550, 95940, 90328,
+    96152, 89011, 89037, 89044, 89052, 89057, 96153, 97674, 97743};
+
+constexpr bool IsWhodunitQuestDbfID(std::int32_t dbfID) noexcept
+{
+    for (const auto id : WHODUNIT_QUEST_DBF_IDS)
+        if (id == dbfID) return true;
+    return false;
+}
+
+inline constexpr std::array<std::int32_t, 9> SPAWNING_POOL_ZERG_DBF_IDS = {
+    120365, 120367, 120370, 120373, 120375,
+    120378, 120381, 120383, 120386};
+inline constexpr std::uint8_t SPAWNING_POOL_UNLOCK_TIER = 2;
+
+constexpr bool IsSpawningPoolZergDbfID(std::int32_t dbfID) noexcept
+{
+    for (const auto id : SPAWNING_POOL_ZERG_DBF_IDS)
+        if (id == dbfID) return true;
+    return false;
+}
+
+enum class SpawningPoolZergEffect : std::uint8_t {
+    SUMMON_COPY,
+    END_TURN_TIER_HEALTH,
+    RALLY_TIER_ATTACK,
+    DEATHRATTLE_ATTACK_DAMAGE,
+    KILL_ATTACK,
+    AVENGE_STATS,
+    ATTACKING_VENOMOUS,
+    PLAY_CARD_BUFF,
+    START_COMBAT_DOUBLE_STATS,
+};
+
+struct SpawningPoolZergBehaviorSpec {
+    std::int32_t dbfID;
+    std::int32_t goldenDbfID;
+    std::uint8_t tier;
+    SpawningPoolZergEffect effect;
+    bool executable;
+};
+
+inline constexpr std::array<SpawningPoolZergBehaviorSpec, 9>
+    SPAWNING_POOL_ZERG_BEHAVIORS = {{
+        {120365, 120366, 1, SpawningPoolZergEffect::SUMMON_COPY, true},
+        {120367, 120369, 1, SpawningPoolZergEffect::END_TURN_TIER_HEALTH, true},
+        {120370, 120372, 1, SpawningPoolZergEffect::RALLY_TIER_ATTACK, true},
+        {120373, 120374, 2, SpawningPoolZergEffect::DEATHRATTLE_ATTACK_DAMAGE, true},
+        {120375, 120377, 2, SpawningPoolZergEffect::KILL_ATTACK, true},
+        {120378, 120380, 2, SpawningPoolZergEffect::AVENGE_STATS, true},
+        {120381, 120382, 3, SpawningPoolZergEffect::ATTACKING_VENOMOUS, true},
+        {120383, 120385, 3, SpawningPoolZergEffect::PLAY_CARD_BUFF, true},
+        {120386, 120388, 3, SpawningPoolZergEffect::START_COMBAT_DOUBLE_STATS, true},
+    }};
+
+constexpr bool IsExecutableSpawningPoolZergDbfID(std::int32_t dbfID) noexcept
+{
+    for (const auto& spec : SPAWNING_POOL_ZERG_BEHAVIORS)
+        if (spec.dbfID == dbfID) return spec.executable;
+    return false;
+}
+
+constexpr std::uint8_t SpawningPoolZergTier(std::int32_t dbfID) noexcept
+{
+    for (const auto& spec : SPAWNING_POOL_ZERG_BEHAVIORS)
+        if (spec.dbfID == dbfID) return spec.tier;
+    return 0;
+}
 
 //! Generated quest-reward cards are modal options rather than ordinary
 //! minions/spells. Keep their pinned IDs in one typed pool so replayed choice
@@ -154,7 +242,7 @@ constexpr std::string_view GeneratedQuestRewardMissingLinkReason(
 }
 
 //! Exact Patch 36.4 behavior batch (eight distinct reusable families).
-inline constexpr std::array<Season14HeroPowerDefinition, 45>
+inline constexpr std::array<Season14HeroPowerDefinition, 46>
     SEASON14_HERO_POWER_BEHAVIORS = {{
         {"TB_BaconShop_HP_035", 59399,
          Season14HeroPowerKind::STARTING_HEALTH, 0, true},
@@ -249,6 +337,8 @@ inline constexpr std::array<Season14HeroPowerDefinition, 45>
          Season14HeroPowerKind::LIFT_OFF, 0, true},
         {"BG31_HERO_802p", 119196,
          Season14HeroPowerKind::WARP_GATE, 0, true},
+        {"BG31_HERO_811p", 120362,
+         Season14HeroPowerKind::SPAWNING_POOL, 6, true},
     }};
 
 constexpr const Season14HeroPowerDefinition* FindSeason14HeroPowerBehavior(

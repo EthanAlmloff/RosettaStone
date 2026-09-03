@@ -327,10 +327,16 @@ void Battle::Initialize()
         });
         if (targets.empty()) return;
         auto& target = *targets[Random::get<std::size_t>(0, targets.size() - 1)];
-        AttackingStateGuard attacking(projectile);
-        target.TakeDamage(projectile);
-        projectile.TakeDamage(target);
+        {
+            AttackingStateGuard attacking(projectile);
+            target.TakeDamage(projectile);
+            projectile.TakeDamage(target);
+        }
+        m_killContext = KillContext{projectile.GetIndex(),
+                                    &owner == &m_player1 ? 1 : 2,
+                                    true};
         ProcessDestroy(false);
+        m_killContext = {};
     };
     fireLockAndLoad(m_player1, m_p1Field, m_p2Field);
     fireLockAndLoad(m_player2, m_p2Field, m_p1Field);
@@ -572,7 +578,15 @@ void Battle::Initialize()
                 target.TakeDamage(*attacker);
                 attacker->TakeDamage(target);
             }
+            // This deferred Rally attack is still an attack resolution.  Keep
+            // its attacker identity alive through death processing so effects
+            // such as Mutalisk are credited to the Rally owner's field.
+            m_killContext = KillContext{
+                attacker->GetIndex(),
+                turn == Turn::PLAYER1 ? 1 : 2,
+                true};
             ProcessDestroy(false);
+            m_killContext = {};
         }
     };
     resolveYoHoOgre(m_player1, m_p1Field, m_p2Field, Turn::PLAYER1);
@@ -776,7 +790,12 @@ bool Battle::Attack()
                     queuedTarget->TakeDamage(summoned);
                     summoned.TakeDamage(*queuedTarget);
                 }
+                m_killContext = KillContext{
+                    summoned.GetIndex(),
+                    m_turn == Turn::PLAYER1 ? 1 : 2,
+                    true};
                 ProcessDestroy(false);
+                m_killContext = {};
             }
         }
     }
@@ -798,7 +817,9 @@ bool Battle::Attack()
     // in the same subsequent death/trigger cleanup.
     const bool bladeCollector = attackerAfterRally.GetCardID() == "BG26_817" ||
                                 attackerAfterRally.GetCardID() == "BG26_817_G";
-    if (bladeCollector) {
+    const bool ultralisk = attackerAfterRally.GetCardID() == "BG31_HERO_811t10" ||
+                           attackerAfterRally.GetCardID() == "BG31_HERO_811t10_G";
+    if (bladeCollector || ultralisk) {
         const int position = nextTarget.GetZonePosition();
         std::vector<Minion*> adjacent;
         defendingField.ForEachAlive([&](MinionData& data) {
@@ -839,7 +860,10 @@ bool Battle::Attack()
         }
     }
 
+    m_killContext = KillContext{attackerAfterRally.GetIndex(),
+                                (m_turn == Turn::PLAYER1) ? 1 : 2, true};
     ProcessDestroy(false);
+    m_killContext = {};
 
     // A Reborn copy has already spent its attack.  Do not mistake it for the
     // original Windfury attacker when a minion dies in combat or a death
@@ -1172,6 +1196,18 @@ void Battle::ProcessDestroy(bool beforeAttack)
         }
 
         Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+        // Mutalisk's combat kill observer: only confirmed enemy deaths during
+        // an attack-resolution pass count; cleanup/deathrattle passes do not.
+        if (m_killContext.KilledEnemy(std::get<0>(deadMinion))) {
+            Player& killer = m_killContext.attackerOwner == 1 ? m_player1 : m_player2;
+            killer.battleField.ForEachAlive([](MinionData& data) {
+                auto& mutalisk = data.value();
+                if (mutalisk.GetCardID() == "BG31_HERO_811t6")
+                    mutalisk.ApplyCombatPersistentStats(3, 0);
+                else if (mutalisk.GetCardID() == "BG31_HERO_811t6_G")
+                    mutalisk.ApplyCombatPersistentStats(6, 0);
+            });
+        }
         // Rot Hide Gnoll counts every friendly minion death in this combat.
         // The battle snapshot is intentionally the only state mutated: the
         // recruit board is the next-turn baseline and must not retain this

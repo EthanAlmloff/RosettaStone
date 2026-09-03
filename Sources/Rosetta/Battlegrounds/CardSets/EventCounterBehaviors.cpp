@@ -19,6 +19,9 @@ namespace RosettaStone::Battlegrounds
 {
 void EventCounterBehaviors::AddAll(std::map<std::string, CardDef>& cards)
 {
+    // Canonical descriptor ownership for BG26_152, BG26_810, BG31_035,
+    // BG31_824, BG32_822, and BG36_851 (normal and golden rows) lives in
+    // EventCounterBehaviors.hpp; this executor is their sole runtime path.
     // Fail-closed descriptor rows must never use the empty fallback:
     // cards.emplace(std::string(spec.id), CardDef{});
     // Keep registration data-driven.  Empty definitions are intentional for
@@ -64,6 +67,18 @@ void EventCounterBehaviors::AddAll(std::map<std::string, CardDef>& cards)
             deathrattle.AddDeathrattleTask(
                 SimpleTasks::MagnetizationCombatBuffTask{spec.amount, spec.scaling});
             cards.emplace(std::string(spec.id), CardDef{std::move(deathrattle)});
+            continue;
+        }
+        if (spec.effect == "magnetize_and_improve")
+        {
+            trigger.SetTriggerSource(TriggerSource::FRIENDLY);
+            trigger.SetCondition(SelfCondition{[](Minion& played) {
+                return played.HasRace(Race::MECHANICAL);
+            }});
+            trigger.SetTasks({SimpleTasks::MagnetizeSatelliteTask{
+                spec.amount, spec.health, spec.amount, spec.goldenScale}});
+            power.AddTrigger(std::move(trigger));
+            cards.emplace(std::string(spec.id), CardDef{std::move(power)});
             continue;
         }
         if (spec.effect == "random_stat_buff")

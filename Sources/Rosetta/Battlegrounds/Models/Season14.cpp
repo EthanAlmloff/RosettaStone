@@ -239,6 +239,9 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     warpGateBuyCount = 0;
     warpGateSelectedDbfID = 0;
     warpGateRewardDbfID = 0;
+    spawningPoolDiscount = 0;
+    spawningPoolLarvaEntityID = 0;
+    spawningPoolUnlocked = false;
     liftOffBattlecruiserEntityID = 0;
     heroPowerBatch5 = {};
     heroPowerBatch6 = {};
@@ -385,6 +388,8 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
         heroPowerBatch1);
     if (heroPowerDbfID == 86292)
         ++perfectCrimeDiscount;
+    if (heroPowerDbfID == 120362)
+        spawningPoolDiscount = std::min<std::int32_t>(6, spawningPoolDiscount + 1);
     ResolveUpbeatHarmonyBeginTurn(heroPowerDbfID, heroPowerBatch1);
 
     Season14HeroPowerBatch2Result result{};
@@ -1350,6 +1355,8 @@ bool Season14State::CanUseHeroPower(std::int32_t availableGold) const
     // reject.  The bridge and the public snapshot both use this predicate.
     if (heroPowerDbfID == 105315 && luckyRollCooldown != 0)
         return false;
+    if (heroPowerDbfID == 120362 && spawningPoolUnlocked)
+        return false;
     const bool bloodboundSecondUse =
         heroPowerDbfID == 71459 && heroPowerBatch2.bloodboundUsesThisTurn < 2;
     const bool arcaneAlterationSecondUse =
@@ -1364,7 +1371,7 @@ std::int32_t Season14State::EffectiveHeroPowerCost() const
     return std::max<std::int32_t>(
         0, heroPowerCost + heroPowerBatch1.leadExplorerCostDelta -
                (heroPowerBatch2.nextHeroPowerDiscount ? 1 : 0) -
-               perfectCrimeDiscount);
+               perfectCrimeDiscount - spawningPoolDiscount);
 }
 
 bool Season14State::UseHeroPower()

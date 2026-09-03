@@ -154,6 +154,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftGolemDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftRandomPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DealDamageSelfBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DeathrattleAttackDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DemonDiscoverDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DestroyLastDamageSourceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DestroyUndeadBuffSelfTask.hpp>
@@ -163,6 +164,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnLastTavernSpellTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnStatTransferTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnTavernSpellStatsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnTierHealthTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ExactCopyDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FriendlyRaceEnchantmentTask.hpp>
@@ -205,6 +207,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRandomRaceKeywordTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRemoveKeywordsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTavernSpellHealthBonusTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyTierAttackTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomBountyToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomChooseOneCardToHandTask.hpp>
@@ -235,6 +238,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMinionSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMurlocSummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatSelfCopyTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatSpellScaledRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonRecentDeadMinionsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>

@@ -1758,6 +1758,17 @@ int Minion::TriggerAvenge(Player& player)
             player.season14.progressiveAvengeAttack += definition->attack;
             player.season14.progressiveAvengeHealth += definition->health;
         }
+        else if (definition->effect == AvengeEffect::PLAY_BLOOD_GEMS_RACE)
+        {
+            // ``attack`` stores the number of Blood Gems to play; unlike a
+            // stat buff this must flow through Player's authoritative gem
+            // resolver so race bonuses and persistent gem state apply.
+            player.GetField().ForEachAlive([&](MinionData& data) {
+                if (!data.value().HasRace(definition->race)) return;
+                for (int i = 0; i < definition->attack; ++i)
+                    player.ApplyBloodGemTo(data.value());
+            });
+        }
     }
     if (definition->permanent && activations > 0)
     {

@@ -398,6 +398,7 @@ void Game::Recruit()
         player.remainCoin += heroPowerResult.goldDelta;
         player.ResolveStartTurnTrinkets();
         player.TryResolveWarpGateReward();
+        player.BeginSpawningPoolMorphChoice();
         player.BeginFantasticTreasureOffer();
         player.recruitField.ForEachAlive([](MinionData& data) {
             if (data.value().HasTimeTurning())

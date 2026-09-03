@@ -133,7 +133,9 @@ class Player
     bool TryResolveRapidReanimationIfSpace(FieldZone& field);
     bool BeginFantasticTreasureOffer();
     bool BeginWarpGateChoice();
+    bool BeginWhodunitQuestChoice();
     bool TryResolveWarpGateReward();
+    bool BeginSpawningPoolMorphChoice();
     //! Each friendly Demon consumes one random Tavern minion for its stats.
     bool DevourRandomTavernForDemons(int multiplier);
     void UpdateSkyGolemsForDeathrattle();
@@ -158,6 +160,8 @@ class Player
     //! \param targetIdx The index of the target in player's field.
     void PlayCard(std::size_t handIdx, std::size_t fieldIdx,
                   int targetIdx = -1);
+    //! Resolves the Spawning Pool Infestor payload after any card succeeds.
+    void ApplyInfestorPlayCardBuff();
 
     //! Returns whether a supported no-target Tavern spell can be played.
     //! \param handIdx The index of the spell in the player's hand.
@@ -356,6 +360,7 @@ class Player
     std::function<bool(Player&, int)> addRandomMinionToHandCallback;
     std::function<int()> getNextCardIndexCallback;
     std::function<void(int)> returnMinionCallback;
+    int darkcrestImprovement = 0;
     std::function<void(Player&)> clearTavernMinionsCallback;
     std::function<void(Player&)> upgradeTavernCallback;
     std::function<void()> completeRecruitCallback;

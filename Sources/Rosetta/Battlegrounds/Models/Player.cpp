@@ -29,12 +29,11 @@
 
 namespace RosettaStone::Battlegrounds
 {
-void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
-                           int targetIdx, bool temporary,
-                           std::int32_t sourceCardDbfID);
 namespace
 {
 using Random = effolkronium::random_thread_local;
+void ApplySpellBoardEffect(Player&, const TavernSpellBehavior&, int, bool,
+                           std::int32_t);
 
 // These pool helpers are defined with the other supported-card predicates
 // below, but are also used by modal legality/commit paths earlier in this
@@ -305,6 +304,17 @@ void Player::ApplyFreshMinionModifiers(Minion& minion)
     if (minion.GetCardID() == "BG24_004" ||
         minion.GetCardID() == "BG24_004_G")
         minion.SetImmuneWhileAttacking(true);
+    // Viper's Venomous is paired with immunity while it is attacking.  The
+    // flag is installed on each combat copy here, never on the recruit card.
+    if (minion.GetCardID() == "BG31_HERO_811t8" ||
+        minion.GetCardID() == "BG31_HERO_811t8_G")
+        minion.SetImmuneWhileAttacking(true);
+    // Ultralisk's combat-start multiplier is carried by the combat copy;
+    // unlike an ordinary stat buff it is consumed by Battle::Initialize.
+    if (minion.GetCardID() == "BG31_HERO_811t10")
+        minion.SetStartCombatStatMultipliers(2, 2);
+    else if (minion.GetCardID() == "BG31_HERO_811t10_G")
+        minion.SetStartCombatStatMultipliers(3, 3);
     // Sprout It Out! is a hidden-cost combat aura.  Restrict it to newly
     // summoned combat entities so recruit purchases/plays and hand cards do
     // not inherit combat-only stats or Taunt.
@@ -397,6 +407,21 @@ void Player::ApplyFreshMinionModifiers(Minion& minion)
         minion.ApplyEternalKnightDeathCount(eternalKnightsDiedThisGame);
     if (season14.GeneratedRewardGlobalAttack() != 0)
         minion.ApplyGlobalMinionAttack(season14.GeneratedRewardGlobalAttack());
+}
+
+void Player::ApplyInfestorPlayCardBuff()
+{
+    int total = 0;
+    recruitField.ForEachAlive([&total](MinionData& data) {
+        const auto id = data.value().GetCardID();
+        if (id == "BG31_HERO_811t9") total += 1;
+        else if (id == "BG31_HERO_811t9_G") total += 2;
+    });
+    if (total == 0) return;
+    recruitField.ForEachAlive([total](MinionData& data) {
+        data.value().SetAttack(data.value().GetAttack() + total);
+        data.value().SetHealth(data.value().GetHealth() + total);
+    });
 }
 
 void Player::ApplyTamuzoCombatSummon(Minion& summoned)
@@ -752,6 +777,8 @@ void Player::SelectHero(std::size_t idx)
                           hero.card.heroPowerDbfID != 0);
     if (hero.card.heroPowerDbfID == 119196)
         BeginWarpGateChoice();
+    if (hero.card.heroPowerDbfID == 92961)
+        BeginWhodunitQuestChoice();
 
     // Menagerist's Amalgam is a one-time starting minion, not a combat
     // summon. Install it on the recruit board at hero selection so it
@@ -794,6 +821,22 @@ void Player::SelectHero(std::size_t idx)
             if (getNextCardIndexCallback) cruiser.SetIndex(getNextCardIndexCallback());
             season14.liftOffBattlecruiserEntityID = cruiser.GetIndex();
             recruitField.Add(cruiser, recruitField.GetCount());
+        }
+    }
+
+    // Spawning Pool starts with one authoritative 2/2 Larva on the recruit
+    // board. Keep its entity identity stable; morphing is deliberately
+    // fail-closed until the Zerg candidate behaviors are registered.
+    if (hero.card.heroPowerDbfID == 120362 && !recruitField.IsFull()) {
+        const Card larvaCard = Cards::FindCardByDbfID(120359);
+        if (!larvaCard.id.empty()) {
+            Minion larva(larvaCard);
+            larva.SetAttack(2);
+            larva.SetHealth(2);
+            larva.getPlayerCallback = [this]() -> Player& { return *this; };
+            if (getNextCardIndexCallback) larva.SetIndex(getNextCardIndexCallback());
+            season14.spawningPoolLarvaEntityID = larva.GetIndex();
+            recruitField.Add(larva, recruitField.GetCount());
         }
     }
 
@@ -1155,6 +1198,15 @@ void Player::RefreshSpellcraft()
         if (id == "BG26_524") malchezaarRefreshesRemaining = std::max(malchezaarRefreshesRemaining, 2);
         else if (id == "BG26_524_G") malchezaarRefreshesRemaining = std::max(malchezaarRefreshesRemaining, 4);
     });
+    bool hasDarkcrest = false;
+    recruitField.ForEachAlive([&](MinionData& data) {
+        const auto& id = data.value().GetCardID();
+        hasDarkcrest = hasDarkcrest || id == "BG31_920" || id == "BG31_920_G";
+    });
+    if (hasDarkcrest)
+        darkcrestImprovement = std::min(5, darkcrestImprovement + 1);
+    else
+        darkcrestImprovement = 0;
     recruitField.ForEach([](MinionData& data) {
         data.value().ExpireTemporaryEffects();
         data.value().ResetSpellcraftUses();
@@ -1191,6 +1243,8 @@ void Player::RefreshSpellcraft()
         { "BG31_830_G", "BG31_830_Gt", 1 },
         { "BG31_924", "BG31_924t", 1 },
         { "BG31_924_G", "BG31_924_Gt", 1 },
+        { "BG31_920", "BG31_920t", 1 },
+        { "BG31_920_G", "BG31_920_Gt", 1 },
         { "BG26_501", "BG26_501t", 1 },
         { "BG26_501_G", "BG26_501_Gt", 1 },
         { "BG29_879", "BG29_879t", 1 },
@@ -1216,6 +1270,9 @@ void Player::RefreshSpellcraft()
             continue;
         Spell spell(card);
         spell.SetTemporary(true);
+        if (std::string_view(spec.minion) == "BG31_920" ||
+            std::string_view(spec.minion) == "BG31_920_G")
+            spell.SetDynamicTier(1 + darkcrestImprovement);
         for (int i = 0; i < spec.copies && !hand.IsFull(); ++i)
             hand.Add(CardData{ spell });
     }
@@ -1536,15 +1593,78 @@ bool Player::BeginWarpGateChoice()
 {
     if (season14.heroPowerDbfID != 119196 || season14.warpGateSelectedDbfID != 0)
         return false;
-    static constexpr std::array<std::int32_t, 1> knownProtoss = {119960};
     std::vector<Card> candidates;
     for (const auto& card : Cards::GetAllCards())
-        if (std::find(knownProtoss.begin(), knownProtoss.end(), card.dbfID) != knownProtoss.end())
+        // Warp Gate is a hero-generated source, so candidates need not be in
+        // the ordinary Tavern pool. The explicit DBF allowlist is the tribe
+        // boundary; unsupported card behavior remains fail-closed at reward
+        // construction rather than silently substituting another tribe.
+        if (IsWarpGateProtossDbfID(card.dbfID) &&
+            card.GetCardType() == CardType::MINION && card.normalDbfID == 0 &&
+            card.hasBehavior)
             candidates.push_back(card);
     if (candidates.size() < 2) return false;
     Random::shuffle(candidates.begin(), candidates.end());
     season14.BeginOfferingDecision(Season14Decision::CHOICE, 0, 119196,
         {{candidates[0].dbfID, 0}, {candidates[1].dbfID, 0}});
+    return true;
+}
+
+bool Player::BeginWhodunitQuestChoice()
+{
+    if (season14.heroPowerDbfID != 92961 ||
+        season14.pendingDecision != Season14Decision::NONE)
+        return false;
+    std::vector<std::int32_t> quests;
+    for (const auto dbfID : WHODUNIT_QUEST_DBF_IDS) {
+        const auto quest = Cards::FindCardByDbfID(dbfID);
+        // RosettaStone's card schema stores legacy Battlegrounds Quest
+        // tokens as SPELL cards with a QUEST mechanic; the pinned DBF pool is
+        // the authoritative type guard here.
+        if (quest.dbfID != 0 && quest.GetCardType() == CardType::SPELL)
+            quests.push_back(dbfID);
+    }
+    if (quests.size() < 2) return false;
+    Random::shuffle(quests.begin(), quests.end());
+    season14.BeginOfferingDecision(Season14Decision::CHOICE, 0, 92961,
+        {{quests[0], 0}, {quests[1], 0}});
+    return true;
+}
+
+bool Player::BeginSpawningPoolMorphChoice()
+{
+    if (season14.heroPowerDbfID != 120362 ||
+        !season14.spawningPoolUnlocked ||
+        season14.spawningPoolLarvaEntityID == 0 ||
+        season14.pendingDecision != Season14Decision::NONE)
+        return false;
+    bool larvaPresent = false;
+    recruitField.ForEachAlive([&](MinionData& data) {
+        larvaPresent = larvaPresent ||
+            static_cast<std::uint64_t>(data.value().GetIndex()) ==
+                season14.spawningPoolLarvaEntityID;
+    });
+    if (!larvaPresent) return false;
+    std::vector<Card> candidates;
+    for (const auto& id : SPAWNING_POOL_ZERG_DBF_IDS) {
+        const auto card = Cards::FindCardByDbfID(id);
+        // The pinned pool is tiered Zerg minions (T2 through T10).  Reject
+        // malformed/generated entries with no tavern tier even if a behavior
+        // definition happens to exist for them.
+        if (card.dbfID != 0 &&
+            card.GetTier() == SpawningPoolZergTier(card.dbfID) &&
+            card.GetTier() <= SPAWNING_POOL_UNLOCK_TIER &&
+            card.hasBehavior &&
+            IsExecutableSpawningPoolZergDbfID(card.dbfID))
+            candidates.push_back(card);
+    }
+    if (candidates.size() < 2) return false;
+    Random::shuffle(candidates.begin(), candidates.end());
+    std::vector<Season14Offering> offerings;
+    for (std::size_t i = 0; i < std::min<std::size_t>(3, candidates.size()); ++i)
+        offerings.push_back({candidates[i].dbfID, 0});
+    season14.BeginOfferingDecision(Season14Decision::DISCOVER,
+        season14.spawningPoolLarvaEntityID, 120359, std::move(offerings));
     return true;
 }
 
@@ -1796,6 +1916,13 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             ApplyAfterPlayCardTrinkets(minion.GetRace());
 
             minion.ActivateTask(PowerType::POWER, *this);
+            int brannRepeats = 0;
+            recruitField.ForEachAlive([&brannRepeats](MinionData& data) {
+                if (data.value().GetCardID() == "BG_LOE_077") ++brannRepeats;
+                else if (data.value().GetCardID() == "BG_LOE_077_G") brannRepeats += 2;
+            });
+            for (int i = 0; i < brannRepeats; ++i)
+                minion.ActivateTask(PowerType::POWER, *this);
             if ((minion.GetCardID() == "BG22_HERO_201_Buddy" ||
                  minion.GetCardID() == "BG22_HERO_201_Buddy_G") &&
                 addRandomMinionToHandCallback) {
@@ -1841,6 +1968,13 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             ApplyAfterPlayCardTrinkets(minion.GetRace());
 
             minion.ActivateTask(PowerType::POWER, *this, target);
+            int brannRepeats = 0;
+            recruitField.ForEachAlive([&brannRepeats](MinionData& data) {
+                if (data.value().GetCardID() == "BG_LOE_077") ++brannRepeats;
+                else if (data.value().GetCardID() == "BG_LOE_077_G") brannRepeats += 2;
+            });
+            for (int i = 0; i < brannRepeats; ++i)
+                minion.ActivateTask(PowerType::POWER, *this, target);
             if (minion.GetCardID() == "TB_BaconShop_HERO_18_Buddy" ||
                 minion.GetCardID() == "TB_BaconShop_HERO_18_Buddy_G") {
                 const int multiplier = minion.GetCardID().ends_with("_G") ? 2 : 1;
@@ -2019,6 +2153,8 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             data.value().ApplyPlayCardStatBonus();
         });
 
+        ApplyInfestorPlayCardBuff();
+
         // Baby Elekk's authoritative 36.4 text checks whether the played
         // minion has less Attack than this Buddy, then buffs both the played
         // minion and the Buddy. Snapshot the played Attack so multiple
@@ -2092,12 +2228,36 @@ bool Player::BeginTavernSpellDiscover(int amount, std::uint64_t sourceEntityID,
 
 bool Player::ApplyChoice(std::size_t offeringIdx)
 {
+    if (season14.pendingSourceCardDbfID == 120359) {
+        if (season14.pendingDecision != Season14Decision::DISCOVER ||
+            offeringIdx >= season14.pendingOfferings.size() ||
+            season14.pendingSourceEntityID == 0)
+            return false;
+        const auto chosen = season14.pendingOfferings[offeringIdx].dbfID;
+        if (!IsExecutableSpawningPoolZergDbfID(chosen) ||
+            !CardDefs::HasDefinition(Cards::FindCardByDbfID(chosen).id))
+            return false;
+        Minion* larva = nullptr;
+        recruitField.ForEachAlive([&](MinionData& data) {
+            if (static_cast<std::uint64_t>(data.value().GetIndex()) ==
+                season14.pendingSourceEntityID)
+                larva = &data.value();
+        });
+        if (larva == nullptr || larva->GetDbfID() != 120359 ||
+            !season14.SelectDecision(offeringIdx))
+            return false;
+        const auto replacement = Cards::FindCardByDbfID(chosen);
+        if (!larva->TransformTo(replacement)) return false;
+        season14.spawningPoolLarvaEntityID = 0;
+        return true;
+    }
     if (season14.pendingSourceCardDbfID == 119196) {
         if (season14.pendingDecision != Season14Decision::CHOICE ||
             season14.pendingOfferings.size() != 2 || offeringIdx >= 2) return false;
         const auto chosen = season14.pendingOfferings[offeringIdx].dbfID;
         const auto card = Cards::FindCardByDbfID(chosen);
-        if (card.GetCardType() != CardType::MINION || card.dbfID != 119960 ||
+        if (card.GetCardType() != CardType::MINION ||
+            !IsWarpGateProtossDbfID(card.dbfID) ||
             !season14.SelectDecision(offeringIdx)) return false;
         season14.warpGateSelectedDbfID = chosen;
         return true;
@@ -2340,6 +2500,15 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
     }
 
     const auto offering = season14.pendingOfferings[offeringIdx];
+    // Whodunit is a public quest selection, not a hand-card Discover. Keep
+    // the selected DBF in the decision/replay stream; quest progression and
+    // reward resolution are delegated to the lobby quest subsystem.
+    if (season14.pendingSourceCardDbfID == 92961) {
+        if (!IsWhodunitQuestDbfID(offering.dbfID) ||
+            season14.pendingOfferings.size() != 2)
+            return false;
+        return season14.SelectDecision(offeringIdx);
+    }
     if (championChoice) {
         const auto card = Cards::FindCardByDbfID(offering.dbfID);
         if (card.GetCardType() != CardType::MINION || card.GetTier() != 7 ||
@@ -4490,6 +4659,18 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
                     return result;
                 }()));
             return;
+        case TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND:
+        {
+            std::vector<Card> candidates = SupportedMinionsForRace(Race::NAGA);
+            if (effect.value > 0)
+                candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
+                    [&](const Card& card) { return card.GetTier() != effect.value; }),
+                    candidates.end());
+            static_cast<void>(AddRandomMinionToHand(player, candidates));
+            if (effect.randomCount > 1)
+                static_cast<void>(AddRandomMinionToHand(player, candidates));
+            return;
+        }
         case TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND:
         {
             const Race race = MostCommonFriendlyRace(player);
@@ -5017,6 +5198,7 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         return false;
     }
     if ((behavior.effect == TavernSpellEffect::RANDOM_MINION_TO_HAND ||
+         behavior.effect == TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND ||
          behavior.effect == TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND ||
          behavior.effect == TavernSpellEffect::STEAL_RANDOM_SHOP_MINION) &&
         hand.IsFull())
@@ -5026,6 +5208,9 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
     if (behavior.effect == TavernSpellEffect::RANDOM_MINION_TO_HAND &&
         !HasSupportedTier1Minion())
     {
+        return false;
+    if (behavior.effect == TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND &&
+        SupportedMinionsForRace(Race::NAGA).empty())
         return false;
     }
     if (behavior.effect == TavernSpellEffect::DISCOVER_MINION) {
@@ -5237,6 +5422,8 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     const int sourceSpellDbfID = spell.GetDbfID();
     bool temporarySpell = spell.IsTemporary();
     TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
+    if (spell.GetID() == "BG31_920t" || spell.GetID() == "BG31_920_Gt")
+        effect.value = spell.GetDynamicTier();
     // Thaumaturgy scales by one stat point per three successful Tavern
     // spells cast this game.  Keep the scaling at resolution so generated
     // and refreshed Spellcraft copies observe the same counter.
@@ -5314,6 +5501,9 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     }
     remainCoin += effect.gold;
     season14.Emit(Season14Event::SPELL_CAST);
+    // Emit is reached only after payment/removal and before any modal branch;
+    // this ensures Infestor observes discover/choice spells exactly once.
+    ApplyInfestorPlayCardBuff();
     if (effect.effect == TavernSpellEffect::REFRESH_TAVERN_SPELLS)
     {
         std::vector<Card> candidates;

@@ -28,6 +28,8 @@ void SpellcraftMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG31_830_G", CardDef{});
     cards.emplace("BG31_924", CardDef{});
     cards.emplace("BG31_924_G", CardDef{});
+    cards.emplace("BG31_920", CardDef{});
+    cards.emplace("BG31_920_G", CardDef{});
     cards.emplace("BG26_501", CardDef{});
     cards.emplace("BG26_501_G", CardDef{});
     // Tranquil Meditative is a continuous Tavern-spell stat aura.  Its

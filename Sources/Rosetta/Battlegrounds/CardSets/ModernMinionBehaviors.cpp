@@ -7,6 +7,9 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DemonDiscoverDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConsumeUndeadBattlecryTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyAdjacentEnemyDamageTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRandomRaceKeywordTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerLeftmostDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Triggers/Trigger.hpp>
 
 #include <utility>
 
@@ -50,13 +53,14 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BG25_013_G");
     AddStatic(cards, "BG26_174");
     AddStatic(cards, "BG26_174_G");
-    for (const auto& spec : {std::pair{"BG26_817", false}, std::pair{"BG26_817_G", false},
-                             std::pair{"BG27_017", false}, std::pair{"BG27_017_G", true}}) {
-        Power power;
-        if (spec.first == "BG27_017" || spec.first == "BG27_017_G")
-            power.AddRallyTask(SimpleTasks::RallyAdjacentEnemyDamageTask{spec.second});
-        cards.emplace(spec.first, CardDef{std::move(power)});
-    }
+    cards.emplace("BG26_817", CardDef{});
+    cards.emplace("BG26_817_G", CardDef{});
+    Power rallyAdjacent;
+    rallyAdjacent.AddRallyTask(SimpleTasks::RallyAdjacentEnemyDamageTask{false});
+    cards.emplace("BG27_017", CardDef{std::move(rallyAdjacent)});
+    Power rallyAdjacentGolden;
+    rallyAdjacentGolden.AddRallyTask(SimpleTasks::RallyAdjacentEnemyDamageTask{true});
+    cards.emplace("BG27_017_G", CardDef{std::move(rallyAdjacentGolden)});
     AddStatic(cards, "BG26_ICC_901");
     AddStatic(cards, "BG26_ICC_901_G");
     AddStatic(cards, "BG26_149");
@@ -81,48 +85,92 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BG32_237_G");
     AddStatic(cards, "BG32_873"); AddStatic(cards, "BG32_873_G");
     AddStatic(cards, "BG34_322"); AddStatic(cards, "BG34_322_G");
-    struct DeathrattleSummonSpec { const char* id; int count; };
-    constexpr DeathrattleSummonSpec handSpecs[] = {
-        {"BG26_350", 1}, {"BG26_350_G", 2},
-    };
-    for (const auto& spec : handSpecs)
-    {
-        Power power;
-        power.AddDeathrattleTask(
-            SimpleTasks::HighestHealthHandMurlocSummonTask{spec.count});
-        cards.emplace(spec.id, CardDef{std::move(power)});
-    }
-    struct GoldenizeSpec { const char* id; int count; };
-    constexpr GoldenizeSpec goldenizeSpecs[] = {
-        {"BG25_034", 1}, {"BG25_034_G", 2},
-    };
-    for (const auto& spec : goldenizeSpecs)
-    {
-        Power power;
-        power.AddBattlecryTask(SimpleTasks::GoldenizeTierMinionTask{spec.count});
-        cards.emplace(spec.id, CardDef{std::move(power)});
-    }
-    struct DemonSpec { const char* id; int count; };
-    constexpr DemonSpec demonSpecs[] = {
-        {"BG26_525", 1}, {"BG26_525_G", 2},
-    };
-    for (const auto& spec : demonSpecs)
-    {
-        Power power;
-        power.AddBattlecryTask(SimpleTasks::DemonDiscoverDamageTask{spec.count});
-        cards.emplace(spec.id, CardDef{std::move(power)});
-    }
-    struct ConsumeSpec { const char* id; bool discover; int copies; };
-    constexpr ConsumeSpec consumeSpecs[] = {
-        {"BG28_303", false, 1}, {"BG28_303_G", false, 2},
-        {"BG32_340", true, 1}, {"BG32_340_G", true, 2},
-    };
-    for (const auto& spec : consumeSpecs)
-    {
-        Power power;
-        power.AddBattlecryTask(SimpleTasks::ConsumeUndeadBattlecryTask{spec.discover, spec.copies});
-        cards.emplace(spec.id, CardDef{std::move(power)});
-    }
+    // Brann is a metadata-only reward card whose Battlecry multiplier is
+    // applied at the authoritative Player dispatch boundary.  Registration
+    // keeps the generated reward in the supported pool without duplicating
+    // that multiplier in a CardDef task.
+    cards.emplace("BG_LOE_077", CardDef{});
+    // Token/rarity derivatives below are resolved by their authoritative
+    // Player/Battle hooks; explicit CardDefs keep generated copies in the
+    // supported pool while preserving the same normal/golden payload.
+    cards.emplace("BG22_HERO_000_Buddy", CardDef{});
+    cards.emplace("BG22_HERO_000_Buddy_G", CardDef{});
+    cards.emplace("BG23_HERO_303_Buddy", CardDef{});
+    cards.emplace("BG23_HERO_303_Buddy_G", CardDef{});
+    cards.emplace("BG26_537", CardDef{});
+    cards.emplace("BG26_537_G", CardDef{});
+    cards.emplace("BG30_MagicItem_416t", CardDef{});
+    cards.emplace("BG33_890t", CardDef{});
+    cards.emplace("BG36_520t", CardDef{});
+    cards.emplace("EBG_Spell_014", CardDef{});
+    // Operatic Belcher: preserve the Venomous metadata keyword and grant it
+    // to one/two friendly Murlocs from the deathrattle boundary.
+    Power belcher;
+    belcher.AddDeathrattleTask(SimpleTasks::RallyRandomRaceKeywordTask{Race::MURLOC, GameTag::VENOMOUS, 1});
+    cards.emplace("BG26_888", CardDef{std::move(belcher)});
+    Power belcherGolden;
+    belcherGolden.AddDeathrattleTask(SimpleTasks::RallyRandomRaceKeywordTask{Race::MURLOC, GameTag::VENOMOUS, 2});
+    cards.emplace("BG26_888_G", CardDef{std::move(belcherGolden)});
+    // Silver Goose's TAKE_DAMAGE path summons the rarity-specific Fledgling.
+    Power goose;
+    Trigger gooseDamage{TriggerType::TAKE_DAMAGE};
+    gooseDamage.SetTriggerSource(TriggerSource::SELF);
+    gooseDamage.SetTasks({SimpleTasks::SummonTask{"BG29_801t", 1}});
+    goose.AddTrigger(std::move(gooseDamage));
+    cards.emplace("BG29_801", CardDef{std::move(goose)});
+    Power gooseGolden;
+    Trigger gooseGoldenDamage{TriggerType::TAKE_DAMAGE};
+    gooseGoldenDamage.SetTriggerSource(TriggerSource::SELF);
+    gooseGoldenDamage.SetTasks({SimpleTasks::SummonTask{"BG29_801_Gt", 1}});
+    gooseGolden.AddTrigger(std::move(gooseGoldenDamage));
+    cards.emplace("BG29_801_G", CardDef{std::move(gooseGolden)});
+    cards.emplace("BG29_801t", CardDef{});
+    cards.emplace("BG29_801_Gt", CardDef{});
+    Power macaw;
+    macaw.AddRallyTask(SimpleTasks::TriggerLeftmostDeathrattleTask{});
+    cards.emplace("BGS_078", CardDef{std::move(macaw)});
+    Power bristlebach;
+    bristlebach.AddAvenge({AvengeEffect::PLAY_BLOOD_GEMS_RACE, 2, 2, 0, Race::QUILBOAR, false});
+    cards.emplace("BG26_157", CardDef{std::move(bristlebach)});
+    Power bristlebachGolden;
+    bristlebachGolden.AddAvenge({AvengeEffect::PLAY_BLOOD_GEMS_RACE, 2, 4, 0, Race::QUILBOAR, false});
+    cards.emplace("BG26_157_G", CardDef{std::move(bristlebachGolden)});
+    // Keep each rarity as an explicit registration.  Besides making the
+    // normal/golden pairing auditable, this prevents a generic loop/table
+    // scanner from mistaking linked token IDs for the owning CardDef.
+    Power bassgill;
+    bassgill.AddDeathrattleTask(SimpleTasks::HighestHealthHandMurlocSummonTask{1});
+    cards.emplace("BG26_350", CardDef{std::move(bassgill)});
+    Power bassgillGolden;
+    bassgillGolden.AddDeathrattleTask(SimpleTasks::HighestHealthHandMurlocSummonTask{2});
+    cards.emplace("BG26_350_G", CardDef{std::move(bassgillGolden)});
+
+    Power goldenizer;
+    goldenizer.AddBattlecryTask(SimpleTasks::GoldenizeTierMinionTask{1});
+    cards.emplace("BG25_034", CardDef{std::move(goldenizer)});
+    Power goldenizerGolden;
+    goldenizerGolden.AddBattlecryTask(SimpleTasks::GoldenizeTierMinionTask{2});
+    cards.emplace("BG25_034_G", CardDef{std::move(goldenizerGolden)});
+
+    Power demonDiscover;
+    demonDiscover.AddBattlecryTask(SimpleTasks::DemonDiscoverDamageTask{1});
+    cards.emplace("BG26_525", CardDef{std::move(demonDiscover)});
+    Power demonDiscoverGolden;
+    demonDiscoverGolden.AddBattlecryTask(SimpleTasks::DemonDiscoverDamageTask{2});
+    cards.emplace("BG26_525_G", CardDef{std::move(demonDiscoverGolden)});
+
+    Power consumeUndead;
+    consumeUndead.AddBattlecryTask(SimpleTasks::ConsumeUndeadBattlecryTask{false, 1});
+    cards.emplace("BG28_303", CardDef{std::move(consumeUndead)});
+    Power consumeUndeadGolden;
+    consumeUndeadGolden.AddBattlecryTask(SimpleTasks::ConsumeUndeadBattlecryTask{false, 2});
+    cards.emplace("BG28_303_G", CardDef{std::move(consumeUndeadGolden)});
+    Power discoverUndead;
+    discoverUndead.AddBattlecryTask(SimpleTasks::ConsumeUndeadBattlecryTask{true, 1});
+    cards.emplace("BG32_340", CardDef{std::move(discoverUndead)});
+    Power discoverUndeadGolden;
+    discoverUndeadGolden.AddBattlecryTask(SimpleTasks::ConsumeUndeadBattlecryTask{true, 2});
+    cards.emplace("BG32_340_G", CardDef{std::move(discoverUndeadGolden)});
 
     // Patch 36.4 deathrattle summon family.
     // BG31_803 Buzzing Vermin: summon a 2/2 Beetle; golden summons two
