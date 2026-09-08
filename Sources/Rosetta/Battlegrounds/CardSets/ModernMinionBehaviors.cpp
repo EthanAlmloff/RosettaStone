@@ -9,6 +9,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyAdjacentEnemyDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRandomRaceKeywordTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerLeftmostDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerAdjacentBattlecryTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CopyTargetBattlecryTask.hpp>
 #include <Rosetta/Battlegrounds/Triggers/Trigger.hpp>
 
 #include <utility>
@@ -38,6 +40,15 @@ void AddDeathrattleSummon(std::map<std::string, CardDef>& cards, const char* id,
 
 void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
 {
+    // Buddy lifecycle effects are resolved at their authoritative event
+    // boundaries in Player/Battle; explicit empty CardDefs keep these pool
+    // entities supported rather than silently metadata-only.
+    AddStatic(cards, "BG24_HERO_204_Buddy");
+    AddStatic(cards, "BG24_HERO_204_Buddy_G");
+    AddStatic(cards, "BG25_HERO_103_Buddy");
+    AddStatic(cards, "BG25_HERO_103_Buddy_G");
+    AddStatic(cards, "BG26_HERO_104_Buddy");
+    AddStatic(cards, "BG26_HERO_104_Buddy_G");
     // Eternal Knight's stats are maintained by authoritative death
     // processing in Battle.cpp; register both pool entities so its dynamic
     // wherever-this-is aura is not mistaken for unsupported content.
@@ -73,8 +84,32 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BG28_633_G");
     AddStatic(cards, "BG27_514");
     AddStatic(cards, "BG27_514_G");
+    // Tide Oracle Morgl's confirmed attack-kill hand stat transfer is
+    // resolved by Battle.cpp using the exact attacker entity and slain
+    // minion snapshot; keep both pool entities registered here.
+    AddStatic(cards, "BG27_513");
+    AddStatic(cards, "BG27_513_G");
     AddStatic(cards, "BG29_813");
     AddStatic(cards, "BG29_813_G");
+    // Sklibb, Snow Elemental, and Ticket Collector are owned by the
+    // refresh/sale phase boundaries in Player.cpp; register their normal and
+    // golden pool entities explicitly so those hooks are executable rather
+    // than metadata-only.
+    AddStatic(cards, "TB_BaconShop_HERO_59_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_59_Buddy_G");
+    AddStatic(cards, "TB_BaconShop_HERO_78_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_78_Buddy_G");
+    AddStatic(cards, "TB_BaconShop_HERO_94_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_94_Buddy_G");
+    // Timewarped Poet is a static Divine Shield/trigger-visual minion; its
+    // all-Dragon combat-persistence aura is applied by Battle.cpp snapshots.
+    AddStatic(cards, "BG34_Giant_314");
+    AddStatic(cards, "BG34_Giant_314_G");
+    // Egg of the Endtimes' delayed Tier-6 Dragon modal is resolved by the
+    // recruit-hand timer path; registration prevents an unsupported token
+    // from entering the pool while that modal is pending.
+    AddStatic(cards, "BG34_639");
+    AddStatic(cards, "BG34_639_G");
     AddStatic(cards, "BG31_320");
     AddStatic(cards, "BG31_320_G");
     AddStatic(cards, "BG31_323");
@@ -85,6 +120,49 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BG32_237_G");
     AddStatic(cards, "BG32_873"); AddStatic(cards, "BG32_873_G");
     AddStatic(cards, "BG34_322"); AddStatic(cards, "BG34_322_G");
+    // Karl the Lost buffs friendly Divine Shield minions after a successful
+    // Hero Power use; the lifecycle hook lives on Player.
+    AddStatic(cards, "TB_BaconShop_HERO_15_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_15_Buddy_G");
+    // Weebomination resolves its end-of-turn health gain against final board
+    // positions and the hero's current missing health in Game.
+    AddStatic(cards, "TB_BaconShop_HERO_34_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_34_Buddy_G");
+    // Jr. Navigator discounts the Lead Explorer hero power once per
+    // resolved sale trigger; Sharkbait refreshes the hero power when sold.
+    AddStatic(cards, "TB_BaconShop_HERO_42_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_42_Buddy_G");
+    AddStatic(cards, "TB_BaconShop_HERO_68_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_68_Buddy_G");
+    // Clockwork Assistant and Sparkfin Soothsayer have explicit Battlecry
+    // resolution in Player::PlayMinion (their modal/pool rules are player
+    // state, not fixed CardDef tasks).
+    AddStatic(cards, "TB_BaconShop_HERO_28_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_28_Buddy_G");
+    AddStatic(cards, "TB_BaconShop_HERO_55_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_55_Buddy_G");
+    // Maxwell's sale trigger grants plain copies of the active hero's Buddy;
+    // Player resolves it immediately after the minion is committed.
+    AddStatic(cards, "TB_BaconShop_HERO_40_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_40_Buddy_G");
+    // Loyal Henchman grants a plain copy of the second enemy killed each
+    // combat; the threshold is tracked in Season14State and resolved by
+    // Battle after deathrattle/Reborn ordering.
+    AddStatic(cards, "TB_BaconShop_HERO_45_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_45_Buddy_G");
+    // Hunter of Old and Lil' K.T. resolve their public opponent copies at
+    // recruit-start, where hand capacity and plain-copy semantics are known.
+    AddStatic(cards, "TB_BaconShop_HERO_50_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_50_Buddy_G");
+    AddStatic(cards, "TB_BaconShop_HERO_70_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_70_Buddy_G");
+    // Icesnarl and Tamuzo have their event-boundary stat resolution in
+    // Battle.cpp/Player.cpp.  Register both rarities here so these buddies
+    // are admitted to the supported pool and retain their catalog identity.
+    AddStatic(cards, "BG20_HERO_100_Buddy");
+    AddStatic(cards, "BG20_HERO_100_Buddy_G");
+    AddStatic(cards, "BG23_HERO_201_Buddy");
+    AddStatic(cards, "BG23_HERO_201_Buddy_G");
     // Brann is a metadata-only reward card whose Battlecry multiplier is
     // applied at the authoritative Player dispatch boundary.  Registration
     // keeps the generated reward in the supported pool without duplicating
@@ -126,6 +204,33 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG29_801_G", CardDef{std::move(gooseGolden)});
     cards.emplace("BG29_801t", CardDef{});
     cards.emplace("BG29_801_Gt", CardDef{});
+    // Rylak Metalhead triggers each surviving adjacent Battlecry when its
+    // Deathrattle resolves. The task uses the removed entity's last field
+    // position, so zone compaction cannot retarget the wrong slot.
+    Power rylak;
+    rylak.AddDeathrattleTask(SimpleTasks::TriggerAdjacentBattlecryTask{false});
+    cards.emplace("BG26_801", CardDef{std::move(rylak)});
+    Power rylakGolden;
+    rylakGolden.AddDeathrattleTask(SimpleTasks::TriggerAdjacentBattlecryTask{true});
+    cards.emplace("BG26_801_G", CardDef{std::move(rylakGolden)});
+    // Faceless Manipulator copies the selected minion's card identity and
+    // base stats in-place; golden Faceless upgrades the copied identity.
+    Power faceless;
+    faceless.AddBattlecryTask(SimpleTasks::CopyTargetBattlecryTask{});
+    cards.emplace("BG_EX1_564", CardDef{
+        std::move(faceless),
+        {{PlayReq::REQ_TARGET_TO_PLAY, 0},
+         {PlayReq::REQ_MINION_TARGET, 0},
+         {PlayReq::REQ_FRIENDLY_TARGET, 0},
+         {PlayReq::REQ_NONSELF_TARGET, 0}}});
+    Power facelessGolden;
+    facelessGolden.AddBattlecryTask(SimpleTasks::CopyTargetBattlecryTask{true});
+    cards.emplace("BG_EX1_564_G", CardDef{
+        std::move(facelessGolden),
+        {{PlayReq::REQ_TARGET_TO_PLAY, 0},
+         {PlayReq::REQ_MINION_TARGET, 0},
+         {PlayReq::REQ_FRIENDLY_TARGET, 0},
+         {PlayReq::REQ_NONSELF_TARGET, 0}}});
     Power macaw;
     macaw.AddRallyTask(SimpleTasks::TriggerLeftmostDeathrattleTask{});
     cards.emplace("BGS_078", CardDef{std::move(macaw)});

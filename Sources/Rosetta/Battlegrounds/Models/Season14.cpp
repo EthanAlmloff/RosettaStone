@@ -2,11 +2,15 @@
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 
+#include <effolkronium/random.hpp>
+
 #include <algorithm>
 #include <utility>
 
 namespace RosettaStone::Battlegrounds
 {
+using Random = effolkronium::random_thread_local;
+
 std::vector<Minion> Season14State::TakeCombatDeadMinions(Race race, std::size_t count)
 {
     std::vector<Minion> result;
@@ -23,6 +27,18 @@ std::vector<Minion> Season14State::TakeCombatDeadMinions(Race race, std::size_t 
         }
     }
     return result;
+}
+
+std::optional<Minion> Season14State::CopyLastCombatDeadMinion() const
+{
+    if (combatDeadMinions.empty()) return std::nullopt;
+    const auto& dead = combatDeadMinions.back();
+    const auto card = Cards::FindCardByID(dead.GetCardID());
+    if (card.id.empty()) return std::nullopt;
+    const auto plainCard = card.normalDbfID != 0
+                               ? Cards::FindCardByDbfID(card.normalDbfID)
+                               : card;
+    return Minion{plainCard};
 }
 bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
 {
@@ -48,6 +64,9 @@ bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
         case Season14GeneratedChoiceDefinition::Effect::DEATHRATTLE_DEATH_BUFF:
             generatedRewardRitualDagger = true;
             return true;
+        case Season14GeneratedChoiceDefinition::Effect::RITUAL_DAGGER_REPEAT:
+            generatedRewardRitualDaggerRepeat = true;
+            return true;
         case Season14GeneratedChoiceDefinition::Effect::END_TURN_BATTLECRY:
             generatedRewardSnickerSnacks = true;
             return true;
@@ -59,6 +78,223 @@ bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
             return true;
         case Season14GeneratedChoiceDefinition::Effect::START_TURN_HAND_BUFF:
             generatedRewardRedHand = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::START_COMBAT_GLOBAL_STATS:
+            generatedRewardStaffOfOrigination = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::END_TURN_TIER_THREE_STATS:
+            generatedRewardTinyHenchmen = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::COOKED_BOOK:
+            generatedRewardCookedBook = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::TEAL_TIGER_SAPPHIRE:
+            generatedRewardTealTiger = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::ALTER_EGO:
+            generatedRewardAlterEgo = true;
+            // The base row buffs Even tiers; its linked generated token buffs
+            // Odd tiers.  Both rows share the same typed lifecycle effect.
+            generatedRewardAlterEgoEven = dbfID != 96137;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::MENAGERIE_MAYHEM:
+            generatedRewardMenagerieMayhem = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::HIDDEN_TREASURE_VAULT:
+            generatedRewardHiddenVault = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::VOLATILE_VENOM:
+            generatedRewardVolatileVenom = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::BLOOD_GOBLET:
+            generatedRewardBloodGoblet = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::SINFALL_MEDALLION:
+            generatedRewardSinfallMedallion = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::ANIMA_BRIBE:
+            generatedRewardAnimaBribe = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::VICTIMS_SPECTER:
+            generatedRewardVictimsSpecter = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::DEVILS_IN_DETAILS:
+            generatedRewardDevilsInDetails = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::PILFERED_LAMPS:
+            generatedRewardPilferedLamps = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::KIDNAP_SACK:
+            generatedRewardKidnapSack = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::ANOTHER_HIDDEN_BODY:
+            generatedRewardAnotherHiddenBody = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::ETHEREAL_EVIDENCE:
+            generatedRewardEtherealEvidence = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::FRIENDS_ALONG_THE_WAY:
+            // The reward text's {0} is the lobby's selected minion type.  The
+            // lobby exposes the ten-race pool through RACES_IN_BATTLEGROUNDS;
+            // Player pins the concrete race and resolves the card pool from
+            // authoritative Cards metadata at the first trigger.
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::GHASTLY_MASK:
+            generatedRewardGhastlyMask = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::UNMURLOC_YOUR_POTENTIAL:
+            generatedRewardUnmurloc = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::PARTNER_IN_CRIME:
+            generatedRewardPartnerInCrime = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::WONDROUS_WISDOMBALL:
+            generatedRewardWisdomball = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::ESSENCE_OF_ZERUS:
+            generatedRewardEssenceOfZerus = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::ENHANCE_A_MATIC:
+            generatedRewardEnhanceAMatic = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::GOLDEN_HAMMER:
+            generatedRewardGoldenHammer = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::STURDY_SHARD:
+            generatedRewardSturdyShard = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::BLOODSOAKED_TOME:
+            generatedRewardBloodsoakedTome = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::ENDLESS_BLOOD_MOON:
+            generatedRewardEndlessBloodMoon = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::BEYOND_THE_MIRAGE:
+            generatedRewardBeyondTheMirage = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::INVIGORATING_CONCH:
+            generatedRewardInvigoratingConch = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::TIMELINE_ACCELERATION:
+            generatedRewardTimelineAcceleration = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::SMELTING_CHAMBER:
+            generatedRewardSmeltingChamber = true;
+            generatedRewardSmeltingTier = 1;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::STASH_OF_THE_SCRIBE:
+            generatedRewardStashOfTheScribe = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::SPLITTING_SCROLL:
+            generatedRewardSplittingScroll = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::DOUBLE_HEADED_REWARD:
+            generatedRewardDoubleHeaded = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::BOOM_SQUAD:
+            generatedRewardBoomSquad = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::CYCLE_ENERGY:
+            generatedRewardCycleEnergy = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::TURBULENT_TOMBS:
+            generatedRewardTurbulentTombs = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::STABLE_AMALGAMATION:
+            generatedRewardStableAmalgamation = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::MAP_OF_THE_UNKNOWN:
+            generatedRewardMapUnknown = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::TEMPORAL_TAMPERING:
+            generatedRewardTemporalTampering = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::NINE_LIVES:
+            generatedRewardNineLives = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::TOTEMIC_TAVERN:
+            generatedRewardTotemicTavern = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::PURIFIED_SHARD:
+            generatedRewardPurifiedShard = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::THE_WALL:
+            generatedRewardTheWall = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::BATTLECRY_REPEAT:
+            generatedRewardBattlecryRepeat = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::AVENGE_REFRESH:
+            generatedRewardAvengeRefresh = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::START_TURN_RANDOM_SPELLS:
+            generatedRewardStartTurnRandomSpells = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::TAVERN_EXTRA_MINIONS:
+            generatedRewardScepterOfGuidance = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::REFRESH_GOLDEN_HIGHEST:
+            generatedRewardGoldenKobold = true;
+            generatedRewardGoldenKoboldRefreshes = 0;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::RANDOM_TIER_SEVEN_COPY:
+            generatedRewardSecretCulprit = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::OPPONENT_WARBAND_DISCOVER:
+            generatedRewardDoppelgangersLocket = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::COMBAT_SUMMON_BUFF:
+            generatedRewardTumblingDisaster = true;
+            generatedRewardTumblingAvenge = 0;
+            generatedRewardTumblingBonus = 4;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::START_TURN_BUDDY_DISCOVER:
+            generatedRewardOpenAuditions = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::START_COMBAT_RIGHTEOUS_CHARGE:
+            generatedRewardRighteousCharge = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::RUSHING_WINDS:
+            generatedRewardRushingWinds = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::NORGANNON_REWARD:
+            generatedRewardNorgannon = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::MAGICFIN_RELIC:
+            generatedRewardMagicfin = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::UNTOLD_RICHES:
+            generatedRewardUntoldRiches = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::GOLDEN_FORGE:
+            generatedRewardGoldenForge = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::QUAINT_BOUTIQUE:
+            generatedRewardQuaintBoutique = true;
+            AddNextTurnGold(4);
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::JUMBO_WAREHOUSE:
+            generatedRewardJumboWarehouse = true;
+            AddNextTurnGold(4);
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::COSMIC_REWARD:
+            generatedRewardCosmicReward = true;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::PERPETUAL_INCANTATION:
+            generatedRewardPerpetualIncantation = true;
+            // The pinned reward text grants an immediate +2/+1 to Tavern
+            // spells.  Each subsequently resolved spell earns another +2/+1
+            // for later spells (the endlessly-compounding portion is applied
+            // by OnTavernSpellResolved after the current spell resolves).
+            AddTavernSpellAttackBonus(2);
+            AddTavernSpellHealthBonus(1);
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::RALLYING_CRY:
+            generatedRewardRallyingCry = true;
+            generatedRewardRallyingCryResolving = false;
+            return true;
+        case Season14GeneratedChoiceDefinition::Effect::OPPONENT_WARBAND_GUESS:
+            generatedRewardOpponentWarbandGuess = true;
             return true;
         default:
             // The remaining choices are intentionally metadata-only until
@@ -77,6 +313,9 @@ void Season14State::BeginDecision(
         pendingOfferings.clear();
         pendingSourceEntityID = 0;
         pendingSourceCardDbfID = 0;
+        windfallAttack = 0;
+        windfallHealth = 0;
+        windfallRemaining = 0;
         pendingTavernReplacementSlot = -1;
         pendingTavernReplacementTier = 0;
         chooseOne = {};
@@ -167,7 +406,8 @@ bool Season14State::SelectSpellTargetChoice(std::size_t offeringIndex,
 {
     if ((spellModal.kind != Season14SpellModalKind::TARGET_STATS &&
          spellModal.kind != Season14SpellModalKind::ALL_MINION_STATS &&
-         spellModal.kind != Season14SpellModalKind::TARGET_OR_ALL_STATS) ||
+         spellModal.kind != Season14SpellModalKind::TARGET_OR_ALL_STATS &&
+         spellModal.kind != Season14SpellModalKind::BLOOD_GEM_CHOOSE_ONE) ||
         offeringIndex > 1)
         return false;
     if (offeringIndex == 0) {
@@ -228,6 +468,10 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     rapidReanimationTargetEntityID = 0;
     rapidReanimationTargetSlot = -1;
     rapidReanimationSnapshot.reset();
+    pendingHeroPowerReplayDbfID = 0;
+    pendingHeroPowerReplayRemaining = 0;
+    pendingHeroPowerReplayTier = 0;
+    pendingHeroPowerReplayRace = 0;
     heroPowerAvailable = available;
     heroPowerUsed = false;
     luckyRollCooldown = 0;
@@ -245,6 +489,9 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     liftOffBattlecruiserEntityID = 0;
     heroPowerBatch5 = {};
     heroPowerBatch6 = {};
+    heroPowerBatch7 = {};
+    heroPowerBatch8 = {};
+    heroPowerBatch9 = {};
     sharpenBladesPurchases = 0;
     cloningGalleryUsed = false;
     buriedTreasureDigs = 0;
@@ -281,9 +528,35 @@ void Season14State::RecordLastOpponentCombatMinions(
     const std::vector<std::int32_t>& dbfIDs)
 {
     lastOpponentCombatMinionDbfIDs.clear();
+    lastOpponentCombatMinionSnapshots.clear();
     for (const auto dbfID : dbfIDs)
         if (dbfID > 0)
             lastOpponentCombatMinionDbfIDs.push_back(dbfID);
+}
+
+void Season14State::RecordLastOpponentCombatMinionSnapshots(
+    const std::vector<Minion>& minions)
+{
+    lastOpponentCombatMinionSnapshots = minions;
+    lastOpponentCombatMinionDbfIDs.clear();
+    for (const auto& minion : minions)
+        if (minion.GetDbfID() > 0)
+            lastOpponentCombatMinionDbfIDs.push_back(minion.GetDbfID());
+}
+
+std::optional<Minion> Season14State::LastOpponentCombatMinionSnapshot(
+    std::size_t index) const
+{
+    if (index >= lastOpponentCombatMinionSnapshots.size()) return std::nullopt;
+    return lastOpponentCombatMinionSnapshots[index];
+}
+
+std::optional<Minion> Season14State::FindLastOpponentCombatMinionSnapshot(
+    std::int32_t dbfID) const
+{
+    for (const auto& minion : lastOpponentCombatMinionSnapshots)
+        if (minion.GetDbfID() == dbfID) return minion;
+    return std::nullopt;
 }
 
 bool Season14State::BeginTransformDecision(std::uint64_t sourceEntityID,
@@ -363,6 +636,7 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     if (luckyRollCooldown > 0) --luckyRollCooldown;
     goldSpentThisTurn = 0;
     soldMinionsThisTurn = 0;
+    temporaryMinionPurchaseCost = -1;
     buddyAvengeDeaths = 0;
     refreshExtraShopSlots = 0;
     spellMinionAttackDelta = 0;
@@ -372,10 +646,20 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     refreshShopStatsDeltaHealth = 0;
     temporaryTavernSpellAttack = 0;
     temporaryTavernSpellHealth = 0;
+    // No public Discover modal may survive a recruit-phase boundary.  Clear
+    // any queued Cathedral/Sushi replay defensively with the other
+    // per-turn state so an interrupted modal cannot leak into the next turn.
+    discoverReplayRemaining = 0;
+    discoverReplaySourceSpellDbfID = 0;
+    discoverReplayTargetEntityID = 0;
     if (imprisonedTurns > 0) --imprisonedTurns;
     // Reclaimed Souls' preceding-combat records remain available until its
     // Discover is committed during this recruit phase.
     heroDamageThisTurn = 0;
+    // Per-instance counters live on the recruit-board minions so copies of
+    // Unearthed Underling each retain their own two-trigger allowance.
+    // Reset only at the recruit-turn boundary; a mid-turn play starts at zero
+    // naturally and a combat copy is never visited here.
     if (heroPowerDbfID == 122960 && ++tavernLightingTurns == 3) {
         tavernLightingTurns = 0;
         ++tavernLightingAttack;
@@ -401,6 +685,33 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     BeginRecruitTurnBatch4();
     BeginRecruitTurnBatch5();
     ResolveVoidPowerBeginTurn(heroPowerDbfID, heroPowerBatch6);
+    ResolveFeelDevastationBeginTurn(heroPowerDbfID, heroPowerBatch6);
+    ResolveSeason14HeroPowerBatch7BeginTurn(heroPowerDbfID, heroPowerBatch7);
+    Season14HeroPowerBatch9Result batch9Result{};
+    ResolveSeason14HeroPowerBatch9Event(
+        heroPowerDbfID, Season14HeroPowerBatch9Event::BEGIN_TURN,
+        heroPowerBatch9, batch9Result);
+    if (batch9Result.prizeReady &&
+        ConsumeSeason14PrizeWall(heroPowerBatch9) &&
+        pendingDecision == Season14Decision::NONE)
+    {
+        std::vector<Card> prizes;
+        for (const auto& card : Cards::GetAllCards())
+            if (card.GetCardType() == CardType::SPELL &&
+                card.normalDbfID == 0 && card.dbfID > 0 &&
+                card.id.starts_with("BGS_Treasures_"))
+                prizes.push_back(card);
+        if (prizes.size() >= 3) {
+            Random::shuffle(prizes.begin(), prizes.end());
+            BeginOfferingDecision(Season14Decision::DISCOVER, 0, 67357,
+                {{prizes[0].dbfID, 0}, {prizes[1].dbfID, 0},
+                 {prizes[2].dbfID, 0}});
+        } else {
+            // Preserve the four-turn cadence when a pinned data set cannot
+            // construct a valid public offering; no phantom prize is made.
+            heroPowerBatch9.prizeChoiceReady = false;
+        }
+    }
     return result;
 }
 
@@ -459,6 +770,10 @@ void Season14State::OnSellMinion()
 std::int32_t Season14State::OnBuyMinion(bool purchasedPirate)
 {
     OnBuyMinionSharpenBlades();
+    // Pirate Parrrrty! arms the next hero-power discount only after an actual
+    // Pirate purchase; buying a non-Pirate must not consume or create it.
+    if (heroPowerDbfID == 62243 && purchasedPirate)
+        heroPowerBatch2.nextHeroPowerDiscount = true;
     return Season14HeroPowerBatch1PurchaseGold(heroPowerDbfID,
                                                purchasedPirate);
 }
@@ -560,8 +875,15 @@ Season14HeroPowerBatch2Result Season14State::OnUpgradeTavern()
 
 std::int32_t Season14State::MinionPurchaseCost(std::int32_t baseCost) const
 {
-    const auto withBatch1 = heroPowerBatch1.MinionCost(baseCost);
+    const auto effectiveBase = temporaryMinionPurchaseCost >= 0
+        ? temporaryMinionPurchaseCost : baseCost;
+    const auto withBatch1 = heroPowerBatch1.MinionCost(effectiveBase);
     const auto batch2 = Season14HeroPowerBatch2Modifiers(heroPowerDbfID);
+    // Bloodsoaked Tome states an absolute Tavern price, not a two-gold
+    // discount: every minion purchase is exactly 2 Gold while the reward is
+    // active.  Keep the ordinary hero-power modifiers for all other games.
+    if (generatedRewardBloodsoakedTome)
+        return 2;
     return std::max<std::int32_t>(0, withBatch1 + batch2.minionCost);
 }
 
@@ -578,7 +900,18 @@ std::int32_t Season14State::RefreshCost(std::int32_t baseCost) const
 
 std::int32_t Season14State::UpgradeCost(std::int32_t baseCost) const
 {
-    return heroPowerBatch1.UpgradeCost(baseCost);
+    const auto withBatch1 = heroPowerBatch1.UpgradeCost(baseCost);
+    const auto batch8 = Season14HeroPowerBatch8Modifiers(heroPowerDbfID);
+    auto result = withBatch1 + batch8.upgradeCostDelta;
+    for (const auto& trinket : trinkets)
+    {
+        if (!trinket.active) continue;
+        const auto behavior = FindTrinketBehavior(
+            Cards::FindCardByDbfID(trinket.dbfID).id);
+        if (behavior.effect == TrinketEffect::UPGRADE_COST_DISCOUNT)
+            result -= behavior.amount;
+    }
+    return std::max<std::int32_t>(0, result);
 }
 
 std::size_t Season14State::TavernOfferCount(std::size_t baseCount) const
@@ -587,10 +920,14 @@ std::size_t Season14State::TavernOfferCount(std::size_t baseCount) const
     const auto delta = modifiers.tavernSlotsDelta +
                        trinketExtraShopSlots +
                        refreshExtraShopSlots +
-                       HeroPowerBatch4PassiveModifiers().tavernSlotsDelta;
-    const auto extraTrainingSlots =
+                       HeroPowerBatch4PassiveModifiers().tavernSlotsDelta +
+                       (generatedRewardScepterOfGuidance ? 2 : 0);
+    // Demon Hunter Training says that Bob always has seven minions after the
+    // fifth refresh.  It is a target size, not a fixed +2 modifier: ordinary
+    // Tavern sizes are 3..6 through tiers 1..6 and already 7 at tier 7.
+    const std::int32_t extraTrainingSlots =
         heroPowerDbfID == 61915 && heroPowerBatch5.demonHunterTrainingUnlocked
-            ? 2
+            ? static_cast<std::int32_t>(7 > baseCount ? 7 - baseCount : 0)
             : 0;
     const auto adjustedDelta = delta + extraTrainingSlots;
     if (adjustedDelta < 0)
@@ -660,7 +997,9 @@ bool Season14State::ShouldFreezeRemainingTavern() const
 std::int32_t Season14State::TavernSpellCost(std::int32_t baseCost) const
 {
     const auto withBatch1 = heroPowerBatch1.TavernSpellCost(baseCost);
-    return heroPowerBatch2.TavernSpellCost(withBatch1);
+    const auto modified = heroPowerBatch2.TavernSpellCost(withBatch1);
+    return std::max<std::int32_t>(
+        0, modified - (generatedRewardBeyondTheMirage ? 1 : 0));
 }
 
 std::int32_t Season14State::ConsumeTavernSpellDiscount() noexcept
@@ -905,6 +1244,10 @@ void Season14State::ResetTrinketAvengeProgress() noexcept
                 trinket.triggerProgress = 0;
             if (behavior.effect == TrinketEffect::AFTER_TWO_ATTACKS_QUILBOAR_GEM)
                 trinket.triggerProgress = 0;
+            if (behavior.effect == TrinketEffect::START_COMBAT_DRAGON_SHIELDS)
+                trinket.triggerProgress = 0;
+            if (behavior.effect == TrinketEffect::ATTACKING_DRAGON_DIVINE_SHIELD)
+                trinket.triggerProgress = 0;
         }
     }
 }
@@ -971,6 +1314,7 @@ Season14State::OnTrinketFriendlyMinionDied()
             if (behavior.effect == TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK)
             {
                 AddTavernSpellAttackBonus(behavior.attack);
+                AddTavernSpellHealthBonus(behavior.health);
                 continue;
             }
             result.first += behavior.attack;
@@ -981,12 +1325,21 @@ Season14State::OnTrinketFriendlyMinionDied()
 }
 
 void Season14State::OnTavernSpellResolved(bool spellResolved,
-                                           std::int32_t sourceDbfID)
+                                           std::int32_t sourceDbfID,
+                                           bool spellOnMinion)
 {
     if (!spellResolved)
         return;
     ++successfulSpellCount;
     RecordDistinctSpell(sourceDbfID);
+    if (generatedRewardPerpetualIncantation)
+    {
+        // The reward compounds after each successful Tavern spell.  Applying
+        // the increment here (after resolution) gives replayed/generated
+        // copies the same monotonic growth and avoids counting failed plays.
+        AddTavernSpellAttackBonus(2);
+        AddTavernSpellHealthBonus(1);
+    }
     for (auto& trinket : trinkets)
     {
         if (!trinket.active || trinket.remainingUses == 0) continue;
@@ -1003,6 +1356,27 @@ void Season14State::OnTavernSpellResolved(bool spellResolved,
         {
             spellCastMinionAttackDelta += behavior.attack;
             spellCastMinionHealthDelta += behavior.health;
+        }
+        if (spellOnMinion && behavior.effect == TrinketEffect::TAVERN_SPELL_STATS)
+        {
+            // Honeycomb Ring's improvement lasts only for this recruit turn.
+            // The base aura remains in tavernSpell*Bonus; this delta is reset
+            // by BeginRecruitTurn and therefore affects subsequent spells only.
+            temporaryTavernSpellAttack += behavior.attack;
+            temporaryTavernSpellHealth += behavior.health;
+        }
+        if (behavior.effect == TrinketEffect::SPELL_COUNT_RANDOM_NAGA &&
+            behavior.value > 0 && ++trinket.triggerProgress >= behavior.value)
+        {
+            trinket.triggerProgress = 0;
+            ++pendingSpellCountNagaRewards;
+        }
+        if (spellOnMinion &&
+            behavior.effect == TrinketEffect::SPELL_COUNT_GOLD_ON_MINION &&
+            behavior.value > 0 && ++trinket.triggerProgress >= behavior.value)
+        {
+            trinket.triggerProgress = 0;
+            pendingSpellCountGold += behavior.amount > 0 ? behavior.amount : 1;
         }
     }
     if (sourceDbfID > 0) lastTavernSpellDbfID = sourceDbfID;
@@ -1447,6 +1821,10 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
             case TrinketEffect::IMMEDIATE_GOLD:
                 trinketImmediateGold += behavior.value;
                 break;
+            case TrinketEffect::ACQUIRE_RANDOM_FRIENDLY_COPY:
+                // The copy is resolved by Player at acquisition/start-turn;
+                // no persistent aura is needed here.
+                break;
             case TrinketEffect::SHOP_STATS_AND_EXTRA_SLOT:
                 AddPersistentShopStats(behavior.attack, behavior.health);
                 trinketExtraShopSlots += behavior.value;
@@ -1473,6 +1851,12 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 persistentFodderHealth += behavior.health;
                 break;
             case TrinketEffect::TAVERN_STATS_PER_SOLD:
+                break;
+            case TrinketEffect::TAVERN_SPELL_GROWING_STATS:
+                AddTavernSpellAttackBonus(behavior.attack);
+                AddTavernSpellHealthBonus(behavior.health);
+                break;
+            case TrinketEffect::TAVERN_SPELL_IMPROVE_AFTER_MINION_CAST:
                 break;
             case TrinketEffect::NEXT_TAVERN_SPELL_DISCOUNT:
                 break;
@@ -1537,6 +1921,10 @@ void Season14State::Emit(Season14Event event)
     {
         combatKillProgress = 0;
         combatKillThresholdTriggered = false;
+        loyalHenchmanKills = 0;
+        // Deathrattle-repeat rewards are once per combat, not once per
+        // lobby. Keep this counter aligned with the Battle lifecycle.
+        deathrattlesTriggered = 0;
     }
     const auto index = static_cast<std::size_t>(event);
     if (index < eventCounts.size())

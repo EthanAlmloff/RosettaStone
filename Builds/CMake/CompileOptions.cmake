@@ -92,6 +92,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 		/wd4522       # -> disable warning: 'at::Tensor': multiple assignment operators specified (caused by Torch)
 		/wd4996       # -> disable warning: 'getenv': This function or variable may be unsafe. Consider using _dupenv_s instead (caused by Torch)
 		/wd4458       # -> disable warning: declaration of 'pyobj' hides class member (caused by Torch)
+		/wd4456       # -> disable warning: declaration hides a previous local declaration
 		/wd4305       # -> disable warning: 'initializing': truncation from 'double' to 'float' (caused by Torch)
 		/wd4018       # -> disable warning: '>': signed/unsigned mismatch (caused by Torch)
 		/wd4273       # -> disable warning: 'torch::jit::tracer::addInputs': inconsistent dll linkage (caused by Torch)

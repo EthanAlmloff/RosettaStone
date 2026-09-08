@@ -24,6 +24,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/HandRaceBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GainGoldTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DiscardSpellGainGoldTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BloodGemRaceBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTask.hpp>
@@ -46,6 +47,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MagnetizeSatelliteTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MagnetizationCountBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MagnetizationCombatBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MagnetizationSelfBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastTavernSpellOnAdjacentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellDiscountTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnTavernSpellStatsTask.hpp>
@@ -54,6 +56,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmRefreshRandomShopStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmFodderRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerLeftmostDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AfterSellRaceStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTrackedAvengeCardsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastSelfScalingTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastOnSelfHealthTask.hpp>
@@ -120,15 +123,22 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MinionOfferingTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftRandomPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftGolemDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftDoubleAttackTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMurlocSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHighestHandMinionSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ExactCopyDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatDestroyAdjacentTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnDestroyAdjacentCopyTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/WindfallTornadoDiscoverTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandSelfCopyTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatPirateScallywagTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerAdjacentBattlecryTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CopyTargetBattlecryTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyAdjacentEnemyDamageTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSpellcraftToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/QuilboarBloodGolemDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTauntBuffSelfTask.hpp>
 
 #include <variant>
 
@@ -143,6 +153,7 @@ using TaskType =
                  SimpleTasks::HandRaceBuffTask,
                  SimpleTasks::FreeRefreshTask,
                  SimpleTasks::GainGoldTask,
+                 SimpleTasks::DiscardSpellGainGoldTask,
                  SimpleTasks::GenerateBloodGemsTask,
                  SimpleTasks::BloodGemRaceBonusTask,
                  SimpleTasks::IncludeTask, SimpleTasks::RandomTask,
@@ -165,15 +176,18 @@ using TaskType =
                  SimpleTasks::MagnetizeSatelliteTask,
                  SimpleTasks::MagnetizationCountBuffTask,
                  SimpleTasks::MagnetizationCombatBuffTask,
+                 SimpleTasks::MagnetizationSelfBuffTask,
                  SimpleTasks::CastTavernSpellOnAdjacentTask,
                  SimpleTasks::RebornAttackTask,
                  SimpleTasks::PersistentRaceBuffTask, SimpleTasks::PersistentBeetleBuffTask, SimpleTasks::RandomChromadrakeToHandTask, SimpleTasks::BattlecryTavernSpellDiscountTask, SimpleTasks::EndTurnTavernSpellStatsTask, SimpleTasks::BattlecrySpentGoldRaceHealthTask, SimpleTasks::PersistentTavernTierBuffTask, SimpleTasks::ArmRefreshRandomShopStatsTask, SimpleTasks::ArmFodderRefreshTask, SimpleTasks::TriggerLeftmostDeathrattleTask, SimpleTasks::SummonTrackedAvengeCardsTask, SimpleTasks::SpellCastSelfScalingTask, SimpleTasks::SpellCastOnSelfHealthTask, SimpleTasks::ApplyMinionStatBuffTask, SimpleTasks::AttackingMinionBuffTask, SimpleTasks::AttackGainHealthTask,
                  SimpleTasks::OnePerTypeRallyBuffTask,
+                 SimpleTasks::AfterSellRaceStatsTask,
                  SimpleTasks::SummonedMinionStatMultiplierTask,
                  SimpleTasks::RallyTavernSpellHealthBonusTask,
                  SimpleTasks::RandomTavernSpellToHandTask, SimpleTasks::DestroyUndeadBuffSelfTask, SimpleTasks::ActivateFishbaitTask, SimpleTasks::ActivateRandomTavernSpellsTask, SimpleTasks::DealDamageSelfBuffTask,
                  SimpleTasks::RandomSpellcraftToHandTask,
                  SimpleTasks::QuilboarBloodGolemDeathrattleTask,
+                 SimpleTasks::SummonTauntBuffSelfTask,
                  SimpleTasks::EndTurnStatTransferTask,
                  SimpleTasks::RallyHighestHandSummonTask,
                  SimpleTasks::HighestHealthHandMurlocSummonTask,
@@ -220,13 +234,19 @@ using TaskType =
                  SimpleTasks::GrowingSummonAttackTask,
                  SimpleTasks::MinionOfferingTask, SimpleTasks::DarkGiftRandomPoolTask,
                  SimpleTasks::DarkGiftGolemDeathrattleTask,
+                 SimpleTasks::DarkGiftDoubleAttackTask,
                  SimpleTasks::StartCombatHandStatsTask,
                  SimpleTasks::StartCombatHighestHandMurlocSummonTask,
                  SimpleTasks::StartCombatHighestHandMinionSummonTask,
                  SimpleTasks::ExactCopyDeathrattleTask,
                  SimpleTasks::StartCombatDestroyAdjacentTask,
+                 SimpleTasks::EndTurnDestroyAdjacentCopyTask,
+                 SimpleTasks::WindfallTornadoDiscoverTask,
                  SimpleTasks::RallyAdjacentEnemyDamageTask,
-                 SimpleTasks::StartCombatHandSelfCopyTask>;
+                 SimpleTasks::StartCombatHandSelfCopyTask,
+                 SimpleTasks::StartCombatPirateScallywagTask,
+                 SimpleTasks::TriggerAdjacentBattlecryTask,
+                 SimpleTasks::CopyTargetBattlecryTask>;
 }  // namespace RosettaStone::Battlegrounds
 
 #endif  // ROSETTASTONE_BATTLEGROUNDS_TASK_TYPE_HPP

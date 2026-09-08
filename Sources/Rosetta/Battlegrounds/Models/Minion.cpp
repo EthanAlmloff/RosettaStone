@@ -9,6 +9,7 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemAttackerTask.hpp>
 #include <effolkronium/random.hpp>
 
@@ -480,6 +481,22 @@ bool Minion::CanMakeGolden() const
     return !Cards::FindCardByDbfID(m_card.premiumDbfID).id.empty();
 }
 
+bool Minion::MakeGoldenUntilNextTurn()
+{
+    // A second cast in the same turn must not replace the original snapshot:
+    // doing so would make expiry restore the already-premium card and leave
+    // the source permanently golden.  Treat this as a non-stacking effect.
+    if (IsTemporarilyGolden() || !CanMakeGolden())
+        return false;
+    m_temporaryGoldenOriginalCard = m_card;
+    if (!MakeGolden())
+    {
+        m_temporaryGoldenOriginalCard.reset();
+        return false;
+    }
+    return true;
+}
+
 int Minion::GetAttack() const
 {
     return m_attack;
@@ -512,10 +529,41 @@ bool Minion::TransformTo(Card replacement)
 {
     if (replacement.dbfID == 0 || replacement.GetCardType() != CardType::MINION)
         return false;
-    m_card = std::move(replacement);
-    m_card.Initialize();
-    for (const auto& tag : m_card.gameTags) {
-        switch (tag.first) {
+    // A transformation is a new card instance in the same entity/zone.  Build
+    // a fresh instance so temporary stats, enchantment counters, keyword
+    // charges, and the old card's executable powers cannot leak through the
+    // identity replacement.  Preserve only engine-owned identity/zone data.
+    const int index = m_index;
+    const int poolIndex = m_poolIdx;
+    const ZoneType zoneType = m_zoneType;
+    const int zonePos = m_zonePos;
+    const int lastFieldPos = m_lastFieldPos;
+    auto playerCallback = std::move(getPlayerCallback);
+    Minion transformed(std::move(replacement), poolIndex);
+    transformed.SetIndex(index);
+    transformed.SetZoneType(zoneType);
+    transformed.SetZonePosition(zonePos);
+    transformed.SetLastFieldPos(lastFieldPos);
+    transformed.getPlayerCallback = std::move(playerCallback);
+    *this = std::move(transformed);
+    // Re-derive runtime keyword flags from the replacement metadata.  The
+    // fresh-instance construction above already initializes these flags, but
+    // keeping the reset/rebuild explicit makes the transform boundary robust
+    // if construction or assignment gains additional instance state later.
+    // The equivalent direct replacement operation is `m_card = std::move(replacement)`;
+    // this path uses a fresh instance so no old runtime state can leak.
+    m_hasDeathrattle = false;
+    m_hasTaunt = false;
+    m_hasDivineShield = false;
+    m_hasReborn = false;
+    m_hasWindfury = false;
+    m_hasMegaWindfury = false;
+    m_hasVenomous = false;
+    m_hasStealth = false;
+    for (const auto& tag : m_card.gameTags)
+    {
+        switch (tag.first)
+        {
             case GameTag::DEATHRATTLE: m_hasDeathrattle = true; break;
             case GameTag::TAUNT: m_hasTaunt = true; break;
             case GameTag::DIVINE_SHIELD: m_hasDivineShield = true; break;
@@ -876,6 +924,16 @@ void Minion::ExpireTemporaryEffects()
     m_temporaryMegaWindfury = false;
     m_temporaryVenomous = false;
     m_temporaryStealth = false;
+
+    // Temporary Golden conversions change card identity (and therefore
+    // golden-only powers) but must not erase stats, buffs, zone identity, or
+    // runtime keyword state accumulated while the conversion was active.
+    if (m_temporaryGoldenOriginalCard.has_value())
+    {
+        m_card = std::move(*m_temporaryGoldenOriginalCard);
+        m_card.Initialize();
+        m_temporaryGoldenOriginalCard.reset();
+    }
 }
 
 bool Minion::IsLavaLurker() const noexcept
@@ -1206,6 +1264,10 @@ bool Minion::IsValidPlayTarget(Player& player, int targetIdx)
     {
         Minion& target = player.recruitField[targetIdx];
 
+        if (m_card.playRequirements.contains(PlayReq::REQ_NONSELF_TARGET) &&
+            IsSameInstance(target))
+            return false;
+
         // Mind Muck's targeting metadata is a friendly-minion arrow, but its
         // semantic requirement is a friendly Demon.  Keep legality aligned
         // with ConsumeRandomTavernTask so an invalid target cannot consume
@@ -1245,6 +1307,23 @@ bool Minion::CheckTargetingType([[maybe_unused]] Minion& target)
 
 void Minion::ActivateTrigger(TriggerType type, Minion& source)
 {
+    // Baby Y'Shaarj observes every friendly summon, but only summons whose
+    // card tier matches the owner's current Tavern tier. The printed effect
+    // buffs *that summoned entity*, not every minion in the warband. Resolve
+    // against the authoritative owner callback and let each Buddy copy stack.
+    if (type == TriggerType::SUMMON && source.GetTier() == getPlayerCallback().currentTier)
+    {
+        auto& owner = getPlayerCallback();
+        int amount = 0;
+        auto& field = owner.isInCombat ? owner.battleField : owner.recruitField;
+        field.ForEachAlive([&amount](MinionData& data) {
+            const auto& id = data.value().GetCardID();
+            if (id == "TB_BaconShop_HERO_92_Buddy") amount += 4;
+            else if (id == "TB_BaconShop_HERO_92_Buddy_G") amount += 8;
+        });
+        if (amount != 0)
+            source.ApplyPersistentMinionStats(amount, amount);
+    }
     if (type == TriggerType::SUMMON &&
         (source.GetCardID() == "BG22_HERO_305t" || source.GetCardID() == "BG22_HERO_305t_G")) {
         const int amount = GetCardID() == "BG22_HERO_305_Buddy" ? 2
@@ -1270,6 +1349,23 @@ void Minion::ActivateTrigger(TriggerType type, Minion& source)
 
 void Minion::ActivateTask(PowerType type, Player& player)
 {
+    // Jr. Navigator's Battlecry discounts Lead Explorer for future uses.
+    // Store the discount as a negative cost delta; this path is reached once
+    // for each actual Battlecry replay, including Brann-style repeats.
+    if (type == PowerType::POWER &&
+        (GetCardID() == "TB_BaconShop_HERO_42_Buddy" ||
+         GetCardID() == "TB_BaconShop_HERO_42_Buddy_G"))
+    {
+        // Lead Explorer's discount is player-owned hero-power state.  Keep
+        // this on the Batch1 state used by EffectiveHeroPowerCost so every
+        // replay (including Brann-style Battlecry repeats) is applied to the
+        // same cost path and persists across recruit turns.
+        player.season14.heroPowerBatch1.leadExplorerCostDelta -=
+            GetCardID().ends_with("_G") ? 4 : 2;
+        player.season14.RecordBattlecry();
+        player.AdvanceDarkGiftCounters(1);
+        return;
+    }
     if (type == PowerType::POWER && !TaughtTavernSpell().empty()) {
         const auto spell = Cards::FindCardByID(TaughtTavernSpell());
         const auto behavior = FindTavernSpellBehavior(TaughtTavernSpell());
@@ -1308,6 +1404,37 @@ void Minion::ActivateTask(PowerType type, Player& player)
             else if (id == "BG25_354_G") repeats += 2;
         });
     }
+    if (type == PowerType::POWER)
+    {
+        // Dragon Skull reacts to each resolved Battlecry, including every
+        // repetition introduced by Battlecry-doubling effects.  Resolve the
+        // edge targets after repeat multiplicity is known, but before the
+        // task body, so each repeated Battlecry sees the authoritative board
+        // edges and receives exactly one +A/+H application.
+        auto& battlecryField = player.isInCombat ? player.battleField : player.recruitField;
+        for (int repeat = 0; repeat < repeats; ++repeat)
+        {
+            for (const auto& trinket : player.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(
+                    Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect != TrinketEffect::BATTLECRY_EDGE_STATS) continue;
+                std::vector<Minion*> edges;
+                battlecryField.ForEachAlive([&edges](MinionData& data) {
+                    edges.push_back(&data.value());
+                });
+                if (!edges.empty()) {
+                    edges.front()->SetAttack(edges.front()->GetAttack() + behavior.attack);
+                    edges.front()->SetHealth(edges.front()->GetHealth() + behavior.health);
+                    if (edges.size() > 1) {
+                        edges.back()->SetAttack(edges.back()->GetAttack() + behavior.attack);
+                        edges.back()->SetHealth(edges.back()->GetHealth() + behavior.health);
+                    }
+                }
+            }
+        }
+    }
     for (auto& task : tasks)
     {
         if (player.taskStack.isStackingTasks &&
@@ -1331,6 +1458,26 @@ void Minion::ActivateTask(PowerType type, Player& player)
 
 void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
 {
+    // Weebomination's printed effect is a targeted Battlecry, not an
+    // end-of-turn aura.  Keep the calculation at the Battlecry dispatch
+    // boundary so Brann/other Battlecry replays resolve it once per replay,
+    // against the hero health at that moment.  Armor is deliberately not
+    // included: the hero's current Health is compared with its effective
+    // starting maximum (including hero start-health modifiers).
+    if (type == PowerType::POWER &&
+        (GetCardID() == "TB_BaconShop_HERO_34_Buddy" ||
+         GetCardID() == "TB_BaconShop_HERO_34_Buddy_G"))
+    {
+        if (&target == this || target.IsDestroyed()) return;
+        player.season14.RecordBattlecry();
+        player.AdvanceDarkGiftCounters(1);
+        const int maxHealth = player.season14.heroPowerBatch1.StartingHealth(
+            player.hero.card.GetHealth());
+        const int missingHealth = std::max(0, maxHealth - player.hero.health);
+        const int multiplier = GetCardID().ends_with("_G") ? 2 : 1;
+        target.SetHealth(target.GetHealth() + multiplier * missingHealth);
+        return;
+    }
     auto tasks = GetTasks(type);
     if (tasks.empty())
     {
@@ -1612,6 +1759,16 @@ void Minion::ActivateRally([[maybe_unused]] Player& player, Minion& source,
                 }
             },
             task);
+    }
+    // Rallying Cry duplicates every Rally dispatch, not only the synthetic
+    // end-turn Rally emitted by a Trinket.  Guard the nested call so a
+    // duplicated resolution cannot recurse indefinitely.
+    if (player.season14.HasGeneratedRewardRallyingCry() &&
+        !player.season14.generatedRewardRallyingCryResolving)
+    {
+        player.season14.generatedRewardRallyingCryResolving = true;
+        ActivateRally(player, source, target);
+        player.season14.generatedRewardRallyingCryResolving = false;
     }
 }
 

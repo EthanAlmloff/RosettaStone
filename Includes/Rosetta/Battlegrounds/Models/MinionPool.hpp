@@ -47,6 +47,13 @@ class MinionPool
     void AddMinionsToTavern(Player& player, Tavern& tavern);
     void AddMinionsToTavern(Player& player, Tavern& tavern, Race preferredRace);
     bool AddRandomMinionToTavern(Player& player, Tavern& tavern, int tier);
+    bool AddRandomRaceMinionToTavern(Player& player, Tavern& tavern, int tier,
+                                     Race race);
+
+    //! Claims a specific available pool entry for a caller that is replacing
+    //! an existing Tavern slot. Returns false without changing pool state if
+    //! the index is invalid or already claimed.
+    bool TakeMinion(int poolIdx);
 
     //! Returns a minion to the pool.
     //! \param idx The pool index of a minion.

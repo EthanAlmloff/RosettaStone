@@ -2,14 +2,22 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GoldenizeTierMinionTask.hpp>
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus GoldenizeTierMinionTask::Run(Player& player, Minion& source, Minion& target) {
-  if (m_count <= 0 || target.IsDestroyed() || target.GetTier() > 6 || !target.CanMakeGolden()) return TaskStatus::STOP;
+  const bool buddyOnly = source.GetCardID() == "BG25_HERO_105_Buddy" ||
+                         source.GetCardID() == "BG25_HERO_105_Buddy_G";
+  const auto isBuddy = [](const Minion& minion) {
+    return minion.GetCardID().find("_Buddy") != std::string::npos;
+  };
+  if (m_count <= 0 || target.IsDestroyed() || target.GetTier() > 6 ||
+      !target.CanMakeGolden() || (buddyOnly && !isBuddy(target)))
+    return TaskStatus::STOP;
   if (m_count > 1)
   {
     player.season14.pendingGoldenizeTargets.clear();
     player.GetField().ForEachAlive([&](MinionData& data) {
       auto& candidate = data.value();
       if (&candidate != &source && &candidate != &target &&
-          candidate.GetTier() <= 6 && candidate.CanMakeGolden())
+          candidate.GetTier() <= 6 && candidate.CanMakeGolden() &&
+          (!buddyOnly || isBuddy(candidate)))
         player.season14.pendingGoldenizeTargets.push_back(
             static_cast<std::uint64_t>(candidate.GetIndex()));
     });

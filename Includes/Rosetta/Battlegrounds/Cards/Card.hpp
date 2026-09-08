@@ -108,6 +108,11 @@ class Card
     bool isCurHero = false;
     bool isBattlegroundsPoolMinion = false;
     bool isBattlegroundsPoolSpell = false;
+    //! Darkmoon Prize pool tier (the source metadata's
+    //! `battlegroundsDarkmoonPrizeTurn`).  This is distinct from the
+    //! minion Tavern tech level: Darkmoon prize cards intentionally do not
+    //! carry a `techLevel` tag.
+    int darkmoonPrizeTurn = 0;
     bool isBattlegroundsDarkGift = false;
     bool isBattlegroundsDuosExclusive = false;
     bool isBattlegroundsTrinket = false;

@@ -35,7 +35,7 @@ std::shared_ptr<Enchantment> Enchantment::GetInstance(Playable* owner,
     std::map<GameTag, int> tags;
     tags[ENTITY_ID] = id;
     tags[CONTROLLER] = owner->player->playerID;
-    tags[ZONE] = std::to_underlying(ZoneType::SETASIDE);
+    tags[ZONE] = static_cast<int>(ZoneType::SETASIDE);
 
     if (num1 > 0)
     {

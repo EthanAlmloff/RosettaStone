@@ -18,6 +18,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeapfroggerDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSummonFromPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastSpellBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BattlecryTavernSpellAttackBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomGoldenTierMinionToHandTask.hpp>
@@ -154,6 +155,36 @@ TEST_CASE("[Generated mappings] - Beast rally family is race-gated")
         const auto& tasks = cards.at(id).power.GetRallyTask();
         REQUIRE(tasks.size() == 1);
         REQUIRE(std::holds_alternative<SimpleTasks::RallyRaceBuffTask>(tasks.front()));
+    }
+}
+
+TEST_CASE("[Generated mappings] - lifecycle enchantment deathrattles retain exact payloads")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    for (const auto id : {"BG22_HERO_001p_t1e", "BG27_004e", "BG28_603e",
+                          "BG29_875e", "BG30_119e", "BG32_172e",
+                          "BG_BOT_312e", "BG21_HERO_030pe",
+                          "BG36_MidGameEffect_000t52e"})
+    {
+        REQUIRE(cards.contains(id));
+        CHECK(!cards.at(id).power.GetDeathrattleTask().empty());
+    }
+    for (const auto id : {"BG31_325e", "BG31_325_Ge"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* gems =
+            std::get_if<SimpleTasks::GenerateBloodGemsTask>(&tasks.front());
+        REQUIRE(gems != nullptr);
+        CHECK(gems->Amount() == (std::string_view(id) == "BG31_325_Ge" ? 4 : 2));
+    }
+    for (const auto id : {"BG27_004_Ge", "BG29_875_Ge", "BG30_119_Ge",
+                          "BG32_172_Ge"})
+    {
+        REQUIRE(cards.contains(id));
+        CHECK(!cards.at(id).power.GetDeathrattleTask().empty());
     }
 }
 
@@ -617,4 +648,51 @@ TEST_CASE("[Generated mappings] - Blue Whelp adds future Tavern spell attack")
         CHECK(task->GetAttack() ==
               (std::string_view(id) == "BG33_830_G" ? 2 : 1));
     }
+}
+
+TEST_CASE("[Generated mappings] - lifecycle enchantment payloads match pinned text")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+
+    const auto expectSummon = [&](const char* enchantment, const char* token,
+                                  int amount) {
+        REQUIRE(cards.contains(enchantment));
+        const auto& tasks = cards.at(enchantment).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* summon = std::get_if<SimpleTasks::SummonTask>(&tasks.front());
+        REQUIRE(summon != nullptr);
+        CHECK(summon->m_cardID == token);
+        CHECK(summon->m_amount == amount);
+    };
+
+    expectSummon("BG22_HERO_001p_t1e", "BG22_HERO_001p_t1", 1);
+    expectSummon("BG27_004e", "BG27_004t2", 1);
+    expectSummon("BG27_004_Ge", "BG27_004_Gt2", 1);
+    expectSummon("BG28_603e", "BG28_603t", 1);
+    expectSummon("BG29_875e", "BG29_875t", 1);
+    expectSummon("BG29_875_Ge", "BG29_875_Gt", 1);
+    expectSummon("BG30_119e", "BGS_061", 1);
+    expectSummon("BG30_119_Ge", "TB_BaconUps_141", 1);
+    expectSummon("BG32_172e", "BG_TTN_401", 1);
+    expectSummon("BG32_172_Ge", "BG_TTN_401_G", 1);
+    expectSummon("BG_BOT_312e", "BG_BOT_312t", 3);
+
+    for (const auto id : {"BG31_325e", "BG31_325_Ge"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& tasks = cards.at(id).power.GetDeathrattleTask();
+        REQUIRE(tasks.size() == 1);
+        const auto* gems = std::get_if<SimpleTasks::GenerateBloodGemsTask>(
+            &tasks.front());
+        REQUIRE(gems != nullptr);
+        CHECK(gems->Amount() == (std::string_view(id) == "BG31_325_Ge" ? 4 : 2));
+    }
+
+    REQUIRE(cards.contains("BG36_MidGameEffect_000t52e"));
+    const auto& refreshTasks =
+        cards.at("BG36_MidGameEffect_000t52e").power.GetDeathrattleTask();
+    REQUIRE(refreshTasks.size() == 1);
+    CHECK(std::holds_alternative<SimpleTasks::FreeRefreshTask>(
+        refreshTasks.front()));
 }

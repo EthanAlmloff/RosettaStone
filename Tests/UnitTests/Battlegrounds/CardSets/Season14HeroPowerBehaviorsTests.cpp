@@ -4,6 +4,7 @@
 
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch6.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch10.hpp>
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
 
@@ -17,6 +18,35 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Nine Frogs is registered")
     CHECK(entry->kind == Season14HeroPowerKind::RANDOM_TAVERN_SPELL);
     CHECK(entry->cost == 1);
     CHECK(!entry->passive);
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Batch10 has exact pinned ownership")
+{
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH10.size() == 8);
+    const auto* puzzle = FindSeason14HeroPowerBehaviorBatch10(122958);
+    REQUIRE(puzzle != nullptr);
+    CHECK(puzzle->id == "TB_BaconShop_HP_039t");
+    CHECK(puzzle->cost == 0);
+    CHECK(puzzle->passive);
+    const auto* kings = FindSeason14HeroPowerBehaviorBatch10("TB_BaconShop_HP_041");
+    REQUIRE(kings != nullptr);
+    CHECK(kings->dbfID == 63127);
+    CHECK(kings->cost == 2);
+    CHECK(!kings->passive);
+    const auto* procrastinate = FindSeason14HeroPowerBehaviorBatch10(59891);
+    REQUIRE(procrastinate != nullptr);
+    CHECK(procrastinate->id == "TB_BaconShop_HP_044");
+    CHECK(procrastinate->cost == 0);
+    CHECK(!procrastinate->passive);
+    const auto* rune = FindSeason14HeroPowerBehaviorBatch10("TB_BaconShop_HP_702t");
+    REQUIRE(rune != nullptr);
+    CHECK(rune->dbfID == 122959);
+    CHECK(rune->cost == 1);
+    CHECK(!rune->passive);
+    for (const auto& entry : SEASON14_HERO_POWER_BEHAVIORS_BATCH10) {
+        CHECK(FindSeason14HeroPowerBehaviorBatch10(entry.id) == &entry);
+        CHECK(FindSeason14HeroPowerBehaviorBatch10(entry.dbfID) == &entry);
+    }
 }
 
 TEST_CASE("[Season14HeroPowerBehaviors] - Warp Gate has a pinned Protoss pool")
@@ -93,7 +123,7 @@ TEST_CASE("[Season14HeroPowerBehaviors] - kill attribution is enemy-only")
 
 TEST_CASE("[Season14HeroPowerBehaviors] - Void Power has turn-seven Discover payload")
 {
-    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH6.size() == 1);
+    CHECK(SEASON14_HERO_POWER_BEHAVIORS_BATCH6.size() == 2);
     const auto* entry = FindSeason14HeroPowerBehaviorBatch6("BG36_HERO_101p");
     REQUIRE(entry != nullptr);
     CHECK(FindSeason14HeroPowerBehaviorBatch6(132581) == entry);
@@ -131,6 +161,34 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Void Power has turn-seven Discover pay
     CHECK(modal.SelectDecision(1));
     CHECK(modal.pendingDecision == Season14Decision::NONE);
     CHECK(modal.pendingOfferings.empty());
+}
+
+TEST_CASE("[Season14HeroPowerBehaviors] - Feel Devastation recurs every four turns and rolls back failed offers")
+{
+    const auto* entry = FindSeason14HeroPowerBehaviorBatch6("BG36_HERO_105p");
+    REQUIRE(entry != nullptr);
+    CHECK(entry->dbfID == 134010);
+    CHECK(entry->kind == Season14HeroPowerBatch6Kind::FEEL_DEVASTATION);
+    CHECK(entry->passive);
+
+    Season14HeroPowerBatch6State state{};
+    for (int turn = 1; turn < 4; ++turn)
+        CHECK(!ResolveFeelDevastationBeginTurn(134010, state));
+    CHECK(ResolveFeelDevastationBeginTurn(134010, state));
+    CHECK(state.turnNumber == 4);
+    CHECK(state.recurringDiscoverReady);
+    CHECK(ConsumeFeelDevastationDiscover(state));
+    CHECK(!state.recurringDiscoverReady);
+    RestoreFeelDevastationDiscoverReady(state);
+    CHECK(state.recurringDiscoverReady);
+    CHECK(ConsumeFeelDevastationDiscover(state));
+    CHECK(!ConsumeFeelDevastationDiscover(state));
+
+    for (int turn = 5; turn < 8; ++turn)
+        CHECK(!ResolveFeelDevastationBeginTurn(134010, state));
+    CHECK(ResolveFeelDevastationBeginTurn(134010, state));
+    CHECK(state.turnNumber == 8);
+    CHECK(ConsumeFeelDevastationDiscover(state));
 }
 
 TEST_CASE("[Season14HeroPowerBehaviors] - batch has exact unique IDs")

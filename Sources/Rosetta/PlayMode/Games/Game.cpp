@@ -753,7 +753,7 @@ void Game::UpdateAura()
     }
 
     std::erase_if(m_ownedAuras, [this](const auto& aura) {
-        return !std::ranges::contains(auras, aura.get());
+        return std::find(auras.begin(), auras.end(), aura.get()) == auras.end();
     });
 }
 

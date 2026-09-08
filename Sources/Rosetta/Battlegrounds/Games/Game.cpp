@@ -9,11 +9,14 @@
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Managers/GameManager.hpp>
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ActivateRandomTavernSpellsTask.hpp>
 
 #include <effolkronium/random.hpp>
 
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
 #include <unordered_set>
 #include <utility>
 
@@ -137,6 +140,27 @@ void Game::Start()
         m_gameState.minionPool.ReturnMinion(poolIdx);
     };
 
+    auto replaceTavernMinionWithRaceCallback = [this](
+        Player& player, Tavern& tavern, std::size_t slot, Race race) {
+        if (slot >= static_cast<std::size_t>(tavern.fieldZone.GetCount()) ||
+            tavern.fieldZone[slot].IsFrozen())
+            return false;
+        auto candidates = m_gameState.minionPool.GetMinions(1, player.currentTier, true);
+        candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
+            [race](const Minion& minion) { return !minion.HasRace(race); }),
+            candidates.end());
+        if (candidates.empty()) return false;
+        Random::shuffle(candidates.begin(), candidates.end());
+        auto replacement = std::move(candidates.front());
+        if (!m_gameState.minionPool.TakeMinion(replacement.GetPoolIndex()))
+            return false;
+        auto old = tavern.fieldZone.Remove(tavern.fieldZone[slot]);
+        m_gameState.minionPool.ReturnMinion(old.GetPoolIndex());
+        player.ApplyFreshTavernMinionModifiers(replacement);
+        tavern.fieldZone.Add(replacement, slot);
+        return true;
+    };
+
     // Create callback to clear a list of minions in Tavern's field
     auto clearTavernMinionsCallback = [this](Player& player) {
         for (int i = player.tavern.fieldZone.GetCount() - 1; i >= 0; --i)
@@ -158,6 +182,11 @@ void Game::Start()
     };
     auto addRandomTavernMinionCallback = [this](Player& player, int tier) {
         return m_gameState.minionPool.AddRandomMinionToTavern(player, player.tavern, tier);
+    };
+    auto addRandomRaceTavernMinionCallback = [this](
+        Player& player, int tier, Race race) {
+        return m_gameState.minionPool.AddRandomRaceMinionToTavern(
+            player, player.tavern, tier, race);
     };
     auto addRandomMinionToHandCallback = [this](Player& player, int tier) {
         if (player.hand.IsFull()) return false;
@@ -215,8 +244,42 @@ void Game::Start()
         return m_gameState.players.at(idx);
     };
 
+    auto getLowestHealthOpponentPlayerCallback = [this](Player& player) -> Player& {
+        Player* selected = nullptr;
+        for (auto& candidate : m_gameState.players) {
+            if (&candidate == &player || candidate.playState != PlayState::PLAYING)
+                continue;
+            if (selected == nullptr || candidate.hero.health < selected->hero.health)
+                selected = &candidate;
+        }
+        return selected != nullptr ? *selected : player;
+    };
+
     // Create callback to process the tasks related to defeat
     auto processDefeatCallback = [this](Player& player) {
+        // Kel'Thuzad's Kitty resolves against the defeated player's public
+        // warband before the pool/board cleanup below removes its entities.
+        for (auto& observer : m_gameState.players) {
+            if (observer.season14.heroPowerDbfID != 63320 ||
+                observer.hand.IsFull() ||
+                observer.season14.pendingDecision != Season14Decision::NONE)
+                continue;
+            std::vector<Season14Offering> offerings;
+            player.recruitField.ForEachAlive([&offerings](MinionData& data) {
+                const auto& minion = data.value();
+                const auto card = Cards::FindCardByID(minion.GetCardID());
+                if (card.dbfID != 0 && card.normalDbfID == 0 &&
+                    card.GetCardType() == CardType::MINION && card.hasBehavior)
+                    offerings.push_back({card.dbfID, 0});
+            });
+            if (!offerings.empty()) {
+                Random::shuffle(offerings.begin(), offerings.end());
+                if (offerings.size() > 3) offerings.resize(3);
+                observer.season14.BeginOfferingDecision(
+                    Season14Decision::DISCOVER, 0, 63320,
+                    std::move(offerings));
+            }
+        }
         player.playState = PlayState::LOST;
 
         // Determine player's rank
@@ -265,13 +328,22 @@ void Game::Start()
         player.prepareTavernMinionsCallback = prepareTavernMinionsCallback;
         player.purchaseMinionCallback = purchaseMinionCallback;
         player.addRandomTavernMinionCallback = addRandomTavernMinionCallback;
+        player.addRandomRaceTavernMinionCallback =
+            addRandomRaceTavernMinionCallback;
         player.addRandomMinionToHandCallback = addRandomMinionToHandCallback;
         player.getNextCardIndexCallback = getNextCardIndexCallback;
         player.returnMinionCallback = returnMinionCallback;
+        player.replaceTavernMinionWithRaceCallback =
+            replaceTavernMinionWithRaceCallback;
         player.clearTavernMinionsCallback = clearTavernMinionsCallback;
+        player.hand.SetAddCallback([playerPtr = &player](const CardData& card) {
+            playerPtr->OnCardAcquired(card);
+        });
         player.upgradeTavernCallback = upgradeTavernCallback;
         player.completeRecruitCallback = completeRecruitCallback;
         player.getOpponentPlayerCallback = getOpponentPlayerCallback;
+        player.getLowestHealthOpponentPlayerCallback =
+            getLowestHealthOpponentPlayerCallback;
         player.processDefeatCallback = processDefeatCallback;
 
         ++playerIdx;
@@ -303,6 +375,20 @@ void Game::SelectHero()
 
 void Game::Recruit()
 {
+    // A generated reward such as Purified Shard can end the game during the
+    // recruit phase without going through combat elimination. Finalize that
+    // terminal winner before pairing opponents; otherwise numRemainPlayer
+    // still reflects the pre-reward lobby and the game can continue forever
+    // with only non-playing seats left.
+    if (std::any_of(m_gameState.players.begin(), m_gameState.players.end(),
+                    [](const Player& player) {
+                        return player.playState == PlayState::WON;
+                    }))
+    {
+        m_gameState.nextPhase = Phase::GAMEOVER;
+        GameManager::ProcessNextPhase(*this, m_gameState.nextPhase);
+        return;
+    }
     // Check this game is over
     if (m_gameState.numRemainPlayer == 1)
     {
@@ -396,6 +482,17 @@ void Game::Recruit()
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.RefreshSousChefHeroPowerUses();
         player.remainCoin += heroPowerResult.goldDelta;
+        // Nether Portal is a passive start-of-turn reward.  Use the shared
+        // seeded pool task so hand capacity, executable-pool filtering, and
+        // replay RNG semantics remain identical to other random acquisitions.
+        if (player.season14.heroPowerDbfID == 123087)
+            (void)SimpleTasks::RandomCardToHandTask{Race::DEMON, 0, 2}.Run(player);
+        // Puzzle Box unlocks on Turn 3. Target-free executable Tavern spells
+        // are safe to resolve automatically; target-requiring spells remain
+        // fail-closed until a public target modal exists.
+        if (player.season14.heroPowerDbfID == 122958 &&
+            player.season14.recruitTurnNumber >= 3)
+            (void)SimpleTasks::ActivateRandomTavernSpellsTask{1}.Run(player);
         player.ResolveStartTurnTrinkets();
         player.TryResolveWarpGateReward();
         player.BeginSpawningPoolMorphChoice();
@@ -431,6 +528,8 @@ void Game::Recruit()
         // every recruit start; the modal remains pending until selected.
         player.BeginPowerOfStormChoice();
         player.ResolveWardenBuddy();
+        player.ResolveHunterOfOldBuddy();
+        player.ResolveLilKTMinions();
         // Dungar flightpaths advance once per recruit turn and resolve before
         // the player receives the next decision.  Ironforge intentionally
         // leaves its Discover modal pending for the policy to choose.
@@ -439,6 +538,9 @@ void Game::Recruit()
         if (player.season14.TakeVoidPowerDiscoverReady() &&
             !player.BeginVoidPowerDiscover())
             player.season14.RestoreVoidPowerDiscoverReady();
+        if (player.season14.TakeFeelDevastationDiscoverReady() &&
+            !player.BeginFeelDevastationDiscover())
+            player.season14.RestoreFeelDevastationDiscoverReady();
 
         // Decrease the value of coin to upgrade player's Tavern to next tier
         if (player.currentTier < TIER_UPPER_LIMIT)
@@ -498,22 +600,29 @@ void Game::CompleteRecruitPhase()
         if (player.playState == PlayState::PLAYING)
         {
             player.ResolveRecruitEndDeaths();
-            player.ResolveGeneratedQuestRewardEndTurn();
             player.ResolveFodderDefilerEndTurn();
             player.ResolveEnigmaticHeadstoneEndTurn();
+            player.ResolveTrinketEndTurn();
             player.ResolveGeneratedQuestRewardSnickerSnacks();
             // Advance persistent end-of-turn counters (including Patient
             // Scout's tier improvement) before combat begins.
             // Drakkari Enchanter multiplies minion end-of-turn effects. The
             // strongest copy controls the multiplier: normal is 2x and golden
             // is 3x; duplicate copies do not compound the same aura.
-            int endTurnPasses = 1;
-            player.recruitField.ForEachAlive([&endTurnPasses](MinionData& data) {
-                if (data.value().GetCardID() == "BG26_ICC_901") endTurnPasses = std::max(endTurnPasses, 2);
-                else if (data.value().GetCardID() == "BG26_ICC_901_G") endTurnPasses = std::max(endTurnPasses, 3);
+            int drakkariPasses = 1;
+            player.recruitField.ForEachAlive([&drakkariPasses](MinionData& data) {
+                if (data.value().GetCardID() == "BG26_ICC_901") drakkariPasses = std::max(drakkariPasses, 2);
+                else if (data.value().GetCardID() == "BG26_ICC_901_G") drakkariPasses = std::max(drakkariPasses, 3);
             });
-            for (int pass = 0; pass < endTurnPasses; ++pass)
+            for (int pass = 0; pass < drakkariPasses; ++pass)
+            {
+                player.ResolveGeneratedQuestRewardEndTurn();
                 player.ResolveDarkGiftEndTurnTriggers();
+                // Tiny Henchmen is itself an end-of-turn effect, so it must
+                // participate in the same Drakkari repeat boundary as other
+                // end-of-turn triggers.
+                player.ResolveGeneratedQuestRewardTinyHenchmen();
+            }
             player.ResolveSulfurasEndTurn();
             player.ResolveCthunEndTurn();
             player.AdvanceCthunUpgrade();
@@ -539,6 +648,59 @@ void Game::CompleteRecruitPhase()
                     Cards::FindCardByDbfID(trinket.dbfID).id);
                 if (behavior.effect != TrinketEffect::END_TURN_GOLDEN_STATS)
                 {
+                    if (behavior.effect == TrinketEffect::END_TURN_BLOOD_GEMS_PER_TYPE)
+                    {
+                        // Splinter of Aurum's linked end-turn effect chooses
+                        // one random friendly minion for every concrete type.
+                        // A dual-type minion may therefore receive both typed
+                        // applications, matching the visible type model.
+                        for (const auto race : RACES_IN_BATTLEGROUNDS)
+                        {
+                            std::vector<Minion*> candidates;
+                            player.recruitField.ForEachAlive([&](MinionData& data) {
+                                if (data.value().HasRace(race))
+                                    candidates.push_back(&data.value());
+                            });
+                            if (!candidates.empty())
+                            {
+                                auto* target = candidates[Random::get<std::size_t>(
+                                    0, candidates.size() - 1)];
+                                for (int i = 0; i < behavior.attack; ++i)
+                                    player.ApplyBloodGemTo(*target);
+                            }
+                        }
+                        continue;
+                    }
+                    if (behavior.effect == TrinketEffect::END_TURN_MURLOC_STATS)
+                    {
+                        std::vector<Minion*> candidates;
+                        player.recruitField.ForEachAlive([&](MinionData& data) {
+                            if (data.value().HasRace(Race::MURLOC))
+                                candidates.push_back(&data.value());
+                        });
+                        if (!candidates.empty())
+                        {
+                            auto& target = *candidates[Random::get<std::size_t>(
+                                0, candidates.size() - 1)];
+                            target.SetAttack(target.GetAttack() + behavior.attack);
+                            target.SetHealth(target.GetHealth() + behavior.health);
+                            target.SetGameTag(GameTag::VENOMOUS, 1);
+                        }
+                        continue;
+                    }
+                    if (behavior.effect == TrinketEffect::END_TURN_MINION_STATS)
+                    {
+                        const int goldenScale = player.season14.goldenMinionsPlayed;
+                        player.recruitField.ForEachAlive([&behavior, goldenScale](MinionData& data) {
+                            auto& minion = data.value();
+                            // Gold Mallet improves once per Golden minion
+                            // played this game; ordinary/golden Mallet values
+                            // remain the base +2/+1 and +4/+2 respectively.
+                            minion.SetAttack(minion.GetAttack() + behavior.attack + goldenScale);
+                            minion.SetHealth(minion.GetHealth() + behavior.health + goldenScale);
+                        });
+                        continue;
+                    }
                     if (behavior.effect == TrinketEffect::END_TURN_UNDEAD_ATTACK)
                     {
                         player.ApplyPersistentRaceStats(behavior.race,
@@ -563,14 +725,55 @@ void Game::CompleteRecruitPhase()
                     }
                     });
             }
+            // Wolfhead Flail and Insurrectionist's Blade resolve against
+            // stable recruit-board positions. Reacquire each entity before
+            // execution because a deathrattle/Rally task may mutate the field.
+            for (const auto& trinket : player.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(
+                    Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect != TrinketEffect::END_TURN_LEFT_DEATHRATTLES &&
+                    behavior.effect != TrinketEffect::END_TURN_RALLY_TRIGGERS)
+                    continue;
+                std::vector<std::uint64_t> selected;
+                player.recruitField.ForEachAlive([&](MinionData& data) {
+                    if (behavior.effect == TrinketEffect::END_TURN_RALLY_TRIGGERS ||
+                        selected.size() < 2)
+                        selected.push_back(static_cast<std::uint64_t>(data.value().GetIndex()));
+                });
+                for (const auto entityID : selected) {
+                    for (int i = 0; i < player.recruitField.GetCount(); ++i) {
+                        auto& minion = player.recruitField[static_cast<std::size_t>(i)];
+                        if (static_cast<std::uint64_t>(minion.GetIndex()) != entityID ||
+                            minion.IsDestroyed()) continue;
+                        if (behavior.effect == TrinketEffect::END_TURN_LEFT_DEATHRATTLES)
+                            minion.ActivateTask(PowerType::DEATHRATTLE, player);
+                        else
+                            minion.ActivateTrigger(TriggerType::RALLY, minion);
+                        break;
+                    }
+                }
+            }
             // Resolve ordinary minion end-of-turn triggers after the final
             // recruit action and before combat.  Trigger dispatch is kept on
             // the authoritative board instances so generated effects (such
             // as Cataclysmic Harbinger's last-spell copy) cannot be skipped.
-            player.recruitField.ForEachAlive([](MinionData& data) {
-                auto& minion = data.value();
-                minion.ActivateTrigger(TriggerType::TURN_END, minion);
+            const int endTurnPasses = player.season14.HasGeneratedRewardGhastlyMask() ? 2 : 1;
+            int resolvedEndTurnPasses = endTurnPasses;
+            player.recruitField.ForEachAlive([&resolvedEndTurnPasses](const MinionData& data) {
+                const auto& id = data.value().GetCardID();
+                if (id == "TB_BaconShop_HERO_11_Buddy")
+                    resolvedEndTurnPasses = std::max(resolvedEndTurnPasses, 2);
+                else if (id == "TB_BaconShop_HERO_11_Buddy_G")
+                    resolvedEndTurnPasses = std::max(resolvedEndTurnPasses, 3);
             });
+            for (int pass = 0; pass < resolvedEndTurnPasses; ++pass) {
+                player.recruitField.ForEachAlive([](MinionData& data) {
+                    auto& minion = data.value();
+                    minion.ActivateTrigger(TriggerType::TURN_END, minion);
+                });
+            }
             // Master Gadrin resolves from the final recruit-board positions.
             // Normal copies Attack to the minion on its left; golden copies
             // to both adjacent minions. This is a copy, not an additive buff.
@@ -715,6 +918,30 @@ void Game::CompleteRecruitPhase()
             player.season14.Emit(Season14Event::RECRUIT_END);
         }
     }
+    // Bananarama gives its owner two Bananas immediately, then gives every
+    // other living player one at recruit end.  Resolve this after all normal
+    // end-of-turn effects so the generated cards are observable before the
+    // combat copies are made.
+    const auto banana = Cards::FindCardByID("EX1_014t");
+    if (!banana.id.empty()) {
+        for (auto& owner : m_gameState.players) {
+            if (owner.playState != PlayState::PLAYING ||
+                !owner.season14.heroPowerBatch8.bananaramaPending)
+                continue;
+            const auto copies = owner.season14.heroPowerBatch8.bananaramaActivations > 0
+                                    ? owner.season14.heroPowerBatch8.bananaramaActivations
+                                    : 1;
+            for (auto& recipient : m_gameState.players) {
+                if (&recipient == &owner || recipient.playState != PlayState::PLAYING ||
+                    recipient.hand.IsFull())
+                    continue;
+                for (int i = 0; i < copies && !recipient.hand.IsFull(); ++i)
+                    recipient.hand.Add(CardData{Spell(banana)});
+            }
+            owner.season14.heroPowerBatch8.bananaramaPending = false;
+            owner.season14.heroPowerBatch8.bananaramaActivations = 0;
+        }
+    }
     m_playerCount = 0;
     m_gameState.nextPhase = Phase::COMBAT;
     GameManager::ProcessNextPhase(*this, m_gameState.nextPhase);
@@ -751,16 +978,18 @@ void Game::Combat()
         // combat mutates either field; no hand, RNG, or hidden pool state is
         // copied into the information set.
         auto snapshotPublicBoard = [](const Player& player) {
-            std::vector<std::int32_t> ids;
-            player.recruitField.ForEachAlive([&ids](const MinionData& data) {
-                ids.push_back(data.value().GetDbfID());
+            std::vector<Minion> minions;
+            player.recruitField.ForEachAlive([&minions](const MinionData& data) {
+                minions.push_back(data.value());
             });
-            return ids;
+            return minions;
         };
-        player1.season14.RecordLastOpponentCombatMinions(
+        player1.season14.RecordLastOpponentCombatMinionSnapshots(
             snapshotPublicBoard(player2));
-        player2.season14.RecordLastOpponentCombatMinions(
+        player2.season14.RecordLastOpponentCombatMinionSnapshots(
             snapshotPublicBoard(player1));
+        player1.season14.RecordLastOpponentBuddy(player2.hero.card.relatedDbfID);
+        player2.season14.RecordLastOpponentBuddy(player1.hero.card.relatedDbfID);
 
         // Create callback to get battle
         player1.getBattleCallback = [&battle]() -> Battle& { return battle; };
@@ -769,6 +998,24 @@ void Game::Combat()
         const CombatResult result = battle.Run();
         player1.season14.lastCombatLost = result.outcome == BattleResult::PLAYER2_WIN;
         player2.season14.lastCombatLost = result.outcome == BattleResult::PLAYER1_WIN;
+        // Friendly Wager resolves exactly once, after the guessed seat's
+        // combat outcome is authoritative.  A Wishbone replay preserves the
+        // single guess but pays the effect once per committed resolution.
+        for (auto& observer : m_gameState.players) {
+            auto& wager = observer.season14.heroPowerBatch9;
+            if (!wager.wagerPending ||
+                (wager.wagerTargetPlayer != static_cast<int>(std::get<0>(pair)) &&
+                 wager.wagerTargetPlayer != static_cast<int>(std::get<1>(pair))))
+                continue;
+            const bool guessedWon =
+                (result.outcome == BattleResult::PLAYER1_WIN &&
+                 wager.wagerTargetPlayer == static_cast<int>(std::get<0>(pair))) ||
+                (result.outcome == BattleResult::PLAYER2_WIN &&
+                 wager.wagerTargetPlayer == static_cast<int>(std::get<1>(pair)));
+            const auto payout = wager.wagerResolutionCount;
+            if (ResolveSeason14FriendlyWager(wager, guessedWon) && guessedWon)
+                observer.AddTavernCoins(3 * std::max(1, payout));
+        }
         // Combat fields are copies.  Commit only deltas explicitly marked as
         // permanent by combat effects before post-combat rewards resolve.
         battle.CommitPersistentState();
@@ -793,6 +1040,8 @@ void Game::Combat()
         // qualifying kill occurred or the reward could not fit in hand.
         player1.season14.ExpireFirstKillCopy();
         player2.season14.ExpireFirstKillCopy();
+        player1.ResolveGeneratedQuestRewardAfterCombat();
+        player2.ResolveGeneratedQuestRewardAfterCombat();
         player1.season14.ResolveNextCombatReward(result.outcome, true);
         player2.season14.ResolveNextCombatReward(result.outcome, false);
         std::vector<Season14PendingCombatBuff> player1Buffs;
@@ -837,18 +1086,6 @@ void Game::Combat()
             player2.season14.Emit(Season14Event::COMBAT_END);
         }
 
-        auto resolveIcesnarl = [](Player& player) {
-            const auto amount = player.season14.TakeBuddyCombatKillHealth();
-            if (amount <= 0) return;
-            player.recruitField.ForEachAlive([amount](MinionData& data) {
-                const auto& id = data.value().GetCardID();
-                if (id == "BG20_HERO_100_Buddy" || id == "BG20_HERO_100_Buddy_G")
-                    data.value().SetHealth(data.value().GetHealth() + amount);
-            });
-        };
-        resolveIcesnarl(player1);
-        resolveIcesnarl(player2);
-
         // Fairmount's Conviction improvement is a player decision after
         // combat, never a random recruit-end mutation. Queueing is performed
         // by Battle on each qualifying kill; expose one replayable modal now.
@@ -880,6 +1117,34 @@ void Game::Combat()
 
 void Game::GameOver()
 {
+    const auto winner = std::find_if(
+        m_gameState.players.begin(), m_gameState.players.end(),
+        [](const Player& player) { return player.playState == PlayState::WON; });
+    if (winner != m_gameState.players.end())
+    {
+        // Purified Shard (or another immediate-win reward) already assigned
+        // rank 1. Keep the first winner deterministic, and assign every other
+        // seat a distinct descending placement. This also handles a second
+        // immediate-win selection that was queued before this phase ran.
+        // Seats eliminated before the immediate win already own the lower
+        // placement numbers from ProcessDefeat; continue at the current live
+        // seat count so those ranks are not duplicated.
+        int nextRank = m_gameState.numRemainPlayer;
+        winner->rank = 1;
+        for (auto& player : m_gameState.players)
+        {
+            if (&player != &*winner &&
+                (player.playState == PlayState::PLAYING ||
+                 player.playState == PlayState::WON))
+            {
+                player.playState = PlayState::LOST;
+                player.rank = nextRank--;
+            }
+        }
+        m_gameState.numRemainPlayer = 1;
+        m_gameState.phase = Phase::COMPLETE;
+        return;
+    }
     for (auto& player : m_gameState.players)
     {
         if (player.playState == PlayState::PLAYING)

@@ -8,6 +8,7 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftDoubleAttackTask.hpp>
 
 #include <array>
 #include <map>
@@ -62,6 +63,34 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - verified Patch 36.4 batch")
     CHECK(defensive.effect == DarkGiftEffect::DEATHRATTLE_STATS);
     CHECK(defensive.attack == 0);
     CHECK(defensive.health == 10);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Elixir of Vim doubles attack on Rally")
+{
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t6e2");
+    REQUIRE(behavior.effect == DarkGiftEffect::RALLY_DOUBLE_ATTACK);
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    Minion target(base);
+    target.SetAttack(7);
+    Player player;
+    SimpleTasks::DarkGiftDoubleAttackTask task;
+    CHECK(task.Run(player, target) == TaskStatus::COMPLETE);
+    CHECK(target.GetAttack() == 14);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Elixir of Vim is attached as a Rally task")
+{
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t6e2");
+    REQUIRE(behavior.effect == DarkGiftEffect::RALLY_DOUBLE_ATTACK);
+    Minion target(Cards::FindCardByID("BGS_039"));
+    target.SetAttack(5);
+    REQUIRE(ApplyDarkGift(target, behavior));
+    Player player;
+    Minion attacker(Cards::FindCardByID("BGS_039"));
+    attacker.SetAttack(5);
+    target.ActivateRally(player, attacker, target);
+    CHECK(target.GetAttack() == 10);
 }
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")

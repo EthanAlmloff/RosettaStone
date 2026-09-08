@@ -14,7 +14,10 @@ TaskStatus RandomElementalHandAndSummonTask::Run(Player& p, Minion&) {
     if (card.isBattlegroundsPoolMinion && card.hasBehavior && card.normalDbfID == 0 &&
         card.GetCardType() == CardType::MINION && card.HasRace(Race::ELEMENTAL)) pool.push_back(&card);
   if (pool.empty()) return TaskStatus::STOP;
-  for (int i = 0; i < m_amount && !p.hand.IsFull(); ++i) {
+  // Each roll has two independent effects: add the chosen Elemental to hand
+  // when there is room, and summon its combat copy.  A full hand must not
+  // suppress the summon (nor truncate later rolls for a golden source).
+  for (int i = 0; i < m_amount; ++i) {
     const auto& card = *pool[Random::get<std::size_t>(0, pool.size() - 1)];
     // Hand and combat summon are distinct instances.  Never let a full hand
     // suppress the independent summon, and give each copy a fresh identity.

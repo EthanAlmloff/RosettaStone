@@ -36,7 +36,7 @@ ZoneType Playable::GetZoneType() const
 
 void Playable::SetZoneType(ZoneType type)
 {
-    SetGameTag(GameTag::ZONE, std::to_underlying(type));
+    SetGameTag(GameTag::ZONE, static_cast<int>(type));
 }
 
 int Playable::GetZonePosition() const

@@ -56,12 +56,6 @@ inline std::array<Card, EXPECTED_POWER_COUNT> BuildMetadataRegistry(
         {
             continue;
         }
-        if (card.hasBehavior)
-        {
-            throw std::logic_error(
-                "metadata-only hero power unexpectedly has behavior: " +
-                card.id);
-        }
         if (power_index == result.size())
         {
             throw std::length_error("hero-power metadata registry overflow");

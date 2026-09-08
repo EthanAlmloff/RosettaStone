@@ -18,14 +18,9 @@ TargetingPredicate TargetingPredicates::ReqMurlocTarget()
 
 TargetingPredicate TargetingPredicates::ReqTargetWithRace(Race race)
 {
-    switch (race)
-    {
-        case Race::MURLOC:
-            return ReqMurlocTarget();
-        default:
-            throw std::invalid_argument(
-                "TargetingPredicates::ReqTargetWithRace() - "
-                "Race is not implemented!");
-    }
+    // The predicate is a generic metadata restriction.  Keeping the
+    // implementation generic avoids making startup depend on whether a
+    // particular card's tribe has a bespoke targeting helper.
+    return [race](Minion& minion) { return minion.HasRace(race); };
 }
 }  // namespace RosettaStone::Battlegrounds

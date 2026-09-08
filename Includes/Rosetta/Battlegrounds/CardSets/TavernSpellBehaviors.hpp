@@ -44,9 +44,14 @@ enum class TavernSpellEffect
     TARGET_DIVINE_SHIELD,
     TARGET_STATS_TOGGLE_TAUNT,
     SET_PLAYER_ARMOR,
+    GAIN_GOLD,
     NEXT_TURN_GOLD,
     NEXT_COMBAT_REWARD,
     TARGET_NEXT_COMBAT_BUFF,
+    TARGET_STATS_NEXT_TURN,
+    TAVERN_SPELL_STATS_PERMANENT,
+    RANDOM_STAT_TAVERN_SPELL,
+    TARGET_RANDOM_RACE_KEYWORD,
     COMBAT_START_LEFTMOST_ATTACK_DOUBLE,
     COMBAT_START_LEFTMOST_NEAREST_STATS,
     COMBAT_START_RANDOM_ENEMY_SET_HEALTH,
@@ -60,11 +65,15 @@ enum class TavernSpellEffect
     TARGET_SHARED_RACE_STATS,
     TARGET_RACE_SHOP_STATS_PERSISTENT,
     TARGET_GOLDEN,
+    TARGET_GOLDEN_TEMPORARY,
     RANDOM_SHOP_GOLDEN,
     RANDOM_MINION_TO_HAND,
     RANDOM_NAGA_MINION_TO_HAND,
     RANDOM_COMMON_RACE_MINION_TO_HAND,
     STEAL_RANDOM_SHOP_MINION,
+    STEAL_RANDOM_SHOP_RACE,
+    TARGET_DIVINE_SHIELD_AND_WINDFURY,
+    DESTROY_UNDEAD_RANDOM_TO_HAND,
     RANDOM_SHOP_STATS_ON_REFRESH,
     SELL_TARGET_GIVE_RANDOM_STATS,
     TARGET_CONSUME_SHOP_STATS,
@@ -76,6 +85,10 @@ enum class TavernSpellEffect
     DISCOVER_DIFFERENT_RACE,
     RANDOM_MINION_AND_COPY,
     TARGET_SHOP_COPY,
+    TARGET_SHOP_COPY_TIER,
+    TARGET_SHOP_MOVE_NON_GOLDEN,
+    TARGET_DOUBLE_STATS_HAND_LOCK,
+    TARGET_TRIGGER_DEATHRATTLE,
     FIXED_CARDS,
     BLOOD_GEM_TRANSFER,
     RANDOM_SPELLCRAFT,
@@ -85,6 +98,9 @@ enum class TavernSpellEffect
     DISCOVER_CHOOSE_ONE_COMBINED,
     DISCOVER_UNDEAD_DIES_THIS_TURN,
     REFRESH_TAVERN_SPELLS,
+    BLOOD_GEM_CHOOSE_ONE,
+    REFRESH_BATTLECRY_ONE_COST,
+    DISCOVER_TIER_DARKMOON_PRIZE,
 };
 
 struct TavernSpellBehavior
@@ -143,6 +159,19 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     if (id == "BG23_008_Gt") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP };
     if (id == "BG31_830t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
     if (id == "BG31_830_Gt") return { 0, 4, 4, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
+    // Spellcraft tokens from the pinned Season 14 trinket pool.
+    if (id == "BG35_MagicItem_872t") // Ophidian Staff: Beast +2/+2 and Reborn.
+        return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::BEAST };
+    if (id == "BG30_MagicItem_714t")
+        return { 0, 30, 30, TavernSpellEffect::TARGET_STATS_NEXT_TURN };
+    if (id == "BG32_835t")
+        return { 0, 1, 1, TavernSpellEffect::TAVERN_SPELL_STATS_PERMANENT };
+    if (id == "BG32_835_Gt")
+        return { 0, 2, 2, TavernSpellEffect::TAVERN_SPELL_STATS_PERMANENT };
+    if (id == "BG_EX1_014t") return { 0, 1, 1, TavernSpellEffect::TARGET_STATS };
+    if (id == "BG33_Reward_006t") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_AND_WINDFURY };
+    if (id == "BG33_Reward_012t") return { 0, 0, 0, TavernSpellEffect::GAIN_GOLD,
+                                               Race::INVALID, 0, 5 };
     if (id == "BG31_924t") return { 0, 1, 1, TavernSpellEffect::TARGET_STATS };
     if (id == "BG31_924_Gt") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS };
     if (id == "BG26_501t") return { 0, 0, 0, TavernSpellEffect::TARGET_STATS };
@@ -348,6 +377,14 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     {
         return { 0, 0, 0, TavernSpellEffect::TARGET_GOLDEN };
     }
+    if (id == "BG24_Reward_719t") // Golden Hammer: Golden until next turn.
+    {
+        return { 0, 0, 0, TavernSpellEffect::TARGET_GOLDEN_TEMPORARY };
+    }
+    if (id == "BG25_044t") // Gold-Gun: eligible Pirate/Naga, until next turn.
+    {
+        return { 0, 0, 0, TavernSpellEffect::TARGET_GOLDEN_TEMPORARY };
+    }
     if (id == "BG28_830") // Golden Touch: random Tavern minion Golden.
     {
         return { 0, 0, 0, TavernSpellEffect::RANDOM_SHOP_GOLDEN };
@@ -387,8 +424,16 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 0, 0, 0, TavernSpellEffect::DISCOVER_UNDEAD_DIES_THIS_TURN };
     if (id == "BG28_849") // Saloon's Finest: refresh the Tavern with Tavern spells.
         return { 0, 0, 0, TavernSpellEffect::REFRESH_TAVERN_SPELLS };
+    if (id == "BG31_893") // Gem Day: permanently improve every Blood Gem.
+        return { 0, 0, 0, TavernSpellEffect::BLOOD_GEM_CHOOSE_ONE };
+    if (id == "BG35_MagicItem_755t") // Chillmere Mosaic: Battlecries, cost 1.
+        return { 0, 0, 0, TavernSpellEffect::REFRESH_BATTLECRY_ONE_COST };
+    if (id == "BG35_MagicItem_812t") // Triple Prize: discover a Tier 3 prize.
+        return { 0, 0, 0, TavernSpellEffect::DISCOVER_TIER_DARKMOON_PRIZE };
     if (id == "EBG_Spell_037") // Unmasked Identity: Discover a new Hero Power.
         return { 0, 0, 0, TavernSpellEffect::DISCOVER_HERO_POWER };
+    if (id == "BG27_Reward_504t") // Accelerator: transform to one Tier higher.
+        return { 0, 0, 0, TavernSpellEffect::TRANSFORM_HIGHER_TIER };
     if (id == "BG30_804") // Robust Evolution: random higher-Tier transform.
         return { 0, 0, 0, TavernSpellEffect::TRANSFORM_HIGHER_TIER };
     if (id == "BG28_518") // Chef's Choice: a different minion of its type.
@@ -419,6 +464,36 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     if (id == "BG27_514t_G")
         return { 0, 0, 0, TavernSpellEffect::TARGET_SHOP_COPY,
                  Race::INVALID, 0, 2 };
+    if (id == "BG35_MagicItem_817t") // Duplicating Lens: plain copy of a Tier 3-or-below shop minion.
+        return { 0, 0, 0, TavernSpellEffect::TARGET_SHOP_COPY_TIER,
+                 Race::INVALID, 0, 1 };
+    if (id == "BG24_Reward_718t")
+        return { 0, 0, 0, TavernSpellEffect::TARGET_SHOP_MOVE_NON_GOLDEN };
+    if (id == "BG35_MagicItem_838t")
+        return { 0, 0, 0, TavernSpellEffect::TARGET_DOUBLE_STATS_HAND_LOCK };
+    if (id == "BG36_MagicItem_208t")
+        return { 0, 0, 0, TavernSpellEffect::TARGET_TRIGGER_DEATHRATTLE };
+    if (id == "BG26_813t") return { 0, 0, 0, TavernSpellEffect::TARGET_GOLDEN };
+    if (id == "BG30_MagicItem_429t")
+        return { 0, 0, 0, TavernSpellEffect::TARGET_CONSUME_SHOP_STATS,
+                 Race::INVALID, 1, 0, false };
+    if (id == "BG31_891")
+        return { 0, 0, 0, TavernSpellEffect::STEAL_RANDOM_SHOP_RACE, Race::PIRATE };
+    if (id == "BG35_MagicItem_306t")
+        return { 0, 0, 0, TavernSpellEffect::DESTROY_UNDEAD_RANDOM_TO_HAND,
+                 Race::UNDEAD, 1 };
+    if (id == "BG35_MagicItem_733t")
+        return { 0, 0, 0, TavernSpellEffect::DESTROY_UNDEAD_RANDOM_TO_HAND,
+                 Race::UNDEAD, 2 };
+    if (id == "BG33_319t")
+        return { 0, 0, 0, TavernSpellEffect::RANDOM_STAT_TAVERN_SPELL,
+                 Race::INVALID, 1 };
+    if (id == "BG33_319_Gt")
+        return { 0, 0, 0, TavernSpellEffect::RANDOM_STAT_TAVERN_SPELL,
+                 Race::INVALID, 2 };
+    if (id == "BG32_MagicItem_892t")
+        return { 0, 0, 0, TavernSpellEffect::TARGET_RANDOM_RACE_KEYWORD,
+                 Race::MURLOC };
     if (id == "BG34_444") // Easterly Winds: future refreshes buff one minion.
     {
         return { 0, 8, 8, TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH };
@@ -449,8 +524,11 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
 inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 {
     return effect == TavernSpellEffect::TARGET_STATS ||
+           effect == TavernSpellEffect::DESTROY_UNDEAD_RANDOM_TO_HAND ||
            effect == TavernSpellEffect::DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK ||
            effect == TavernSpellEffect::TARGET_NEXT_COMBAT_BUFF ||
+           effect == TavernSpellEffect::TARGET_STATS_NEXT_TURN ||
+           effect == TavernSpellEffect::TARGET_RANDOM_RACE_KEYWORD ||
            effect == TavernSpellEffect::TARGET_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::BLOOD_GEM ||
@@ -461,14 +539,20 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::TARGET_STATS_AND_WINDFURY ||
            effect == TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP ||
            effect == TavernSpellEffect::TARGET_STATS_AND_REBORN ||
+           effect == TavernSpellEffect::TARGET_DIVINE_SHIELD_AND_WINDFURY ||
            effect == TavernSpellEffect::TARGET_STATS_AND_STEALTH ||
            effect == TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY ||
            effect == TavernSpellEffect::TARGET_SHOP_COPY ||
+           effect == TavernSpellEffect::TARGET_SHOP_COPY_TIER ||
+           effect == TavernSpellEffect::TARGET_SHOP_MOVE_NON_GOLDEN ||
+           effect == TavernSpellEffect::TARGET_DOUBLE_STATS_HAND_LOCK ||
+           effect == TavernSpellEffect::TARGET_TRIGGER_DEATHRATTLE ||
            effect == TavernSpellEffect::TARGET_DIVINE_SHIELD ||
            effect == TavernSpellEffect::TARGET_STATS_TOGGLE_TAUNT ||
            effect == TavernSpellEffect::TARGET_SHARED_RACE_STATS ||
            effect == TavernSpellEffect::TARGET_RACE_SHOP_STATS_PERSISTENT ||
            effect == TavernSpellEffect::TARGET_GOLDEN ||
+           effect == TavernSpellEffect::TARGET_GOLDEN_TEMPORARY ||
            effect == TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS ||
            effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS ||
            effect == TavernSpellEffect::SELL_TARGET_GIVE_LEFTMOST_RACE_STATS ||
@@ -479,6 +563,16 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 
 }
 
+//! Returns whether a target-required Tavern spell points at a Tavern slot
+//! rather than a friendly recruit-board minion.  This distinction is part of
+//! the public modal contract used by automatic random-spell effects.
+inline bool TavernSpellTargetsShop(TavernSpellEffect effect) noexcept
+{
+    return effect == TavernSpellEffect::TARGET_SHOP_COPY ||
+           effect == TavernSpellEffect::TARGET_SHOP_COPY_TIER ||
+           effect == TavernSpellEffect::TARGET_SHOP_MOVE_NON_GOLDEN;
+}
+
 //! Returns whether a target satisfies additional spell-specific constraints.
 //! Generic friendly-minion legality is checked by Player; this helper keeps
 //! the low-level Tier 4 cap for Eyes of the Earth Mother declarative and
@@ -486,7 +580,8 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 inline bool TavernSpellTargetIsLegal(TavernSpellEffect effect, int tier,
                                      bool golden) noexcept
 {
-    if (effect == TavernSpellEffect::TARGET_GOLDEN)
+    if (effect == TavernSpellEffect::TARGET_GOLDEN ||
+        effect == TavernSpellEffect::TARGET_GOLDEN_TEMPORARY)
     {
         return !golden && tier >= 1 && tier <= 4;
     }

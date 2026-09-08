@@ -43,6 +43,8 @@ class Player
 
     //! Prepare a list of minions in Tavern for purchase.
     void PrepareTavern();
+    //! Called by HandZone after a card is successfully acquired.
+    void OnCardAcquired(const CardData& card);
 
     //! Replaces last turn's temporary Spellcraft cards and emits this turn's
     //! cards from the currently owned Spellcraft minions.
@@ -64,15 +66,21 @@ class Player
     //! Resolves player-owned generated rewards at recruit end / combat start.
     void ResolveGeneratedQuestRewardEndTurn();
     void ResolveGeneratedQuestRewardStartCombat(FieldZone& combatField);
+    //! Delivers rewards armed by spell-count Trinkets after a successful cast.
+    void ResolveSpellCountTrinkets();
+    void ResolveGeneratedQuestRewardTinyHenchmen();
     void ResolveGeneratedQuestRewardDeath(Minion& deadMinion);
+    void ResolveGeneratedQuestRewardCombatDeath(FieldZone& enemyField);
     void ResolveGeneratedQuestRewardSnickerSnacks();
     void ResolveGeneratedQuestRewardStartTurn();
+    void ResolveGeneratedQuestRewardAfterCombat();
     //! Relics of the Deep grants one Spellcraft at each recruit start.
     void ResolveRelicsOfTheDeepStartTurn();
     void ResolveMechGyverDeath();
     //! Arms Fodder refreshes from Woodland Defiler end-of-turn triggers.
     void ResolveFodderDefilerEndTurn();
     void ResolveEnigmaticHeadstoneEndTurn();
+    void ResolveTrinketEndTurn();
     bool AddGeneratedDiscoverCopy(const Card& card);
     //! Applies Tamuzo's combat-only summon multiplier to a newly summoned unit.
     void ApplyTamuzoCombatSummon(Minion& summoned);
@@ -149,8 +157,12 @@ class Player
     //! Adds a card-definition copy of a friendly board minion to hand.
     //! Dynamic instance state is intentionally not copied.
     bool AddMinionCopyToHand(const Minion& source);
+    //! Adds a plain copy of one uniformly selected living recruit minion.
+    bool AddRandomFriendlyMinionCopyToHand();
+    bool AddHighestLastOpponentMinionCopyToHand();
     //! Begins Void Power's one-time Tier-5 Discover when its unlock fires.
     bool BeginVoidPowerDiscover();
+    bool BeginFeelDevastationDiscover();
     bool CanPurchaseTavernSlot(std::size_t idx) const;
     bool PurchaseTavernSlot(std::size_t idx);
 
@@ -192,6 +204,8 @@ class Player
     //! keeps generated effects (such as Rally) on the same aura/keyword
     //! path as a Blood Gem spell played from hand.
     void ApplyBloodGemTo(Minion& target);
+    //! Notify persistent trinkets that a card was discarded.
+    void OnCardDiscarded();
 
     //! Creates up to `count` canonical Tavern Coin spells in hand.
     int AddTavernCoins(int count);
@@ -221,11 +235,30 @@ class Player
     bool BeginISpyDiscover();
     //! Adds the next opponent's public hero-linked Buddy at recruit start.
     int ResolveWardenBuddy();
+    //! Adds plain copies of the Buddy observed on the most recent opponent.
+    int ResolveHunterOfOldBuddy();
+    //! Adds plain minions from the currently lowest-health opponent's public
+    //! warband at recruit start.
+    int ResolveLilKTMinions();
+    //! Resolve Maxwell's Battlecry copies using the active hero linkage.
+    int ResolveMaxwellBuddyCopies(int copies = 1);
+    //! Starts Ticket Collector's Darkmoon Prize Battlecry Discover.
+    //! Golden copies queue two sequential choices so each selection is
+    //! committed through the ordinary modal/replay path.
+    bool BeginTicketCollectorDiscover(bool golden = false);
+    //! Begin Clockwork Assistant's next-tier minion Discover.
+    bool BeginClockworkAssistantDiscover(bool golden = false);
+    //! Resolve Sparkfin Soothsayer's Tavern-to-Murloc Battlecry.
+    bool ResolveSparkfinSoothsayer(bool golden = false);
+    //! Resolve Loyal Henchman's second-kill plain-copy trigger.
+    void ResolveLoyalHenchmanKill(const Minion& killed);
     //! Begin Power of the Storm's two-option hero-power choice.
     bool BeginPowerOfStormChoice();
     //! Begin a seeded Discover offering of supported Tavern spells.
     bool BeginTavernSpellDiscover(int amount, std::uint64_t sourceEntityID,
-                                  std::int32_t sourceCardDbfID);
+                                   std::int32_t sourceCardDbfID);
+    bool BeginTavernSpellDiscoverReplay(std::int32_t sourceSpellDbfID,
+                                        std::uint64_t targetEntityID);
     bool ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx);
     //! Resolves a pending Tavern-spell modal without re-paying the spell.
     bool ApplySpellChoice(std::size_t offeringIdx);
@@ -233,7 +266,8 @@ class Player
     //! Resolves persistent Trinket effects after any successful Tavern spell,
     //! including modal/Choose-One completion paths.
     void ApplyTavernSpellTrinkets();
-    void ApplyAfterPlayCardTrinkets(Race playedRace = Race::INVALID);
+    void ApplyAfterPlayCardTrinkets(Race playedRace = Race::INVALID,
+                                    bool magnetic = false);
     void ApplyAfterRebornTrinkets();
     void ApplyStartCombatTrinkets();
     void ResolveStartTurnTrinkets();
@@ -266,6 +300,7 @@ class Player
 
     //! Upgrades your Tavern to the next tier.
     void UpgradeTavern();
+    void UpgradeTavernForGeneratedReward();
 
     //! Refreshes a list of minions in Tavern's field.
     //! \p freeRefresh is used by a hero power whose activation already paid
@@ -317,6 +352,8 @@ class Player
     //! Commits a supported damaging hero-power activation and dispatches the
     //! actual damage exactly once. Generic card damage must not use this.
     bool ResolveDamagingHeroPower(int actualDamage);
+    //! Resolves Buddy effects that listen for a successful Hero Power use.
+    void ResolveHeroPowerUseBuddies();
 
     PlayState playState = PlayState::INVALID;
     std::size_t idx = 0;
@@ -352,19 +389,30 @@ class Player
     //! Lifetime Ancestral Automatons summoned by this player, including
     //! entities that subsequently died or moved to another zone.
     int ancestralAutomatonsSummonedThisGame = 0;
+    //! Recruit-turn counter for Akali, Rock Rhino's end-turn hand copy.
+    int akaliBuddyTurns = 0;
 
     std::function<void(Player&)> selectHeroCallback;
     std::function<void(Player&)> prepareTavernMinionsCallback;
     std::function<void(Player&, std::size_t)> purchaseMinionCallback;
     std::function<bool(Player&, int)> addRandomTavernMinionCallback;
+    //! Adds one available minion of a requested race through the authoritative
+    //! pool, preserving pool ownership and Tavern capacity.
+    std::function<bool(Player&, int, Race)> addRandomRaceTavernMinionCallback;
     std::function<bool(Player&, int)> addRandomMinionToHandCallback;
     std::function<int()> getNextCardIndexCallback;
     std::function<void(int)> returnMinionCallback;
+    //! Atomically replaces one unfrozen Tavern slot with an available
+    //! minion of the requested race, preserving pool ownership and slot
+    //! count. Used by race-adding generated rewards such as Totemic Tavern.
+    std::function<bool(Player&, Tavern&, std::size_t, Race)>
+        replaceTavernMinionWithRaceCallback;
     int darkcrestImprovement = 0;
     std::function<void(Player&)> clearTavernMinionsCallback;
     std::function<void(Player&)> upgradeTavernCallback;
     std::function<void()> completeRecruitCallback;
     std::function<Player&(Player&)> getOpponentPlayerCallback;
+    std::function<Player&(Player&)> getLowestHealthOpponentPlayerCallback;
     std::function<Battle&()> getBattleCallback;
     std::function<void(Player&)> processDefeatCallback;
 

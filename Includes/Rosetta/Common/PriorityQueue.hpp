@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <map>
-#include <ranges>
 #include <stdexcept>
 #include <utility>
 
@@ -64,7 +63,9 @@ class PriorityQueue
     //! \return true if the the value of the element exists, false otherwise.
     bool IsExist(const T& value) const
     {
-        return std::ranges::contains(m_elements | std::views::values, value);
+        return std::any_of(m_elements.begin(), m_elements.end(), [&value](const auto& entry) {
+            return entry.second == value;
+        });
     }
 
     //! Checks if the underlying container has no elements.

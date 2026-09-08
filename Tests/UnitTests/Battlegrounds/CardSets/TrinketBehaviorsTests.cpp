@@ -61,6 +61,67 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - recurring portrait acquisitions"
     CHECK(FindTrinketBehavior("BG30_MagicItem_987").cardID == "BG26_814");
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - fixed supported portrait batch")
+{
+    const std::pair<const char*, const char*> expected[] = {
+        {"BG30_MagicItem_431", "BG28_707"},
+        {"BG30_MagicItem_432", "BG26_888"},
+        {"BG30_MagicItem_555", "BG26_175"},
+        {"BG30_MagicItem_803", "BG_BOT_606"},
+        {"BG30_MagicItem_825", "BG21_013"},
+        {"BG30_MagicItem_828", "BG26_505"},
+        {"BG30_MagicItem_869", "BG29_873"},
+        {"BG30_MagicItem_971", "BGS_009"},
+        {"BG32_MagicItem_274", "BG26_157"},
+        {"BG32_MagicItem_301", "BG26_350"},
+        {"BG32_MagicItem_804", "BG_OG_221"},
+        {"BG35_MagicItem_741", "BG26_149"},
+        {"BG35_MagicItem_742", "BG26_147"},
+        {"BG35_MagicItem_924", "BG31_035"},
+    };
+    for (const auto& [id, card] : expected) {
+        const auto behavior = FindTrinketBehavior(id);
+        CHECK(behavior.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+        CHECK(behavior.cardID == card);
+        CHECK(behavior.amount == 1);
+    }
+    const auto sellemental = FindTrinketBehavior("BG32_MagicItem_831");
+    CHECK(sellemental.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+    CHECK(sellemental.cardID == "BGS_115");
+    CHECK(sellemental.repeatAtStartTurn);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - portrait extras are explicit")
+{
+    const auto unsupported[] = {
+        std::pair{"BG30_MagicItem_431", PortraitEffect::LIVING_AZERITE_ELEMENTAL_STATS},
+        std::pair{"BG30_MagicItem_432", PortraitEffect::BELCHER_VENOMOUS_LOSS_STATS},
+        std::pair{"BG30_MagicItem_555", PortraitEffect::SURPRISE_MORE_ELEMENTALS},
+        std::pair{"BG30_MagicItem_803", PortraitEffect::KABOOM_BOT_DEATHRATTLE_DAMAGE},
+        std::pair{"BG30_MagicItem_825", PortraitEffect::WHELP_SMUGGLER_STATS_AND_DRAGON},
+        std::pair{"BG30_MagicItem_828", PortraitEffect::ZESTY_SHAKER_EXTRA_COPY},
+        std::pair{"BG30_MagicItem_869", PortraitEffect::FELBLOOD_BOTH_STATS},
+        std::pair{"BG30_MagicItem_971", PortraitEffect::LIGHTFANG_ALL_TYPES},
+        std::pair{"BG32_MagicItem_274", PortraitEffect::BRISTLEBACH_ALL_MINIONS},
+        std::pair{"BG32_MagicItem_301", PortraitEffect::BASSGILL_SUMMON_DIVINE_SHIELD},
+        std::pair{"BG32_MagicItem_804", PortraitEffect::SELFLESS_BATTLECRY},
+        std::pair{"BG35_MagicItem_924", PortraitEffect::GROUNDBREAKER_ADJACENT_STATS},
+    };
+    for (const auto& [id, effect] : unsupported)
+    {
+        const auto behavior = FindTrinketBehavior(id);
+        CHECK(behavior.portraitEffect == effect);
+        CHECK_FALSE(behavior.portraitExecutable);
+    }
+    for (const auto* id : {"BG32_MagicItem_831", "BG35_MagicItem_741",
+                           "BG35_MagicItem_742"})
+    {
+        const auto behavior = FindTrinketBehavior(id);
+        CHECK(behavior.portraitEffect == PortraitEffect::NONE);
+        CHECK(behavior.portraitExecutable);
+    }
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - tavern spell stat aura family")
 {
     for (const auto* id : {"BG32_MagicItem_700", "BG32_MagicItem_801",
@@ -68,12 +129,154 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - tavern spell stat aura family")
         CHECK(FindTrinketBehavior(id).effect == TrinketEffect::TAVERN_SPELL_STATS);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Season 14 counter and event batch")
+{
+    const auto pipe = FindTrinketBehavior("BG32_MagicItem_281");
+    CHECK(pipe.effect == TrinketEffect::TAVERN_SPELL_NO_TYPE_STATS);
+    CHECK(pipe.attack == 4);
+    CHECK(pipe.health == 4);
+
+    CHECK(FindTrinketBehavior("BG32_MagicItem_279").effect ==
+          TrinketEffect::BLOOD_GEM_DIVINE_SHIELD);
+
+    const auto scale = FindTrinketBehavior("BG32_MagicItem_363");
+    CHECK(scale.effect == TrinketEffect::ATTACKING_DRAGON_DIVINE_SHIELD);
+    CHECK(scale.value == 3);
+
+    const auto kibble = FindTrinketBehavior("BG32_MagicItem_200");
+    CHECK(kibble.effect == TrinketEffect::ATTACKING_BEAST_SCALING);
+    CHECK(kibble.attack == 2);
+
+    const auto aggem = FindTrinketBehavior("BG32_MagicItem_284");
+    CHECK(aggem.effect == TrinketEffect::END_TURN_BLOOD_GEMS_PER_TYPE);
+    CHECK(aggem.attack == 7);
+
+    const auto stinger = FindTrinketBehavior("BG32_MagicItem_111");
+    CHECK(stinger.effect == TrinketEffect::END_TURN_MURLOC_STATS);
+    CHECK(stinger.attack == 8);
+    CHECK(stinger.health == 8);
+
+    const auto wrench = FindTrinketBehavior("BG32_MagicItem_170");
+    CHECK(wrench.effect == TrinketEffect::AFTER_MAGNETIC_MECH_REPAIR);
+    CHECK(wrench.attack == 4);
+    CHECK(wrench.health == 8);
+    CHECK(FindTrinketBehavior("BG32_MagicItem_364").cardID ==
+          "BG34_Giant_314");
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Vashjir Anemone spell scaling")
+{
+    const auto anemone = FindTrinketBehavior("BG32_MagicItem_932");
+    CHECK(anemone.effect == TrinketEffect::START_COMBAT_NAGA_HEALTH);
+    CHECK(anemone.health == 1);
+    CHECK(anemone.value == 4);
+    CHECK(anemone.race == Race::NAGA);
+}
+
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - trigger effects fail closed")
 {
     for (const auto* id : {"BG30_MagicItem_541", "BG30_MagicItem_879",
-                           "BG30_MagicItem_879t", "BG30_MagicItem_423",
-                           "BG30_MagicItem_420"})
+                           "BG30_MagicItem_879t", "BG30_MagicItem_423"})
         CHECK(FindTrinketBehavior(id).effect == TrinketEffect::NONE);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Cathedral, Supply, Beads and follow-up trinkets")
+{
+    CHECK(FindTrinketBehavior("BG30_MagicItem_434").effect ==
+          TrinketEffect::FIRST_SPELL_REPEAT);
+    const auto supply = FindTrinketBehavior("BG30_MagicItem_435");
+    CHECK(supply.effect == TrinketEffect::END_TURN_FIXED_CARD);
+    CHECK(supply.value == 3);
+    CHECK(supply.amount == 1);
+    CHECK(supply.cardID == "BG26_813t");
+    const auto beads = FindTrinketBehavior("BG30_MagicItem_982");
+    CHECK(beads.effect == TrinketEffect::AFTER_BUY_BATTLECRY_MINION);
+    CHECK(beads.value == 2);
+    CHECK(beads.amount == 1);
+    CHECK(beads.battlecryOnly);
+
+    CHECK(FindTrinketBehavior("BG30_MagicItem_821t2").effect ==
+          TrinketEffect::START_COMBAT_GOLDEN_FISH);
+    const auto surveyor = FindTrinketBehavior("BG30_MagicItem_943");
+    CHECK(surveyor.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+    CHECK(surveyor.cardID == "BG30_121");
+    const auto brew = FindTrinketBehavior("BG30_MagicItem_924");
+    CHECK(brew.effect == TrinketEffect::SPEND_GOLD_PIRATE_STATS);
+    CHECK(brew.attack == 3);
+    CHECK(brew.health == 3);
+    const auto goldenBrew = FindTrinketBehavior("BG30_MagicItem_924t");
+    CHECK(goldenBrew.attack == 6);
+    CHECK(goldenBrew.health == 6);
+
+    const auto sushi = FindTrinketBehavior("BG30_MagicItem_920");
+    CHECK(sushi.effect == TrinketEffect::SPELLCRAFT_REPEAT);
+    CHECK(sushi.value == 2);
+    const auto eye = FindTrinketBehavior("BG30_MagicItem_981");
+    CHECK(eye.effect == TrinketEffect::AFTER_FRIENDLY_NO_TYPE_DEATH_RANDOM_SPELL);
+    const auto mushroom = FindTrinketBehavior("BG32_MagicItem_700");
+    CHECK(mushroom.effect == TrinketEffect::TAVERN_SPELL_GROWING_STATS);
+    CHECK(mushroom.attack == 1);
+    CHECK(mushroom.health == 1);
+    const auto honeycomb = FindTrinketBehavior("BG36_MagicItem_371");
+    CHECK(honeycomb.effect ==
+          TrinketEffect::TAVERN_SPELL_IMPROVE_AFTER_MINION_CAST);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Book of Medivh cadence")
+{
+    const auto book = FindTrinketBehavior("BG30_MagicItem_420");
+    CHECK(book.effect == TrinketEffect::BOOK_OF_MEDIVH_DISCOVER);
+    CHECK(book.value == 1);
+    const auto golden = FindTrinketBehavior("BG30_MagicItem_420t");
+    CHECK(golden.effect == TrinketEffect::BOOK_OF_MEDIVH_DISCOVER);
+    CHECK(golden.value == 2);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Globe and Dishware lifecycle")
+{
+    const auto globe = FindTrinketBehavior("BG30_MagicItem_425");
+    CHECK(globe.effect == TrinketEffect::AZEROTH_MODEL_GLOBE);
+    CHECK(globe.value == 2);
+    CHECK(globe.tier == 6);
+    CHECK(globe.amount == 2);
+    CHECK(FindTrinketBehavior("BG30_MagicItem_419").effect ==
+          TrinketEffect::END_TURN_RANDOM_TYPE_MINIONS);
+    CHECK(FindTrinketBehavior("BG30_MagicItem_425").amount == 2);
+    CHECK(FindTrinketBehavior("BG30_MagicItem_419").tier == 0);
+    const auto compass = FindTrinketBehavior("BG30_MagicItem_426");
+    CHECK(compass.effect == TrinketEffect::ACQUIRE_RANDOM_MINIONS);
+    CHECK(compass.repeatAtStartTurn);
+    CHECK(compass.amount == 1);
+    const auto goldenCompass = FindTrinketBehavior("BG30_MagicItem_426t");
+    CHECK(goldenCompass.effect == TrinketEffect::ACQUIRE_RANDOM_MINIONS);
+    CHECK(goldenCompass.repeatAtStartTurn);
+    CHECK(goldenCompass.amount == 2);
+    const auto pendant = FindTrinketBehavior("BG30_MagicItem_706");
+    CHECK(pendant.effect == TrinketEffect::ACQUIRE_RANDOM_FRIENDLY_COPY);
+    CHECK(pendant.repeatAtStartTurn);
+    const auto essence = FindTrinketBehavior("BG30_MagicItem_916");
+    CHECK(essence.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+    CHECK(essence.cardID == "BG28_883");
+    CHECK(essence.amount == 2);
+    CHECK(essence.startTurnAmount == 1);
+    CHECK(essence.repeatAtStartTurn);
+    const auto sticker = FindTrinketBehavior("BG30_MagicItem_942");
+    CHECK(sticker.effect == TrinketEffect::ACQUIRE_RANDOM_MINIONS);
+    CHECK(sticker.race == Race::DEMON);
+    CHECK(sticker.amount == 2);
+    CHECK(sticker.magneticOnly);
+    const auto claw = FindTrinketBehavior("BG30_MagicItem_930");
+    CHECK(claw.effect == TrinketEffect::ACQUIRE_LAST_OPPONENT_COPY);
+    CHECK(claw.repeatAtStartTurn);
+    const auto glowscale = FindTrinketBehavior("BG30_MagicItem_548");
+    CHECK(glowscale.effect == TrinketEffect::ACQUIRE_FIXED_GLOWSCALE);
+    CHECK(glowscale.cardID == "BG34_Giant_035");
+    CHECK(glowscale.amount == 1);
+    const auto lionfish = FindTrinketBehavior("BG36_MagicItem_201");
+    CHECK(lionfish.effect == TrinketEffect::ACQUIRE_FIXED_LIONFISH);
+    CHECK(lionfish.cardID == "BG36_201");
+    CHECK(lionfish.amount == 1);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - refresh and self damage progress")
@@ -296,6 +499,83 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Lightfeather Sticker")
           TrinketEffect::START_COMBAT_RALLY_SHIELDS);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - combat and end-turn trinket batch")
+{
+    const auto scale = FindTrinketBehavior("BG32_MagicItem_363");
+    CHECK(scale.effect == TrinketEffect::ATTACKING_DRAGON_DIVINE_SHIELD);
+    CHECK(scale.value == 3);
+    CHECK(FindTrinketBehavior("BG36_MagicItem_361").effect ==
+          TrinketEffect::START_COMBAT_NAGA_DOUBLE_STATS);
+    const auto mallet = FindTrinketBehavior("BG36_MagicItem_302");
+    CHECK(mallet.effect == TrinketEffect::END_TURN_MINION_STATS);
+    CHECK(mallet.attack == 2);
+    CHECK(mallet.health == 1);
+    const auto goldenMallet = FindTrinketBehavior("BG36_MagicItem_302t");
+    CHECK(goldenMallet.attack == 4);
+    CHECK(goldenMallet.health == 2);
+    const auto ring = FindTrinketBehavior("BG36_MagicItem_371");
+    CHECK(ring.effect == TrinketEffect::TAVERN_SPELL_STATS);
+    CHECK(ring.attack == 1);
+    CHECK(ring.health == 1);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Season 14 generic trigger batch")
+{
+    const auto rally = FindTrinketBehavior("BG36_MagicItem_200");
+    CHECK(rally.effect == TrinketEffect::RALLY_ATTACK_FREE_REFRESH);
+    const auto skull = FindTrinketBehavior("BG36_MagicItem_203");
+    CHECK(skull.effect == TrinketEffect::BATTLECRY_EDGE_STATS);
+    CHECK(skull.attack == 5);
+    CHECK(skull.health == 5);
+    CHECK(FindTrinketBehavior("BG36_MagicItem_212").effect ==
+          TrinketEffect::END_TURN_LEFT_DEATHRATTLES);
+    CHECK(FindTrinketBehavior("BG36_MagicItem_214").effect ==
+          TrinketEffect::END_TURN_RALLY_TRIGGERS);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Scraper Sticker random magnetic mech cadence")
+{
+    const auto scraper = FindTrinketBehavior("BG35_MagicItem_301");
+    CHECK(scraper.effect == TrinketEffect::ACQUIRE_RANDOM_MINIONS);
+    CHECK(scraper.race == Race::MECHANICAL);
+    CHECK(scraper.amount == 1);
+    CHECK(scraper.repeatAtStartTurn);
+    CHECK(scraper.magneticOnly);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - sell and death random-minion thresholds")
+{
+    const auto check = [](std::string_view id, TrinketEffect effect,
+                          Race race, int threshold) {
+        const auto behavior = FindTrinketBehavior(id);
+        CHECK(behavior.effect == effect);
+        CHECK(behavior.race == race);
+        CHECK(behavior.value == threshold);
+    };
+    check("BG30_MagicItem_710", TrinketEffect::AFTER_SELL_RANDOM_MINION,
+          Race::MURLOC, 5);
+    check("BG30_MagicItem_951", TrinketEffect::AFTER_SELL_RANDOM_MINION,
+          Race::ELEMENTAL, 6);
+    check("BG30_MagicItem_713", TrinketEffect::AFTER_FRIENDLY_DEATH_RANDOM_MINION,
+          Race::UNDEAD, 8);
+    check("BG30_MagicItem_931", TrinketEffect::AFTER_FRIENDLY_DEATH_RANDOM_MINION,
+          Race::BEAST, 7);
+    check("BG35_MagicItem_302", TrinketEffect::AFTER_FRIENDLY_DEATH_RANDOM_MINION,
+          Race::MECHANICAL, 8);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - spell-count trinkets")
+{
+    const auto scroll = FindTrinketBehavior("BG32_MagicItem_930");
+    CHECK(scroll.effect == TrinketEffect::SPELL_COUNT_RANDOM_NAGA);
+    CHECK(scroll.race == Race::NAGA);
+    CHECK(scroll.value == 7);
+    const auto wand = FindTrinketBehavior("BG36_MagicItem_307");
+    CHECK(wand.effect == TrinketEffect::SPELL_COUNT_GOLD_ON_MINION);
+    CHECK(wand.value == 3);
+    CHECK(wand.amount == 1);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Quilligraphy Set")
 {
     CHECK(FindTrinketBehavior("BG30_MagicItem_410").effect == TrinketEffect::AVENGE_BLOOD_GEM_BONUS);
@@ -333,7 +613,9 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Jar o' Gems")
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Vash'jir Anemone spell scaling")
 {
     const auto anemone = FindTrinketBehavior("BG32_MagicItem_932");
-    CHECK(anemone.effect == TrinketEffect::NONE);
+    CHECK(anemone.effect == TrinketEffect::START_COMBAT_NAGA_HEALTH);
+    CHECK(anemone.health == 1);
+    CHECK(anemone.value == 4);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - fodder and sold-minion Tavern auras")
@@ -478,10 +760,14 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - registrations")
 {
     std::map<std::string, CardDef> cards;
     TrinketBehaviors::AddAll(cards);
-    CHECK(cards.size() == 93);
+    CHECK(cards.size() == 118);
     CHECK(cards.contains("BG30_MagicItem_996"));
     CHECK(cards.contains("BG30_MagicItem_841"));
     CHECK(cards.contains("BG36_MagicItem_220"));
+    CHECK(cards.contains("BG30_MagicItem_425"));
+    CHECK(cards.contains("BG30_MagicItem_419"));
+    CHECK(cards.contains("BG30_MagicItem_426"));
+    CHECK(cards.contains("BG30_MagicItem_706"));
     CHECK(cards.contains("BG30_MagicItem_541"));
     CHECK(cards.contains("BG30_MagicItem_879"));
     CHECK(cards.contains("BG30_MagicItem_879t"));

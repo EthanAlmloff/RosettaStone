@@ -10,6 +10,10 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch5.hpp>
 #include <Rosetta/Battlegrounds/CardSets/FishbaitBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch6.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch7.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch8.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch9.hpp>
+#include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch10.hpp>
 #include <Rosetta/Common/Enums/CardEnums.hpp>
 #include <Rosetta/Common/Enums/GameEnums.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
@@ -85,7 +89,8 @@ enum class Season14SpellModalKind : std::uint8_t
     TARGET_STATS,
     ALL_MINION_STATS,
     TARGET_OR_ALL_STATS,
-    DISCOVER_TIER_MINION_OR_SPELL
+    DISCOVER_TIER_MINION_OR_SPELL,
+    BLOOD_GEM_CHOOSE_ONE
 };
 struct Season14SpellModalState {
     Season14SpellModalKind kind = Season14SpellModalKind::NONE;
@@ -98,6 +103,14 @@ struct Season14SpellModalState {
     std::string offeringFilter;
     std::uint32_t legalTargetMask = 0;
     std::array<std::uint64_t, 7> legalTargetEntityIDs{};
+    // False selects a recruit-board target; true selects a Tavern-slot
+    // target.  Both use stable entity IDs so a refresh/mutation cannot make
+    // a pending Puzzle Box choice resolve against the wrong card.
+    bool targetShop = false;
+    // Number of additional resolutions armed by repeat Trinkets after the
+    // player commits this modal.  Keeping this on the modal preserves the
+    // selected stable target/branch across the asynchronous choice.
+    std::uint8_t extraResolutionCount = 0;
 };
 //! A generated Mycologist token may carry a Tavern spell.  Keep its source
 //! identity while the free cast is being resolved so a future target/modal
@@ -171,11 +184,18 @@ class Season14State
         return completed;
     }
     Season14Decision pendingDecision = Season14Decision::NONE;
+    //! Remaining Darkmoon Prize selections for Ticket Collector (0/1/2).
+    std::int32_t buddyTicketRemaining = 0;
+    //! Reliquary Attendant copy allowance consumed this recruit turn.
+    std::int32_t buddyReliquaryCopiesUsed = 0;
+    std::int32_t buddyReliquaryCopiesTurn = -1;
     // Detective for Hire uses hidden opponent information; retain only the
     // committed result for Watfin, never the opponent's unrevealed board.
     std::int32_t detectiveLastGuessDbfID = 0;
     bool detectiveGuessCorrect = false;
     std::int32_t zippersPendingCards = 0;
+    // Book of Medivh may expose two consecutive Tavern-spell Discovers.
+    std::int32_t bookOfMedivhRemaining = 0;
     std::int32_t convictionAttackBonus = 0;
     std::int32_t convictionHealthBonus = 0;
     std::int32_t convictionExtraTargets = 0;
@@ -197,6 +217,10 @@ class Season14State
     std::uint8_t heroicInspirationAttacks = 0;
     bool heroicInspirationRewardPending = false;
     std::int32_t buddyAvengeDeaths = 0;
+    // Loyal Henchman counts confirmed enemy kills during the current combat.
+    // This is reset at COMBAT_START and is intentionally separate from the
+    // other combat-kill counters (which have different trigger semantics).
+    std::int32_t loyalHenchmanKills = 0;
     std::int32_t broodmotherAvengeDeaths = 0;
     std::int32_t broodmotherWhelpBonus = 0;
     std::optional<Minion> lockAndLoadProjectile;
@@ -212,6 +236,7 @@ class Season14State
     std::int32_t PendingConvictionImprovements() const noexcept { return convictionPendingImprovements; }
     void QueueBuddyCombatKillHealth(std::int32_t amount) noexcept { buddyCombatKillHealth += std::max<std::int32_t>(0, amount); }
     std::int32_t TakeBuddyCombatKillHealth() noexcept { const auto value = buddyCombatKillHealth; buddyCombatKillHealth = 0; return value; }
+    bool AdvanceLoyalHenchmanKill() noexcept { return ++loyalHenchmanKills == 2; }
     bool BeginConvictionImprovementChoice();
     bool ApplyConvictionImprovement(std::size_t offeringIndex);
     void ArmZippersCards(std::int32_t count) noexcept { zippersPendingCards += std::max(0, count); }
@@ -226,6 +251,13 @@ class Season14State
     std::int32_t pendingDemonDiscoverRemaining = 0;
     std::uint64_t pendingUndeadDiscoverSourceEntityID = 0;
     std::int32_t pendingUndeadDiscoverRemaining = 0;
+    //! Ancient Wishbone replay state for hero powers that open sequential
+    //! Discover modals.  The source DBF and pool discriminator are retained
+    //! until every selected card has been materialized.
+    std::int32_t pendingHeroPowerReplayDbfID = 0;
+    std::int32_t pendingHeroPowerReplayRemaining = 0;
+    std::int32_t pendingHeroPowerReplayTier = 0;
+    std::int32_t pendingHeroPowerReplayRace = 0;
     std::uint64_t pendingMechMagnetizeSourceEntityID = 0;
     std::uint64_t pendingMechMagnetizeTargetEntityID = 0;
     std::int32_t pendingMechMagnetizeRemaining = 0;
@@ -234,6 +266,11 @@ class Season14State
     //! offering as an anonymous global random result.
     std::uint64_t pendingSourceEntityID = 0;
     std::int32_t pendingSourceCardDbfID = 0;
+    //! Windfall Tornado's sold-instance stats survive the public Discover
+    //! modal; golden Windfall keeps one additional sequential choice queued.
+    std::int32_t windfallAttack = 0;
+    std::int32_t windfallHealth = 0;
+    std::int32_t windfallRemaining = 0;
     //! Tavern slot selected by Galakrond's Greed while its replacement
     //! Discover modal is pending; -1 means no Tavern replacement is active.
     std::int32_t pendingTavernReplacementSlot = -1;
@@ -258,11 +295,124 @@ class Season14State
     std::uint64_t generatedRewardStealthEntityID = 0;
     bool generatedRewardEvilTwin = false;
     bool generatedRewardRitualDagger = false;
+    bool generatedRewardRitualDaggerRepeat = false;
     bool generatedRewardSnickerSnacks = false;
     bool generatedRewardExquisiteConch = false;
     bool generatedRewardConchUsedThisTurn = false;
     bool generatedRewardSecretSinstone = false;
     bool generatedRewardRedHand = false;
+    bool generatedRewardTinyHenchmen = false;
+    bool generatedRewardStaffOfOrigination = false;
+    // Additional generated quest-reward families. These are player-owned
+    // counters/auras, so replaying a selected DBF cannot accidentally infer
+    // an effect without the typed lifecycle installation below.
+    bool generatedRewardCookedBook = false;
+    std::int32_t generatedRewardCookedBookBonus = 1;
+    bool generatedRewardTealTiger = false;
+    std::int32_t generatedRewardRefreshesThisTurn = 0;
+    bool generatedRewardAlterEgo = false;
+    bool generatedRewardAlterEgoEven = true;
+    bool generatedRewardMenagerieMayhem = false;
+    bool generatedRewardHiddenVault = false;
+    std::int32_t generatedRewardHiddenVaultGold = 1;
+    bool generatedRewardVolatileVenom = false;
+    bool generatedRewardBloodGoblet = false;
+    bool generatedRewardSinfallMedallion = false;
+    std::int32_t generatedRewardSinfallTier = 0;
+    std::uint64_t generatedRewardSinfallSourceEntityID = 0;
+    bool generatedRewardAnimaBribe = false;
+    bool generatedRewardVictimsSpecter = false;
+    bool generatedRewardDevilsInDetails = false;
+    bool generatedRewardPilferedLamps = false;
+    bool generatedRewardKidnapSack = false;
+    bool generatedRewardAnotherHiddenBody = false;
+    //! Ethereal Evidence is a one-shot reward replacement.  The pending
+    //! modal itself remains in the normal decision state so replay captures
+    //! its exact two DBF offerings rather than a random host-side choice.
+    bool generatedRewardEtherealEvidence = false;
+    bool generatedRewardGhastlyMask = false;
+    //! Exact pinned minion selected for Ghastly Mask's {0} card.  The DBF is
+    //! retained after delivery so replay cannot reroll the linked entity.
+    std::int32_t generatedRewardGhastlyCardDbfID = 0;
+    bool generatedRewardGhastlyCardDelivered = false;
+    bool generatedRewardUnmurloc = false;
+    //! Pinned hero DBF selected by Un-Murloc Your Potential.  The paired
+    //! hero-power DBF is validated against the same manifest pair at apply.
+    std::int32_t generatedRewardUnmurlocHeroDbfID = 0;
+    //! Friends Along the Way chooses the lobby's excluded-race complement
+    //! once when the reward is installed.  Persisting the race makes replay
+    //! and repeated lifecycle callbacks deterministic.
+    Race generatedRewardFriendsRace = Race::INVALID;
+    bool generatedRewardPartnerInCrime = false;
+    bool generatedRewardWisdomball = false;
+    bool generatedRewardWisdomballUsedThisTurn = false;
+    bool generatedRewardEssenceOfZerus = false;
+    bool generatedRewardEnhanceAMatic = false;
+    bool generatedRewardGoldenHammer = false;
+    bool generatedRewardSturdyShard = false;
+    bool generatedRewardBloodsoakedTome = false;
+    bool generatedRewardEndlessBloodMoon = false;
+    bool generatedRewardBeyondTheMirage = false;
+    bool generatedRewardInvigoratingConch = false;
+    bool generatedRewardTimelineAcceleration = false;
+    bool generatedRewardSmeltingChamber = false;
+    std::int32_t generatedRewardSmeltingTier = 1;
+    bool generatedRewardStashOfTheScribe = false;
+    // Generated reward passives whose trigger is a successful purchase/cast.
+    bool generatedRewardSplittingScroll = false;
+    bool generatedRewardDoubleHeaded = false;
+    bool generatedRewardDoubleHeadedUsedThisTurn = false;
+    std::int32_t generatedRewardBoomSquadDeaths = 0;
+    bool generatedRewardBoomSquad = false;
+    //! Avenge counters for the generated Tavern-reward families that resolve
+    //! from the combat death lifecycle rather than a CardDef trigger.
+    std::int32_t generatedRewardCycleEnergyDeaths = 0;
+    std::int32_t generatedRewardStableAmalgamationDeaths = 0;
+    bool generatedRewardCycleEnergy = false;
+    bool generatedRewardStableAmalgamation = false;
+    bool generatedRewardTurbulentTombs = false;
+    bool generatedRewardMapUnknown = false;
+    bool generatedRewardTemporalTampering = false;
+    bool generatedRewardTemporalTamperingReentry = false;
+    bool generatedRewardNineLives = false;
+    bool generatedRewardTotemicTavern = false;
+    bool generatedRewardPurifiedShard = false;
+    bool generatedRewardTheWall = false;
+    bool generatedRewardBattlecryRepeat = false;
+    bool generatedRewardAvengeRefresh = false;
+    bool generatedRewardStartTurnRandomSpells = false;
+    bool generatedRewardScepterOfGuidance = false;
+    bool generatedRewardGoldenKobold = false;
+    std::int32_t generatedRewardGoldenKoboldRefreshes = 0;
+    bool generatedRewardSecretCulprit = false;
+    bool generatedRewardDoppelgangersLocket = false;
+    bool generatedRewardTumblingDisaster = false;
+    std::int32_t generatedRewardTumblingAvenge = 0;
+    std::int32_t generatedRewardTumblingBonus = 4;
+    bool generatedRewardOpenAuditions = false;
+    bool generatedRewardRighteousCharge = false;
+    bool generatedRewardRushingWinds = false;
+    bool generatedRewardNorgannon = false;
+    bool generatedRewardMagicfin = false;
+    bool generatedRewardUntoldRiches = false;
+    bool generatedRewardGoldenForge = false;
+    bool generatedRewardQuaintBoutique = false;
+    bool generatedRewardJumboWarehouse = false;
+    bool generatedRewardCosmicReward = false;
+    //! Perpetual Incantation improves every subsequently resolved Tavern
+    //! spell by +2/+1, with no trigger cap.
+    bool generatedRewardPerpetualIncantation = false;
+    //! Rallying Cry causes each Rally trigger to resolve one additional time.
+    bool generatedRewardRallyingCry = false;
+    bool generatedRewardRallyingCryResolving = false;
+    //! No Place Like Holmes opens a public guess modal from the last observed
+    //! opposing warband; keep it armed until a valid observation exists.
+    bool generatedRewardOpponentWarbandGuess = false;
+    std::int32_t generatedRewardAvengeRefreshDeaths = 0;
+    // Untamed Sorcery may pause on a public target modal.  Keep the number
+    // of unresolved casts so selecting a target resumes the same five-cast
+    // sequence instead of silently ending the reward early.
+    std::int32_t generatedRewardRandomSpellsRemaining = 0;
 
     //! Install one supported generated quest reward effect. Returns false
     //! for metadata-only choices so callers cannot award executable credit.
@@ -272,16 +422,154 @@ class Season14State
     bool HasGeneratedRewardMirrorShield() const noexcept { return generatedRewardMirrorShield; }
     bool HasGeneratedRewardEvilTwin() const noexcept { return generatedRewardEvilTwin; }
     bool HasGeneratedRewardRitualDagger() const noexcept { return generatedRewardRitualDagger; }
+    bool HasGeneratedRewardRitualDaggerRepeat() const noexcept { return generatedRewardRitualDaggerRepeat; }
     bool HasGeneratedRewardSnickerSnacks() const noexcept { return generatedRewardSnickerSnacks; }
     bool HasGeneratedRewardExquisiteConch() const noexcept { return generatedRewardExquisiteConch; }
     bool HasGeneratedRewardSecretSinstone() const noexcept { return generatedRewardSecretSinstone; }
     bool HasGeneratedRewardRedHand() const noexcept { return generatedRewardRedHand; }
+    bool HasGeneratedRewardTinyHenchmen() const noexcept { return generatedRewardTinyHenchmen; }
+    bool HasGeneratedRewardStaffOfOrigination() const noexcept { return generatedRewardStaffOfOrigination; }
+    bool HasGeneratedRewardCookedBook() const noexcept { return generatedRewardCookedBook; }
+    bool HasGeneratedRewardTealTiger() const noexcept { return generatedRewardTealTiger; }
+    bool HasGeneratedRewardAlterEgo() const noexcept { return generatedRewardAlterEgo; }
+    bool HasGeneratedRewardMenagerieMayhem() const noexcept { return generatedRewardMenagerieMayhem; }
+    bool HasGeneratedRewardHiddenVault() const noexcept { return generatedRewardHiddenVault; }
+    bool HasGeneratedRewardVolatileVenom() const noexcept { return generatedRewardVolatileVenom; }
+    bool HasGeneratedRewardBloodGoblet() const noexcept { return generatedRewardBloodGoblet; }
+    bool HasGeneratedRewardSinfallMedallion() const noexcept { return generatedRewardSinfallMedallion; }
+    bool HasGeneratedRewardAnimaBribe() const noexcept { return generatedRewardAnimaBribe; }
+    bool HasGeneratedRewardVictimsSpecter() const noexcept { return generatedRewardVictimsSpecter; }
+    bool HasGeneratedRewardDevilsInDetails() const noexcept { return generatedRewardDevilsInDetails; }
+    bool HasGeneratedRewardPilferedLamps() const noexcept { return generatedRewardPilferedLamps; }
+    bool HasGeneratedRewardKidnapSack() const noexcept { return generatedRewardKidnapSack; }
+    bool HasGeneratedRewardAnotherHiddenBody() const noexcept { return generatedRewardAnotherHiddenBody; }
+    bool HasGeneratedRewardEtherealEvidence() const noexcept { return generatedRewardEtherealEvidence; }
+    bool HasGeneratedRewardGhastlyMask() const noexcept { return generatedRewardGhastlyMask; }
+    std::int32_t GeneratedRewardGhastlyCardDbfID() const noexcept { return generatedRewardGhastlyCardDbfID; }
+    void SetGeneratedRewardGhastlyCardDbfID(std::int32_t dbfID) noexcept { generatedRewardGhastlyCardDbfID = dbfID; }
+    bool GhastlyCardDelivered() const noexcept { return generatedRewardGhastlyCardDelivered; }
+    void MarkGhastlyCardDelivered() noexcept { generatedRewardGhastlyCardDelivered = true; }
+    bool HasGeneratedRewardUnmurloc() const noexcept { return generatedRewardUnmurloc; }
+    std::int32_t GeneratedRewardUnmurlocHeroDbfID() const noexcept { return generatedRewardUnmurlocHeroDbfID; }
+    void SetGeneratedRewardUnmurloc(std::int32_t heroDbfID) noexcept {
+        generatedRewardUnmurloc = true;
+        generatedRewardUnmurlocHeroDbfID = heroDbfID;
+    }
+    Race GeneratedRewardFriendsRace() const noexcept { return generatedRewardFriendsRace; }
+    void SetGeneratedRewardFriendsRace(Race race) noexcept { generatedRewardFriendsRace = race; }
     bool ConsumeGeneratedRewardConch() noexcept {
         if (!generatedRewardExquisiteConch || generatedRewardConchUsedThisTurn) return false;
         generatedRewardConchUsedThisTurn = true;
         return true;
     }
     std::int32_t GeneratedRewardGlobalAttack() const noexcept { return generatedRewardGlobalAttack; }
+    bool HasGeneratedRewardPartnerInCrime() const noexcept { return generatedRewardPartnerInCrime; }
+    bool HasGeneratedRewardWisdomball() const noexcept { return generatedRewardWisdomball; }
+    bool HasGeneratedRewardEssenceOfZerus() const noexcept { return generatedRewardEssenceOfZerus; }
+    bool HasGeneratedRewardEnhanceAMatic() const noexcept { return generatedRewardEnhanceAMatic; }
+    bool HasGeneratedRewardGoldenHammer() const noexcept { return generatedRewardGoldenHammer; }
+    bool HasGeneratedRewardSturdyShard() const noexcept { return generatedRewardSturdyShard; }
+    bool HasGeneratedRewardBloodsoakedTome() const noexcept { return generatedRewardBloodsoakedTome; }
+    bool HasGeneratedRewardEndlessBloodMoon() const noexcept { return generatedRewardEndlessBloodMoon; }
+    bool HasGeneratedRewardBeyondTheMirage() const noexcept { return generatedRewardBeyondTheMirage; }
+    bool HasGeneratedRewardInvigoratingConch() const noexcept { return generatedRewardInvigoratingConch; }
+    bool HasGeneratedRewardTimelineAcceleration() const noexcept { return generatedRewardTimelineAcceleration; }
+    bool HasGeneratedRewardSmeltingChamber() const noexcept { return generatedRewardSmeltingChamber; }
+    std::int32_t GeneratedRewardSmeltingTier() const noexcept { return generatedRewardSmeltingTier; }
+    void AdvanceGeneratedRewardSmeltingTier() noexcept { if (generatedRewardSmeltingTier < 6) ++generatedRewardSmeltingTier; }
+    bool HasGeneratedRewardStashOfTheScribe() const noexcept { return generatedRewardStashOfTheScribe; }
+    bool HasGeneratedRewardSplittingScroll() const noexcept { return generatedRewardSplittingScroll; }
+    bool HasGeneratedRewardDoubleHeaded() const noexcept { return generatedRewardDoubleHeaded; }
+    bool HasGeneratedRewardBoomSquad() const noexcept { return generatedRewardBoomSquad; }
+    bool HasGeneratedRewardCycleEnergy() const noexcept { return generatedRewardCycleEnergy; }
+    bool HasGeneratedRewardStableAmalgamation() const noexcept { return generatedRewardStableAmalgamation; }
+    bool HasGeneratedRewardTurbulentTombs() const noexcept { return generatedRewardTurbulentTombs; }
+    void ResetGeneratedRewardAvenge() noexcept
+    {
+        generatedRewardCycleEnergyDeaths = 0;
+        generatedRewardStableAmalgamationDeaths = 0;
+        generatedRewardAvengeRefreshDeaths = 0;
+    }
+    bool HasGeneratedRewardMapUnknown() const noexcept { return generatedRewardMapUnknown; }
+    bool HasGeneratedRewardTemporalTampering() const noexcept { return generatedRewardTemporalTampering; }
+    bool HasGeneratedRewardNineLives() const noexcept { return generatedRewardNineLives; }
+    bool HasGeneratedRewardTotemicTavern() const noexcept { return generatedRewardTotemicTavern; }
+    bool HasGeneratedRewardPurifiedShard() const noexcept { return generatedRewardPurifiedShard; }
+    bool HasGeneratedRewardTheWall() const noexcept { return generatedRewardTheWall; }
+    bool HasGeneratedRewardBattlecryRepeat() const noexcept { return generatedRewardBattlecryRepeat; }
+    bool HasGeneratedRewardAvengeRefresh() const noexcept { return generatedRewardAvengeRefresh; }
+    bool HasGeneratedRewardStartTurnRandomSpells() const noexcept { return generatedRewardStartTurnRandomSpells; }
+    bool HasGeneratedRewardScepterOfGuidance() const noexcept { return generatedRewardScepterOfGuidance; }
+    bool HasGeneratedRewardGoldenKobold() const noexcept { return generatedRewardGoldenKobold; }
+    bool HasGeneratedRewardSecretCulprit() const noexcept { return generatedRewardSecretCulprit; }
+    bool HasGeneratedRewardDoppelgangersLocket() const noexcept { return generatedRewardDoppelgangersLocket; }
+    bool HasGeneratedRewardTumblingDisaster() const noexcept { return generatedRewardTumblingDisaster; }
+    bool HasGeneratedRewardOpenAuditions() const noexcept { return generatedRewardOpenAuditions; }
+    bool HasGeneratedRewardRighteousCharge() const noexcept { return generatedRewardRighteousCharge; }
+    bool HasGeneratedRewardRushingWinds() const noexcept { return generatedRewardRushingWinds; }
+    bool HasGeneratedRewardNorgannon() const noexcept { return generatedRewardNorgannon; }
+    bool HasGeneratedRewardMagicfin() const noexcept { return generatedRewardMagicfin; }
+    bool HasGeneratedRewardUntoldRiches() const noexcept { return generatedRewardUntoldRiches; }
+    bool HasGeneratedRewardGoldenForge() const noexcept { return generatedRewardGoldenForge; }
+    bool HasGeneratedRewardPerpetualIncantation() const noexcept { return generatedRewardPerpetualIncantation; }
+    bool HasGeneratedRewardRallyingCry() const noexcept { return generatedRewardRallyingCry; }
+    bool HasGeneratedRewardOpponentWarbandGuess() const noexcept { return generatedRewardOpponentWarbandGuess; }
+    bool HasGeneratedRewardQuaintBoutique() const noexcept { return generatedRewardQuaintBoutique; }
+    bool HasGeneratedRewardJumboWarehouse() const noexcept { return generatedRewardJumboWarehouse; }
+    bool HasGeneratedRewardCosmicReward() const noexcept { return generatedRewardCosmicReward; }
+    std::int32_t GeneratedRewardTumblingAvenge() const noexcept { return generatedRewardTumblingAvenge; }
+    std::int32_t GeneratedRewardTumblingBonus() const noexcept { return generatedRewardTumblingBonus; }
+    void ResetGeneratedRewardTumblingAvenge() noexcept { generatedRewardTumblingAvenge = 0; }
+    bool AdvanceGeneratedRewardTumblingAvenge() noexcept
+    {
+        if (!generatedRewardTumblingDisaster || ++generatedRewardTumblingAvenge < 4)
+            return false;
+        generatedRewardTumblingAvenge = 0;
+        generatedRewardTumblingBonus += 4;
+        return true;
+    }
+    void RecordGeneratedRewardGoldenKoboldRefresh() noexcept
+    {
+        if (generatedRewardGoldenKobold) ++generatedRewardGoldenKoboldRefreshes;
+    }
+    std::int32_t GeneratedRewardGoldenKoboldRefreshes() const noexcept
+    {
+        return generatedRewardGoldenKoboldRefreshes;
+    }
+    bool ConsumeGeneratedRewardGoldenKoboldTrigger() noexcept
+    {
+        if (!generatedRewardGoldenKobold || generatedRewardGoldenKoboldRefreshes < 5)
+            return false;
+        generatedRewardGoldenKoboldRefreshes -= 5;
+        return true;
+    }
+    void BeginGeneratedRewardRandomSpells(std::int32_t amount) noexcept
+    {
+        generatedRewardRandomSpellsRemaining = std::max<std::int32_t>(0, amount);
+    }
+    std::int32_t GeneratedRewardRandomSpellsRemaining() const noexcept
+    {
+        return generatedRewardRandomSpellsRemaining;
+    }
+    void SetGeneratedRewardRandomSpellsRemaining(std::int32_t amount) noexcept
+    {
+        generatedRewardRandomSpellsRemaining = std::max<std::int32_t>(0, amount);
+    }
+    bool HasPendingGeneratedRewardRandomSpells() const noexcept
+    {
+        return generatedRewardRandomSpellsRemaining > 0;
+    }
+    void FinishGeneratedRewardRandomSpells() noexcept
+    {
+        generatedRewardRandomSpellsRemaining = 0;
+    }
+    bool AdvanceGeneratedRewardAvengeRefresh() noexcept
+    {
+        return generatedRewardAvengeRefresh &&
+               ++generatedRewardAvengeRefreshDeaths >= 2
+                   ? (generatedRewardAvengeRefreshDeaths = 0, true)
+                   : false;
+    }
 
     std::int32_t heroPowerDbfID = 0;
     std::int32_t heroPowerCost = 0;
@@ -291,6 +579,9 @@ class Season14State
     //! Public information retained from the opponent's most recent combat;
     //! Detective for Hire only receives this through its two-card choice.
     std::vector<std::int32_t> lastOpponentCombatMinionDbfIDs;
+    std::vector<Minion> lastOpponentCombatMinionSnapshots;
+    //! Public hero linkage observed for the most recent opponent combat.
+    std::int32_t lastOpponentBuddyDbfID = 0;
     std::int32_t detectiveCorrectDbfID = 0;
     bool rapidReanimationArmed = false;
     std::uint64_t rapidReanimationTargetEntityID = 0;
@@ -298,7 +589,12 @@ class Season14State
     std::optional<Minion> rapidReanimationSnapshot;
     bool heroPowerAvailable = false;
     bool heroPowerUsed = false;
+    //! Three Wishes is a persistent three-charge hero power.
+    std::int32_t threeWishesRemaining = 3;
     std::int32_t buddyExtraHeroPowerUses = 0;
+    //! Legacy Buddy lifecycle counters.  These are player-owned so combat
+    //! copies cannot leak state across lobbies or recruit/combat boundaries.
+    std::int32_t chromieRefreshesThisTurn = 0;
     void EnableBuddyExtraHeroPowerUses(std::int32_t n) noexcept { buddyExtraHeroPowerUses = std::max(buddyExtraHeroPowerUses, n); }
     void ResetBuddyExtraHeroPowerUses() noexcept { buddyExtraHeroPowerUses = 0; }
     bool powerOfStormActive = false;
@@ -313,6 +609,9 @@ class Season14State
     Season14HeroPowerBatch4State heroPowerBatch4;
     Season14HeroPowerBatch5State heroPowerBatch5;
     Season14HeroPowerBatch6State heroPowerBatch6;
+    Season14HeroPowerBatch7State heroPowerBatch7;
+    Season14HeroPowerBatch8State heroPowerBatch8;
+    Season14HeroPowerBatch9State heroPowerBatch9;
     std::array<Race, 3> stirPotRaces{};
     std::int32_t stirPotCount = 0;
     std::int32_t imprisonedSlot = -1;
@@ -328,6 +627,8 @@ class Season14State
     std::int32_t murlocRewardsRemaining = 5;
     std::int32_t battlecryRewardBuys = 0;
     bool battlecryRewardGiven = false;
+    //! Clockwork Assistant's golden form chains a second public Discover.
+    std::uint8_t clockworkDiscoverRemaining = 0;
     bool AdvanceMechGyverDeath() noexcept
     {
         if (++mechGyverDeaths < 9) return false;
@@ -397,10 +698,24 @@ class Season14State
     //! intentionally non-consuming: multiple Kangor deathrattles each refer
     //! to the same first deaths; it is cleared at the next combat start.
     std::vector<Minion> TakeCombatDeadMinions(Race race, std::size_t count);
+    std::optional<Minion> CopyLastCombatDeadMinion() const;
     void ClearCombatDeadMinions() noexcept { combatDeadMinions.clear(); }
+    std::size_t CountCombatDeadMinions(Race race) const noexcept
+    {
+        return static_cast<std::size_t>(std::count_if(
+            combatDeadMinions.begin(), combatDeadMinions.end(),
+            [race](const Minion& minion) { return minion.HasRace(race); }));
+    }
     std::vector<std::int32_t> pendingCombatStartEffects;
     //! Remaining Discover selections for a multi-spell Activate.
     std::int32_t tavernSpellDiscoverRemaining = 0;
+    //! Additional resolutions queued by Cathedral/Sushi for an ordinary
+    //! Tavern-spell Discover.  Discover is asynchronous, so the replay must
+    //! retain the source and (for typed Discover spells) the stable target
+    //! until the public offering is committed.
+    std::int32_t discoverReplayRemaining = 0;
+    std::int32_t discoverReplaySourceSpellDbfID = 0;
+    std::uint64_t discoverReplayTargetEntityID = 0;
     bool shopBloodGemsOnRefresh = false;
     //! One-shot tribe filter consumed by the next Tavern fill.
     Race pendingRefreshRace = Race::INVALID;
@@ -408,6 +723,9 @@ class Season14State
     std::int32_t pendingCombatRewardCount = 0;
     bool firstMinionPlayedThisTurn = false;
     std::int32_t battlecryBuysThisTurn = 0;
+    //! Override the base Tavern minion purchase cost for the current recruit
+    //! turn; -1 means normal tier-independent cost handling.
+    std::int32_t temporaryMinionPurchaseCost = -1;
     std::int32_t minionsPlayedThisTurn = 0;
     std::int32_t progressiveAvengeAttack = 1;
     std::int32_t progressiveAvengeHealth = 1;
@@ -451,6 +769,10 @@ class Season14State
     std::int32_t spellMinionAttackProgress = 0;
     //! Number of successfully resolved spells this game.
     std::int32_t successfulSpellCount = 0;
+    //! Rewards produced by spell-count Trinkets and not yet delivered by
+    //! Player. Hand rewards remain pending when the hand is full.
+    std::int32_t pendingSpellCountNagaRewards = 0;
+    std::int32_t pendingSpellCountGold = 0;
     std::vector<std::int32_t> distinctSpellsThisTurn;
     void RecordDistinctSpell(std::int32_t dbfID) {
         if (dbfID > 0 && std::find(distinctSpellsThisTurn.begin(), distinctSpellsThisTurn.end(), dbfID) == distinctSpellsThisTurn.end()) distinctSpellsThisTurn.push_back(dbfID);
@@ -478,6 +800,10 @@ class Season14State
     std::int32_t fodderRefreshes = 0;
     std::int32_t goldenMinionsPlayed = 0;
     std::int32_t piratesPlayedThisGame = 0;
+    //! Lifetime Pirate acquisitions, including cards added to hand.  This is
+    //! distinct from played/summoned counters so moving a card to the board
+    //! cannot count the same acquisition twice.
+    std::int32_t piratesAcquiredThisGame = 0;
     std::int32_t unboundElementals = 0;
     std::vector<std::string> combatAvengeCards;
     std::int32_t foddersPerRefresh = 1;
@@ -562,6 +888,15 @@ class Season14State
     {
         return ConsumeVoidPowerDiscover(heroPowerBatch6);
     }
+    bool TakeFeelDevastationDiscoverReady() noexcept
+    {
+        return ConsumeFeelDevastationDiscover(heroPowerBatch6);
+    }
+    void RestoreFeelDevastationDiscoverReady() noexcept
+    {
+        RosettaStone::Battlegrounds::RestoreFeelDevastationDiscoverReady(
+            heroPowerBatch6);
+    }
     void RestoreVoidPowerDiscoverReady() noexcept
     {
         RosettaStone::Battlegrounds::RestoreVoidPowerDiscoverReady(
@@ -615,6 +950,10 @@ class Season14State
 
     //! Returns the effective cost of buying a minion under passive auras.
     std::int32_t MinionPurchaseCost(std::int32_t baseCost) const;
+    void SetTemporaryMinionPurchaseCost(std::int32_t cost) noexcept
+    {
+        temporaryMinionPurchaseCost = cost < 0 ? -1 : cost;
+    }
 
     //! Returns the effective cost of refreshing the Tavern.
     std::int32_t RefreshCost(std::int32_t baseCost) const;
@@ -671,6 +1010,9 @@ class Season14State
     void AddBloodGemBonus(std::int32_t attack, std::int32_t health) noexcept;
     void AddTavernSpellHealthBonus(std::int32_t health) noexcept;
     void AddTavernSpellAttackBonus(std::int32_t attack) noexcept;
+    void AddTemporaryTavernSpellStats(std::int32_t attack,
+                                      std::int32_t health) noexcept
+    { temporaryTavernSpellAttack += attack; temporaryTavernSpellHealth += health; }
     std::int32_t TakeGrowingSummonAttack(std::int32_t entityIndex,
                                           std::int32_t initialAttack,
                                           std::int32_t increment);
@@ -716,8 +1058,19 @@ class Season14State
     { heroicInspirationRewardPending = false; heroicInspirationAttacks = 0; }
 
     //! Records a successfully resolved Tavern spell.
-    void OnTavernSpellResolved(bool spellResolved, std::int32_t sourceDbfID = 0);
+    // `spellOnMinion` distinguishes targeted/board spell resolutions for
+    // Trinkets whose improvement is only armed after a spell is cast on a
+    // minion (for example Honeycomb Ring).  Keep the default for callers
+    // that resolve non-targeted Tavern spells.
+    void OnTavernSpellResolved(bool spellResolved, std::int32_t sourceDbfID = 0,
+                               bool spellOnMinion = false);
     std::int32_t SuccessfulSpellCount() const noexcept { return successfulSpellCount; }
+    std::int32_t PendingSpellCountNagaRewards() const noexcept
+    { return pendingSpellCountNagaRewards; }
+    bool ConsumeSpellCountNagaReward() noexcept
+    { if (pendingSpellCountNagaRewards <= 0) return false; --pendingSpellCountNagaRewards; return true; }
+    std::int32_t TakeSpellCountGold() noexcept
+    { const auto n = pendingSpellCountGold; pendingSpellCountGold = 0; return n; }
     std::int32_t TakeSpellMinionAttackDelta() noexcept
     { const auto d = spellMinionAttackDelta; spellMinionAttackDelta = 0; return d; }
     std::int32_t LastTavernSpellDbfID() const noexcept { return lastTavernSpellDbfID; }
@@ -893,6 +1246,16 @@ class Season14State
     std::int32_t EffectiveHeroPowerCost() const;
     void RecordLastOpponentCombatMinions(
         const std::vector<std::int32_t>& dbfIDs);
+    void RecordLastOpponentCombatMinionSnapshots(
+        const std::vector<Minion>& minions);
+    void RecordLastOpponentBuddy(std::int32_t dbfID) noexcept
+    {
+        lastOpponentBuddyDbfID = std::max<std::int32_t>(0, dbfID);
+    }
+    std::optional<Minion> LastOpponentCombatMinionSnapshot(
+        std::size_t index) const;
+    std::optional<Minion> FindLastOpponentCombatMinionSnapshot(
+        std::int32_t dbfID) const;
     bool ArmRapidReanimation(std::uint64_t entityID, Minion snapshot);
     bool TakeRapidReanimationSnapshot(Minion& out) noexcept;
 

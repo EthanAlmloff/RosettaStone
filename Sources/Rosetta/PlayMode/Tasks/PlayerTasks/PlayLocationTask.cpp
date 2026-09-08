@@ -22,13 +22,16 @@ TaskStatus PlayLocationTask::Impl(Player* player)
 {
     const auto location = dynamic_cast<Location*>(m_source);
     const auto target = dynamic_cast<Character*>(m_target);
+    const auto validTargets = location ? location->GetValidPlayTargets()
+                                       : std::vector<Character*>{};
 
     if (!location || location->player != player ||
         location->GetZoneType() != ZoneType::PLAY ||
         !location->IsPlayableByPlayer() ||
         !location->IsValidPlayTarget(target) ||
-        (m_target && (!target || !std::ranges::contains(
-                                     location->GetValidPlayTargets(), target))))
+        (m_target && (!target || std::find(validTargets.begin(), validTargets.end(),
+                                           target) == validTargets.end()))
+    )
     {
         return TaskStatus::STOP;
     }

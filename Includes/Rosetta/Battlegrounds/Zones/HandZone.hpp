@@ -12,8 +12,10 @@
 #include <Rosetta/Common/Constants.hpp>
 
 #include <array>
+#include <functional>
 #include <optional>
 #include <variant>
+#include <utility>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -43,6 +45,13 @@ class HandZone
     //! \param card The card context to add.
     //! \param zonePos The zone position.
     void Add(CardData card, int zonePos = -1);
+
+    //! Installs the owning-player hook used for acquisition-triggered
+    //! Battlegrounds effects. The callback runs only after a card enters.
+    void SetAddCallback(std::function<void(const CardData&)> callback)
+    {
+        m_addCallback = std::move(callback);
+    }
 
     //! Removes the specified card from this zone.
     //! \param card The card context to remove.
@@ -94,6 +103,7 @@ class HandZone
 
     std::array<std::optional<CardData>, MAX_HAND_SIZE> m_cards;
     int m_count = 0;
+    std::function<void(const CardData&)> m_addCallback;
 };
 }  // namespace RosettaStone::Battlegrounds
 

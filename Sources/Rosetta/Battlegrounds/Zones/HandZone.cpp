@@ -54,6 +54,8 @@ void HandZone::Add(CardData card, int zonePos)
                m_cards[pos].value());
 
     Reposition(pos);
+    if (m_addCallback)
+        m_addCallback(m_cards[pos].value());
 }
 
 const CardData HandZone::Remove(CardData& card)

@@ -13,6 +13,7 @@
 #include <initializer_list>
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <utility>
 
 namespace RosettaStone::Battlegrounds
@@ -190,6 +191,18 @@ class Minion
     //! current mutable stats and zone identity.
     //! \return false when no linked premium entity is available.
     bool MakeGolden();
+
+    //! Converts this instance to its premium entity for the current recruit
+    //! turn.  ExpireTemporaryEffects restores the original card identity at
+    //! the next recruit start while retaining ordinary instance state.
+    bool MakeGoldenUntilNextTurn();
+
+    //! Returns whether this instance is carrying a temporary golden
+    //! conversion. This is instance state (rather than an IsGolden() alias):
+    //! a temporary conversion must be expired exactly once, including when
+    //! an exact combat/recruit copy is made.
+    bool IsTemporarilyGolden() const noexcept
+    { return m_temporaryGoldenOriginalCard.has_value(); }
 
     //! Returns whether this instance can be converted to a supported premium
     //! entity without mutating it.
@@ -602,6 +615,7 @@ class Minion
     bool m_temporaryMegaWindfury = false;
     bool m_temporaryVenomous = false;
     bool m_temporaryStealth = false;
+    std::optional<Card> m_temporaryGoldenOriginalCard;
     int m_spellcraftUsesRemaining = 0;
     bool m_permanentSpellcraft = false;
     bool m_zestyShakerUsed = false;

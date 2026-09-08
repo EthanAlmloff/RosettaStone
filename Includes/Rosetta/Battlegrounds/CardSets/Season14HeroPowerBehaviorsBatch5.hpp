@@ -17,6 +17,10 @@ namespace RosettaStone::Battlegrounds
 enum class Season14HeroPowerBatch5Kind : std::uint8_t
 {
     EXTRA_DRAGON_REFRESH,
+    // Compatibility spelling retained for the focused contract from the
+    // first Batch5 review.  Both names intentionally denote the same
+    // lifecycle family and therefore must not create a second registry row.
+    EXTRA_DRAGON_REFRESH_POWER = EXTRA_DRAGON_REFRESH,
     REFRESH_THEN_SEVEN,
     FROZEN_MINION_BUFF,
     SELL_TAVERN_BUFF,

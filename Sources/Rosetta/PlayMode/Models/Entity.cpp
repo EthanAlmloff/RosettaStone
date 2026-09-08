@@ -131,7 +131,7 @@ Playable* Entity::GetFromCard(Player* player, Card* card,
     }
 
     tags[GameTag::CONTROLLER] = player->playerID;
-    tags[GameTag::ZONE] = zone ? std::to_underlying(zone->GetType()) : 0;
+    tags[GameTag::ZONE] = zone ? static_cast<int>(zone->GetType()) : 0;
 
     std::unique_ptr<Playable> result;
 
@@ -141,7 +141,7 @@ Playable* Entity::GetFromCard(Player* player, Card* card,
             result = std::make_unique<Hero>(player, card, tags, id);
             break;
         case HERO_POWER:
-            tags[GameTag::ZONE] = std::to_underlying(ZoneType::PLAY);
+            tags[GameTag::ZONE] = static_cast<int>(ZoneType::PLAY);
             result = std::make_unique<HeroPower>(player, card, tags, id);
             break;
         case MINION:

@@ -11,6 +11,7 @@
 #include <effolkronium/random.hpp>
 
 #include <stdexcept>
+#include <algorithm>
 #include <iterator>
 
 using Random = effolkronium::random_thread_local;
@@ -326,6 +327,35 @@ bool MinionPool::AddRandomMinionToTavern(Player& player, Tavern& tavern, int tie
     player.ApplyFreshTavernMinionModifiers(minion);
     tavern.fieldZone.Add(minion);
     std::get<2>(m_minions.at(poolIndex)) = false;
+    return true;
+}
+
+bool MinionPool::AddRandomRaceMinionToTavern(Player& player, Tavern& tavern,
+                                             int tier, Race race)
+{
+    if (tavern.fieldZone.IsFull()) return false;
+    auto candidates = GetMinions(tier, tier, true);
+    candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
+                                    [race](const Minion& minion) {
+                                        return !minion.HasRace(race);
+                                    }),
+                     candidates.end());
+    if (candidates.empty()) return false;
+    Random::shuffle(candidates.begin(), candidates.end());
+    const auto poolIndex = candidates.front().GetPoolIndex();
+    auto minion = std::move(candidates.front());
+    player.ApplyFreshTavernMinionModifiers(minion);
+    tavern.fieldZone.Add(minion);
+    std::get<2>(m_minions.at(poolIndex)) = false;
+    return true;
+}
+
+bool MinionPool::TakeMinion(int poolIdx)
+{
+    if (poolIdx < 0 || poolIdx >= static_cast<int>(m_count)) return false;
+    auto& entry = m_minions.at(static_cast<std::size_t>(poolIdx));
+    if (!std::get<2>(entry)) return false;
+    std::get<2>(entry) = false;
     return true;
 }
 

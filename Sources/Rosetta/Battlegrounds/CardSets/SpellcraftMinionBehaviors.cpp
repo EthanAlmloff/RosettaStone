@@ -32,6 +32,8 @@ void SpellcraftMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG31_920_G", CardDef{});
     cards.emplace("BG26_501", CardDef{});
     cards.emplace("BG26_501_G", CardDef{});
+    cards.emplace("BG24_Reward_719t", CardDef{});
+    cards.emplace("BG25_044t", CardDef{});
     // Tranquil Meditative is a continuous Tavern-spell stat aura.  Its
     // effect is resolved in Player::PlaySpell so generated and modal spells
     // receive the same bonus; no standalone trigger is required here.

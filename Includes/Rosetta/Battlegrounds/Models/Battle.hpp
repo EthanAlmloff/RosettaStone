@@ -10,6 +10,9 @@
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Common/Enums/GameEnums.hpp>
 
+#include <cstdint>
+#include <unordered_map>
+
 namespace RosettaStone::Battlegrounds
 {
 struct CombatResult
@@ -134,6 +137,9 @@ class Battle
     // Combat alternates players, so this state belongs to each side.
     int m_p1PendingAttacks = 0;
     int m_p2PendingAttacks = 0;
+    int m_p1EclipsionAttacks = 0;
+    int m_p2EclipsionAttacks = 0;
+    std::unordered_map<std::uint64_t, int> m_shadowyConstructTriggers;
     bool m_lockAndLoadResolving = false;
     KillContext m_killContext;
 

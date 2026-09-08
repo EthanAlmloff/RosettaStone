@@ -11,7 +11,9 @@ void ModernMinionBehaviorsBatch34::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG22_HERO_200_Buddy_Ge", CardDef{std::move(goldenEnchant)});
     auto add = [](std::map<std::string, CardDef>& cards, const char* id, const char* e) {
         Power p; Trigger t{TriggerType::AFTER_PLAY_MINION};
-        t.SetTriggerSource(TriggerSource::MINIONS_EXCEPT_SELF);
+        // Sub Scrubber is itself a Mech, so its trigger also observes the
+        // play that put this instance onto the board.
+        t.SetTriggerSource(TriggerSource::FRIENDLY);
         t.SetCondition(SelfCondition::IsRace(Race::MECHANICAL));
         t.SetTasks({SimpleTasks::AddEnchantmentTask{e, EntityType::SOURCE}});
         p.AddTrigger(std::move(t)); cards.emplace(id, CardDef{std::move(p)});

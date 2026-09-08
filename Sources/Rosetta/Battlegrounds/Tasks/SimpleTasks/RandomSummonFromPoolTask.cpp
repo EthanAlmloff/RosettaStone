@@ -13,6 +13,8 @@ TaskStatus RandomSummonFromPoolTask::Run(Player& player, Minion& source) {
     if (m_race != Race::INVALID && m_race != Race::ALL && !card.HasRace(m_race)) continue;
     if (card.GetTier() < m_minTier || (m_maxTier > 0 && card.GetTier() > m_maxTier)) continue;
     if (m_golden && card.premiumDbfID == 0) continue;
+    if (m_battlecryOnly && (!card.gameTags.contains(GameTag::BATTLECRY) ||
+                            card.gameTags.at(GameTag::BATTLECRY) == 0)) continue;
     candidates.push_back(&card);
   }
   if (candidates.empty()) return TaskStatus::STOP;

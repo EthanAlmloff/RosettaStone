@@ -5,6 +5,7 @@
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftRandomPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftGolemDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftDoubleAttackTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ArmFodderRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
@@ -195,6 +196,8 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
         behavior.effect = DarkGiftEffect::RALLY_BLOOD_GEMS;
         return behavior;
     }
+    if (id == "BG36_MidGameEffect_000t6e2") // Elixir of Vim: double Attack on Rally.
+        return { DarkGiftEffect::RALLY_DOUBLE_ATTACK };
     return {};
 }
 
@@ -266,6 +269,8 @@ bool DarkGiftTargetIsLegal(const Minion& target,
             return true;
         case DarkGiftEffect::FODDER_REFRESH:
             return behavior.fodderRefreshes > 0;
+        case DarkGiftEffect::RALLY_DOUBLE_ATTACK:
+            return true;
         case DarkGiftEffect::HAND_COPY:
             return true;
         case DarkGiftEffect::REPLICATION:
@@ -378,6 +383,11 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
             return false;
         target.AddDarkGiftRallyTask(
             SimpleTasks::ArmFodderRefreshTask{behavior.fodderRefreshes});
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::RALLY_DOUBLE_ATTACK)
+    {
+        target.AddDarkGiftRallyTask(SimpleTasks::DarkGiftDoubleAttackTask{});
         return true;
     }
 
@@ -536,7 +546,8 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
                             "BG36_MidGameEffect_000t21",
                             "BG36_MidGameEffect_000t50",
                             "BG36_MidGameEffect_000t82",
-                            "BG36_MidGameEffect_000t65" })
+                            "BG36_MidGameEffect_000t65",
+                            "BG36_MidGameEffect_000t6e2" })
     {
         cards.emplace(id, CardDef{});
     }

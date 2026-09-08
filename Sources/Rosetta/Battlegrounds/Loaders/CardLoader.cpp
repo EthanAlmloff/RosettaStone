@@ -9,6 +9,8 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 
@@ -28,15 +30,101 @@ bool IsMetadataFlag(const Json& object, const char* key)
     return object.at(key).is_boolean() && object.at(key).get<bool>();
 }
 
+int JsonInt(const Json& value, const char* field, std::string_view cardLabel)
+{
+    if (!value.is_number())
+    {
+        throw std::invalid_argument("card " + std::string(cardLabel) +
+                                    " field " + field + " must be a number");
+    }
+
+    constexpr auto minInt = std::numeric_limits<int>::min();
+    constexpr auto maxInt = std::numeric_limits<int>::max();
+
+    if (value.is_number_integer())
+    {
+        const auto raw = value.get<Json::number_integer_t>();
+        if (raw < minInt || raw > maxInt)
+        {
+            throw std::invalid_argument("card " + std::string(cardLabel) +
+                                        " field " + field +
+                                        " is outside the int range");
+        }
+        return static_cast<int>(raw);
+    }
+
+    if (value.is_number_unsigned())
+    {
+        const auto raw = value.get<Json::number_unsigned_t>();
+        if (raw > static_cast<Json::number_unsigned_t>(maxInt))
+        {
+            throw std::invalid_argument("card " + std::string(cardLabel) +
+                                        " field " + field +
+                                        " is outside the int range");
+        }
+        return static_cast<int>(raw);
+    }
+
+    const auto raw = value.get<Json::number_float_t>();
+    if (!std::isfinite(raw) || std::trunc(raw) != raw || raw < minInt ||
+        raw > maxInt)
+    {
+        throw std::invalid_argument("card " + std::string(cardLabel) +
+                                    " field " + field +
+                                    " must be an integer in the int range");
+    }
+    return static_cast<int>(raw);
+}
+
+int OptionalJsonInt(const Json& object, const char* field,
+                    std::string_view cardLabel)
+{
+    if (!object.contains(field) || object.at(field).is_null())
+    {
+        return 0;
+    }
+    return JsonInt(object.at(field), field, cardLabel);
+}
+
 int MetadataInt(const Json& object, const char* key)
 {
     if (!object.contains(key) || object.at(key).is_null() ||
-        !object.at(key).is_number_integer())
+        !object.at(key).is_number())
     {
         return 0;
     }
 
-    return object.at(key).get<int>();
+    // Metadata is optional, but a present numeric value should be converted
+    // without relying on nlohmann::json's target-type overload selection.
+    const auto& value = object.at(key);
+    if (value.is_number_integer())
+    {
+        const auto raw = value.get<Json::number_integer_t>();
+        if (raw < std::numeric_limits<int>::min() ||
+            raw > std::numeric_limits<int>::max())
+        {
+            return 0;
+        }
+        return static_cast<int>(raw);
+    }
+    if (value.is_number_unsigned())
+    {
+        const auto raw = value.get<Json::number_unsigned_t>();
+        if (raw > static_cast<Json::number_unsigned_t>(
+                      std::numeric_limits<int>::max()))
+        {
+            return 0;
+        }
+        return static_cast<int>(raw);
+    }
+    const auto raw = value.get<Json::number_float_t>();
+    if (!std::isfinite(raw) || std::trunc(raw) != raw ||
+        raw < std::numeric_limits<int>::min() ||
+        raw > std::numeric_limits<int>::max())
+    {
+        return 0;
+    }
+    return static_cast<int>(raw);
 }
 
 std::string CardLabel(const Json& object, std::size_t recordIndex)
@@ -248,8 +336,7 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
             continue;
         }
 
-        const int dbfID =
-            cardData["dbfId"].is_null() ? 0 : cardData["dbfId"].get<int>();
+        const int dbfID = OptionalJsonInt(cardData, "dbfId", cardLabel);
         const int normalDbfID =
             MetadataInt(cardData, "battlegroundsNormalDbfId");
         const int premiumDbfID =
@@ -267,13 +354,10 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         const Race race = ParseOptionalEnum(cardData, "race", cardLabel,
                                             Race::INVALID);
 
-        const int techLevel = cardData["techLevel"].is_null()
-                                  ? 0
-                                  : cardData["techLevel"].get<int>();
-        const int attack =
-            cardData["attack"].is_null() ? 0 : cardData["attack"].get<int>();
-        const int health =
-            cardData["health"].is_null() ? 0 : cardData["health"].get<int>();
+        const int techLevel =
+            OptionalJsonInt(cardData, "techLevel", cardLabel);
+        const int attack = OptionalJsonInt(cardData, "attack", cardLabel);
+        const int health = OptionalJsonInt(cardData, "health", cardLabel);
         const int cost =
             !cardData.contains("cost") || cardData.at("cost").is_null()
                 ? 0
@@ -316,6 +400,8 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         card.isBattlegroundsPoolMinion = isBattlegroundsPoolMinion;
         card.isBattlegroundsPoolSpell =
             IsMetadataFlag(cardData, "isBattlegroundsPoolSpell");
+        card.darkmoonPrizeTurn =
+            MetadataInt(cardData, "battlegroundsDarkmoonPrizeTurn");
         card.isBattlegroundsDarkGift =
             IsMetadataFlag(cardData, "isBattlegroundsDarkGift");
         card.isBattlegroundsDuosExclusive =
@@ -398,13 +484,6 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
                 card.races.end())
         {
             card.races.emplace_back(race);
-        }
-
-        // NOTE: The value "isBattlegroundsHero" of Lady Vashj
-        //       (TB_BaconShop_HERO_61) is missing.
-        if (id == "TB_BaconShop_HERO_61")
-        {
-            card.isCurHero = true;
         }
 
         if (idx >= cards.size())

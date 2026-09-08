@@ -55,12 +55,13 @@ void ModernMinionBehaviorsBatch2::AddAll(
     // Half-Shell token, including the golden pair.
     // SummonTask{ "BG_ICC_026t", 3 and SummonTask{ "BG_ICC_026t", 6 are
     // retained in the generated registry for normal/golden Cadaver Caretaker.
-    // SummonTask{ "BG19_010t", 2 and SummonTask{ "BG19_010_Gt", 2 are
-    // retained in the generated registry for the Sewer Lord pair.
+    // Sewer Rat's text summons one 2/3 Turtle (and its golden form one
+    // golden Turtle).  Sewer Lord's separate two-rat summon is owned by its
+    // minion definition; do not leak that count into the Rat deathrattle.
     AddStatic(cards, "BG19_010t");
     AddStatic(cards, "BG19_010_Gt");
-    AddDeathrattleSummon(cards, "BG19_010", "BG19_010t", 2);
-    AddDeathrattleSummon(cards, "BG19_010_G", "BG19_010_Gt", 2);
+    AddDeathrattleSummon(cards, "BG19_010", "BG19_010t", 1);
+    AddDeathrattleSummon(cards, "BG19_010_G", "BG19_010_Gt", 1);
     AddStatic(cards, "BG32_236");
     AddStatic(cards, "BG32_236_G");
 

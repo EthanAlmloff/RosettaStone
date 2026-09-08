@@ -26,15 +26,13 @@ TEST_CASE("[GeneratedChoices] - pinned quest reward option pool")
     CHECK(Cards::FindCardByID("BG24_Reward_130").dbfID == 90917);
     CHECK(Cards::FindCardByID("BG24_Reward_131").dbfID == 92542);
     CHECK(Cards::FindCardByID("BG24_Reward_134").dbfID == 92551);
+    CHECK(Cards::FindCardByID("BG24_Reward_136").dbfID == 93069);
+    CHECK(Cards::FindCardByID("BG24_Reward_312").dbfID == 92552);
     for (const auto dbfID : {89449, 89473, 89481, 89483, 89947, 90861,
-                             90865, 90914, 90916, 92542})
+                             90865, 90914, 90916, 92542, 93069, 92552})
         CHECK(IsExecutableSeason14GeneratedQuestReward(dbfID));
     for (const auto dbfID : {90917, 92551})
-        CHECK_FALSE(IsExecutableSeason14GeneratedQuestReward(dbfID));
-    CHECK(GeneratedQuestRewardMissingLinkReason(90917) ==
-          "placeholder_copy_target_0");
-    CHECK(GeneratedQuestRewardMissingLinkReason(92551) ==
-          "placeholder_random_card_92");
+        CHECK(IsExecutableSeason14GeneratedQuestReward(dbfID));
 
     Season14State state;
     CHECK(state.ApplyGeneratedQuestReward(89473));
@@ -57,5 +55,97 @@ TEST_CASE("[GeneratedChoices] - pinned quest reward option pool")
     CHECK(state.HasGeneratedRewardSecretSinstone());
     CHECK(state.ApplyGeneratedQuestReward(92542));
     CHECK(state.HasGeneratedRewardRedHand());
+    CHECK(state.ApplyGeneratedQuestReward(93069));
+    CHECK(state.HasGeneratedRewardTinyHenchmen());
+    CHECK(state.ApplyGeneratedQuestReward(92552));
+    CHECK(state.HasGeneratedRewardStaffOfOrigination());
     CHECK_FALSE(state.ApplyGeneratedQuestReward(90917));
+    CHECK(state.ApplyGeneratedQuestReward(89645));
+    CHECK(state.HasGeneratedRewardAnimaBribe());
+    CHECK(state.ApplyGeneratedQuestReward(93074));
+    CHECK(state.HasGeneratedRewardVictimsSpecter());
+    CHECK(state.ApplyGeneratedQuestReward(90437));
+    CHECK(state.HasGeneratedRewardDevilsInDetails());
+    CHECK(state.ApplyGeneratedQuestReward(95867));
+    CHECK(state.HasGeneratedRewardPilferedLamps());
+    CHECK(state.ApplyGeneratedQuestReward(97966));
+    CHECK(state.HasGeneratedRewardKidnapSack());
+    CHECK(state.ApplyGeneratedQuestReward(91992));
+    CHECK(state.HasGeneratedRewardAnotherHiddenBody());
+    CHECK(state.ApplyGeneratedQuestReward(90917));
+    CHECK(state.HasGeneratedRewardGhastlyMask());
+    CHECK(state.ApplyGeneratedQuestReward(92551));
+    CHECK(state.GeneratedRewardFriendsRace() == Race::INVALID);
+    CHECK(state.ApplyGeneratedQuestReward(96151));
+    CHECK(state.HasGeneratedRewardUnmurloc());
+}
+
+TEST_CASE("[GeneratedChoices] - Batch 113 ALT and 323/351/352/360 identities")
+{
+    CHECK(Cards::FindCardByID("BG24_Reward_113_ALT").dbfID == 95858);
+    CHECK(Cards::FindCardByID("BG24_Reward_323").dbfID == 96148);
+    CHECK(Cards::FindCardByID("BG24_Reward_351").dbfID == 96149);
+    CHECK(Cards::FindCardByID("BG24_Reward_352").dbfID == 96150);
+    CHECK(Cards::FindCardByID("BG24_Reward_360").dbfID == 97436);
+
+    CHECK(IsExecutableSeason14GeneratedQuestReward(95858));
+    CHECK(IsExecutableSeason14GeneratedQuestReward(96148));
+    CHECK(IsExecutableSeason14GeneratedQuestReward(96149));
+    CHECK(IsExecutableSeason14GeneratedQuestReward(96150));
+    CHECK(IsExecutableSeason14GeneratedQuestReward(97436));
+
+    // ALT Ritual Dagger is intentionally not aliased to the original
+    // death-buff family: both rows share a display name but have different
+    // simulator contracts.
+    const auto* original = FindSeason14GeneratedQuestReward(89483);
+    const auto* alt = FindSeason14GeneratedQuestReward(95858);
+    REQUIRE(original != nullptr);
+    REQUIRE(alt != nullptr);
+    CHECK(original->effect != alt->effect);
+
+    Season14State state;
+    CHECK(state.ApplyGeneratedQuestReward(95858));
+    CHECK(state.HasGeneratedRewardRitualDaggerRepeat());
+    CHECK_FALSE(state.HasGeneratedRewardRitualDagger());
+    CHECK(state.ApplyGeneratedQuestReward(96148));
+    CHECK(state.HasGeneratedRewardNineLives());
+    CHECK(state.ApplyGeneratedQuestReward(96149));
+    CHECK(state.HasGeneratedRewardTotemicTavern());
+    CHECK(state.ApplyGeneratedQuestReward(96150));
+    CHECK(state.HasGeneratedRewardPurifiedShard());
+    CHECK(state.ApplyGeneratedQuestReward(97436));
+    CHECK(state.HasGeneratedRewardTheWall());
+}
+
+TEST_CASE("[GeneratedChoices] - typed lifecycle reward ownership")
+{
+    // These rewards are resolved by Player/Season14 lifecycle hooks rather
+    // than CardDef powers. Keep their DBF-to-state ownership explicit so the
+    // coverage audit can credit the real runtime path.
+    CHECK(Cards::FindCardByID("BG27_Reward_502").dbfID == 104697);
+    CHECK(Cards::FindCardByID("BG27_Reward_503").dbfID == 104703);
+    CHECK(Cards::FindCardByID("BG27_Reward_504").dbfID == 104724);
+    CHECK(Cards::FindCardByID("BG27_Reward_804").dbfID == 104675);
+    CHECK(Cards::FindCardByID("BG28_Reward_509").dbfID == 110309);
+
+    Season14State state;
+    CHECK(state.ApplyGeneratedQuestReward(104697));
+    CHECK(state.HasGeneratedRewardBoomSquad());
+    CHECK(state.ApplyGeneratedQuestReward(104703));
+    CHECK(state.HasGeneratedRewardInvigoratingConch());
+    CHECK(state.ApplyGeneratedQuestReward(104724));
+    CHECK(state.HasGeneratedRewardTimelineAcceleration());
+    CHECK(state.ApplyGeneratedQuestReward(104675));
+    CHECK(state.HasGeneratedRewardSturdyShard());
+    CHECK(state.ApplyGeneratedQuestReward(110309));
+    CHECK(state.HasGeneratedRewardSmeltingChamber());
+    CHECK(Cards::FindCardByID("BG28_Reward_504").dbfID == 110303);
+    CHECK(Cards::FindCardByID("BG27_Reward_803").dbfID == 104670);
+    CHECK(Cards::FindCardByID("BG28_Reward_518").dbfID == 110551);
+    CHECK(state.ApplyGeneratedQuestReward(110303));
+    CHECK(state.HasGeneratedRewardCycleEnergy());
+    CHECK(state.ApplyGeneratedQuestReward(104670));
+    CHECK(state.HasGeneratedRewardTurbulentTombs());
+    CHECK(state.ApplyGeneratedQuestReward(110551));
+    CHECK(state.HasGeneratedRewardStableAmalgamation());
 }

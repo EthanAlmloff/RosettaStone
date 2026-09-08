@@ -25,6 +25,10 @@ void Card::Initialize()
             case PlayReq::REQ_TARGET_IF_AVAILABLE:
                 needsTarget = true;
                 break;
+            case PlayReq::REQ_TARGET_TO_PLAY:
+                needsTarget = true;
+                mustHaveToTargetToPlay = true;
+                break;
             case PlayReq::REQ_MINION_TARGET:
                 characterType = CharacterType::MINIONS;
                 break;

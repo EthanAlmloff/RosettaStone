@@ -49,8 +49,10 @@ TaskStatus RemoveEnchantmentTask::Impl(Player* player)
             std::erase_if(player->game->oneTurnEffects,
                           [target, &appliedEffects](const auto& effect) {
                               return effect.first == target &&
-                                     std::ranges::contains(appliedEffects,
-                                                           effect.second.get());
+                                     std::find(appliedEffects.begin(),
+                                               appliedEffects.end(),
+                                               effect.second.get()) !=
+                                         appliedEffects.end();
                           });
         }
         else if (enchant->useScriptTag)

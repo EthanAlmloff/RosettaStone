@@ -6,12 +6,15 @@ namespace RosettaStone::Battlegrounds { class Minion; class Player;
 namespace SimpleTasks {
 class RandomSummonFromPoolTask {
  public:
-  RandomSummonFromPoolTask(Race race, int minTier, int maxTier, int stat, bool golden)
-      : m_race(race), m_minTier(minTier), m_maxTier(maxTier), m_stat(stat), m_golden(golden) {}
+  RandomSummonFromPoolTask(Race race, int minTier, int maxTier, int stat, bool golden,
+                           bool battlecryOnly = false)
+      : m_race(race), m_minTier(minTier), m_maxTier(maxTier), m_stat(stat),
+        m_golden(golden), m_battlecryOnly(battlecryOnly) {}
   TaskStatus Run(Player&, Minion&);
   TaskStatus Run(Player&, Minion&, Minion&);
  private:
   Race m_race = Race::INVALID; int m_minTier = 0; int m_maxTier = 0; int m_stat = 0; bool m_golden = false;
+  bool m_battlecryOnly = false;
 };
 }}
 #endif

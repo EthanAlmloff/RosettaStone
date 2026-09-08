@@ -7,6 +7,72 @@
 using namespace RosettaStone;
 using namespace RosettaStone::Battlegrounds;
 
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Season 14 trinket tokens preserve target restrictions")
+{
+    const auto staff = FindTavernSpellBehavior("BG35_MagicItem_872t");
+    CHECK(staff.effect == TavernSpellEffect::TARGET_STATS_AND_REBORN);
+    CHECK(staff.attack == 2);
+    CHECK(staff.health == 2);
+    CHECK(staff.race == Race::BEAST);
+
+    const auto lens = FindTavernSpellBehavior("BG35_MagicItem_817t");
+    CHECK(lens.effect == TavernSpellEffect::TARGET_SHOP_COPY_TIER);
+    CHECK(lens.value == 1);
+    CHECK(TavernSpellRequiresTarget(lens.effect));
+}
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - executable simple generated tokens")
+{
+    const auto pearl = FindTavernSpellBehavior("BG30_MagicItem_714t");
+    CHECK(pearl.effect == TavernSpellEffect::TARGET_STATS_NEXT_TURN);
+    CHECK(pearl.attack == 30);
+    CHECK(pearl.health == 30);
+    CHECK(TavernSpellRequiresTarget(pearl.effect));
+
+    const auto meditation = FindTavernSpellBehavior("BG32_835t");
+    CHECK(meditation.effect == TavernSpellEffect::TAVERN_SPELL_STATS_PERMANENT);
+    CHECK(meditation.attack == 1);
+    CHECK(meditation.health == 1);
+    const auto goldenMeditation = FindTavernSpellBehavior("BG32_835_Gt");
+    CHECK(goldenMeditation.attack == 2);
+    CHECK(goldenMeditation.health == 2);
+
+    const auto rime = FindTavernSpellBehavior("BG33_319t");
+    CHECK(rime.effect == TavernSpellEffect::RANDOM_STAT_TAVERN_SPELL);
+    CHECK(rime.randomCount == 1);
+    CHECK(FindTavernSpellBehavior("BG33_319_Gt").randomCount == 2);
+
+    const auto bubble = FindTavernSpellBehavior("BG32_MagicItem_892t");
+    CHECK(bubble.effect == TavernSpellEffect::TARGET_RANDOM_RACE_KEYWORD);
+    CHECK(bubble.race == Race::MURLOC);
+    CHECK(TavernSpellRequiresTarget(bubble.effect));
+
+    const auto sack = FindTavernSpellBehavior("BG24_Reward_718t");
+    CHECK(sack.effect == TavernSpellEffect::TARGET_SHOP_MOVE_NON_GOLDEN);
+    CHECK(TavernSpellRequiresTarget(sack.effect));
+
+    const auto stitch = FindTavernSpellBehavior("BG35_MagicItem_838t");
+    CHECK(stitch.effect == TavernSpellEffect::TARGET_DOUBLE_STATS_HAND_LOCK);
+    CHECK(TavernSpellRequiresTarget(stitch.effect));
+
+    const auto candle = FindTavernSpellBehavior("BG36_MagicItem_208t");
+    CHECK(candle.effect == TavernSpellEffect::TARGET_TRIGGER_DEATHRATTLE);
+    CHECK(TavernSpellRequiresTarget(candle.effect));
+}
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - additional unsupported token families are executable")
+{
+    CHECK(FindTavernSpellBehavior("BG26_813t").effect == TavernSpellEffect::TARGET_GOLDEN);
+    CHECK(FindTavernSpellBehavior("BG30_MagicItem_429t").effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS);
+    CHECK(FindTavernSpellBehavior("BG30_MagicItem_429t").randomCount == 1);
+    CHECK(FindTavernSpellBehavior("BG31_891").effect == TavernSpellEffect::STEAL_RANDOM_SHOP_RACE);
+    CHECK(FindTavernSpellBehavior("BG31_891").race == Race::PIRATE);
+    CHECK(FindTavernSpellBehavior("BG33_Reward_006t").effect == TavernSpellEffect::TARGET_DIVINE_SHIELD_AND_WINDFURY);
+    CHECK(FindTavernSpellBehavior("BG35_MagicItem_306t").randomCount == 1);
+    CHECK(FindTavernSpellBehavior("BG35_MagicItem_733t").randomCount == 2);
+    CHECK(FindTavernSpellBehavior("BG_EX1_014t").attack == 1);
+}
+
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - initial lookup table batch")
 {
     struct Expected

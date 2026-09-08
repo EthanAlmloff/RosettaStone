@@ -195,6 +195,18 @@ TEST_CASE("[Season14] - inactive start-turn Trinkets do not grant")
     CHECK(player.hand.GetCount() == 0);
 }
 
+TEST_CASE("[Season14] - acquisition grants recurring Trinkets exactly once")
+{
+    Player player;
+    // Essence of Dreams grants two Dreamer's Embrace spells on acquisition;
+    // the recruit-start cadence is one additional spell.  This guards
+    // against dispatching the immediate grant twice.
+    CHECK(player.AcquireTrinket({111253, 1, true})); // BG30_MagicItem_916
+    CHECK(player.hand.GetCount() == 2);
+    CHECK(player.GrantTrinketStartTurnCards() == 1);
+    CHECK(player.hand.GetCount() == 3);
+}
+
 TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")
 {
     Season14State state;
@@ -207,6 +219,12 @@ TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")
     CHECK(state.MinionPurchaseCost(3) == 5);
     CHECK(state.RefreshCost(1) == 3);
     CHECK(state.UpgradeCost(5) == 6);
+
+    // Skilled Bartender (DBF 57561) is a passive Batch8 power.  Its
+    // executable ownership is the Season14 upgrade-cost boundary, not an
+    // activation branch, so keep an explicit regression check here.
+    state.SetHeroPower(57561, 0, true);
+    CHECK(state.UpgradeCost(5) == 4);
 
     state.SetHeroPower(57945, 0, true);
     CHECK(state.TavernOfferCount(3) == 2);
@@ -222,6 +240,14 @@ TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")
     CHECK(state.RefreshCost(1) == 1);
     state.OnRefreshTavern(false);
     CHECK(state.RefreshCost(1) == 1);
+
+    // Demon Hunter Training targets seven offers after five refreshes; it is
+    // not a fixed two-slot bonus (which would leave low-tier Taverns short).
+    state.SetHeroPower(61915, 0, true);
+    state.heroPowerBatch5.demonHunterTrainingUnlocked = true;
+    CHECK(state.TavernOfferCount(3) == 7);
+    CHECK(state.TavernOfferCount(6) == 7);
+    CHECK(state.TavernOfferCount(7) == 7);
 }
 
 TEST_CASE("[Season14] - lifecycle hooks pay deterministic Batch-2 effects")
@@ -256,6 +282,88 @@ TEST_CASE("[Season14] - hero-power discount is consumed by successful use")
     CHECK(state.UseHeroPower());
     CHECK(!state.heroPowerBatch2.nextHeroPowerDiscount);
     CHECK(!state.CanUseHeroPower(3));
+}
+
+TEST_CASE("[Season14] - spell-count Trinkets use shared resolved-spell callback")
+{
+    Season14State state;
+    state.AddTrinket({120610, 1, true}); // BG32_MagicItem_930
+    state.AddTrinket({133379, 1, true}); // BG36_MagicItem_307
+
+    for (int i = 0; i < 6; ++i)
+        state.OnTavernSpellResolved(true, 0, false);
+    CHECK(state.PendingSpellCountNagaRewards() == 0);
+    CHECK(state.TakeSpellCountGold() == 0);
+
+    // The seventh spell produces Archaic Scroll's Naga reward; only spells
+    // cast on minions advance Wand of Divination.
+    state.OnTavernSpellResolved(true, 0, false);
+    CHECK(state.PendingSpellCountNagaRewards() == 1);
+    CHECK(state.TakeSpellCountGold() == 0);
+    for (int i = 0; i < 2; ++i)
+        state.OnTavernSpellResolved(true, 0, true);
+    CHECK(state.TakeSpellCountGold() == 0);
+    state.OnTavernSpellResolved(true, 0, true);
+    CHECK(state.TakeSpellCountGold() == 1);
+    // Both counters reset at their own thresholds and can trigger again.
+    for (int i = 0; i < 7; ++i)
+        state.OnTavernSpellResolved(true, 0, false);
+    CHECK(state.PendingSpellCountNagaRewards() == 2);
+}
+
+TEST_CASE("[Season14] - spell-count Trinkets are per-instance and retry hand rewards")
+{
+    // Two Archaic Scrolls have independent cadence; an inactive copy must not
+    // advance, and a full hand must leave the generated Naga reward pending.
+    Player player;
+    const auto scroll = Cards::FindCardByID("BG32_MagicItem_930").dbfID;
+    player.season14.trinkets.push_back({scroll, 1, true});
+    player.season14.trinkets.push_back({scroll, 1, true});
+    player.season14.trinkets.push_back({scroll, 1, false});
+    for (int i = 0; i < 7; ++i)
+        player.season14.OnTavernSpellResolved(true, 0, false);
+    CHECK(player.season14.PendingSpellCountNagaRewards() == 2);
+
+    const auto minion = Cards::FindCardByDbfID(49169);
+    for (int i = 0; i < MAX_HAND_SIZE; ++i)
+        player.hand.Add(CardData{Minion(minion)});
+    player.ResolveSpellCountTrinkets();
+    CHECK(player.hand.GetCount() == MAX_HAND_SIZE);
+    CHECK(player.season14.PendingSpellCountNagaRewards() == 2);
+
+    auto held = player.hand[0];
+    player.hand.Remove(held);
+    player.ResolveSpellCountTrinkets();
+    CHECK(player.hand.GetCount() == MAX_HAND_SIZE);
+    CHECK(player.season14.PendingSpellCountNagaRewards() == 1);
+}
+
+TEST_CASE("[Season14] - sell and death random Trinkets keep independent cadence")
+{
+    const std::array<std::pair<const char*, int>, 5> cases{{
+        {"BG30_MagicItem_710", 5},  // Fungalmancer Sticker, Murloc
+        {"BG30_MagicItem_951", 6},  // Lava Lamp, Elemental
+        {"BG30_MagicItem_713", 8},  // Bleeding Heart, Undead
+        {"BG30_MagicItem_931", 7},  // Lucky Tabby, Beast
+        {"BG35_MagicItem_302", 8},  // Stormcoil Sticker, Mech
+    }};
+    const auto minion = Cards::FindCardByDbfID(49169);
+    for (const auto& [id, threshold] : cases)
+    {
+        Player player;
+        const auto dbfID = Cards::FindCardByID(id).dbfID;
+        REQUIRE(dbfID != 0);
+        player.season14.trinkets.push_back({dbfID, 1, true});
+        for (int i = 0; i < threshold * 2; ++i)
+        {
+            player.recruitField.Add(Minion(minion));
+            player.SellMinion(0);
+        }
+        // The counter resets after delivery, so two complete cadences produce
+        // two cards; race filtering is exercised by the production task.
+        CHECK(player.hand.GetCount() == 2);
+        CHECK(player.season14.trinkets.front().triggerProgress == 0);
+    }
 }
 
 TEST_CASE("[Season14] - Temporal Tavern refresh allowance is one-shot")
