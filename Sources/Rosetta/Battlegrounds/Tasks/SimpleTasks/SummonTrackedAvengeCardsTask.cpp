@@ -6,6 +6,10 @@ TaskStatus SummonTrackedAvengeCardsTask::Run(Player& p, Minion&) {
     auto ids = p.season14.TakeCombatAvengeCards();
     bool summonedAny = false;
     for (auto& id : ids) {
+        if (p.GetField().IsFull()) {
+            p.ApplySummonOverflowTrinkets();
+            break;
+        }
         for (int i = 0; i < p.hand.GetCount(); ++i) {
             if (std::holds_alternative<Minion>(p.hand[i]) &&
                 std::get<Minion>(p.hand[i]).GetCardID() == id &&

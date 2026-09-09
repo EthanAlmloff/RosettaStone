@@ -26790,16 +26790,19 @@
         "text": "<b>Deathrattle:</b> Summon a 1/1 Pirate. It attacks immediately.",
         "type": "MINION"
     },
-    {
+        {
         "attack": 1,
         "battlegroundsPremiumDbfId": 62215,
         "cardClass": "ROGUE",
-        "cost": 1,
+        "cost": 0,
         "dbfId": 62213,
         "health": 1,
         "id": "BGS_061t",
         "name": "Sky Pirate",
         "race": "PIRATE",
+        "races": [
+            "PIRATE"
+        ],
         "set": "BATTLEGROUNDS",
         "techLevel": 1,
         "type": "MINION"
@@ -269781,20 +269784,17 @@
         "text": "<b>Secret:</b> When your second minion dies in a turn, return it to life.",
         "type": "SPELL"
     },
-    {
-        "battlegroundsDarkmoonPrizeTurn": 3,
-        "cardClass": "MAGE",
+            {
+        "cardClass": "NEUTRAL",
         "cost": 0,
         "dbfId": 58512,
         "id": "TB_Bacon_Secrets_12",
         "name": "Ice Block",
-        "rarity": "EPIC",
         "referencedTags": [
             "IMMUNE",
             "SECRET"
         ],
         "set": "BATTLEGROUNDS",
-        "spellSchool": "FROST",
         "text": "<b>Secret:</b> When your hero takes fatal damage, prevent it and become <b>Immune</b> this turn.",
         "type": "SPELL"
     },
@@ -272432,7 +272432,7 @@
         "type": "HERO"
     },
     {
-        "attack": 6,
+        "attack": 5,
         "battlegroundsPremiumDbfId": 77820,
         "cardClass": "NEUTRAL",
         "cost": 3,
@@ -272459,7 +272459,7 @@
         "type": "ENCHANTMENT"
     },
     {
-        "attack": 12,
+        "attack": 10,
         "battlegroundsNormalDbfId": 77819,
         "cardClass": "NEUTRAL",
         "cost": 3,
@@ -280463,16 +280463,19 @@
         "text": "<b>Deathrattle:</b> Summon a 2/2 Pirate. It attacks immediately.",
         "type": "MINION"
     },
-    {
+        {
         "attack": 2,
         "battlegroundsNormalDbfId": 62213,
         "cardClass": "ROGUE",
-        "cost": 1,
+        "cost": 0,
         "dbfId": 62215,
         "health": 2,
         "id": "TB_BaconUps_141t",
         "name": "Sky Pirate",
         "race": "PIRATE",
+        "races": [
+            "PIRATE"
+        ],
         "set": "BATTLEGROUNDS",
         "techLevel": 1,
         "type": "MINION"
@@ -329927,4 +329930,901 @@
         "text": "Can only take 1 damage at a time.",
         "type": "MINION"
     }
+,
+{
+    "artist": "BOSi Studio",
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 118681,
+    "hideCost": true,
+    "id": "BG31_HERO_801p",
+    "mechanics": [
+        "TRIGGER_VISUAL"
+    ],
+    "name": "Lift Off",
+    "referencedTags": [
+        "BACON_REFRESH_TOOLTIP"
+    ],
+    "set": "BATTLEGROUNDS",
+    "text": "[x]Start the game with a 2/2\n Battlecruiser. Whenever the\nTavern is <b>Refreshed</b>, add a\n  Battlecruiser Upgrade to it.",
+    "type": "HERO_POWER"
+},
+{
+    "artist": "BOSi Studio",
+    "attack": 2,
+    "battlegroundsPremiumDbfId": 118685,
+    "cardClass": "PALADIN",
+    "cost": 0,
+    "dbfId": 118684,
+    "elite": true,
+    "health": 2,
+    "id": "BG31_HERO_801pt",
+    "name": "Battlecruiser",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 1,
+    "type": "MINION"
+},
+{
+    "artist": "BOSi Studio",
+    "attack": 4,
+    "battlegroundsNormalDbfId": 118684,
+    "cardClass": "PALADIN",
+    "cost": 0,
+    "dbfId": 118685,
+    "elite": true,
+    "health": 4,
+    "id": "BG31_HERO_801pt_G",
+    "name": "Battlecruiser",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 1,
+    "type": "MINION"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120259,
+    "id": "BG31_HERO_801pta",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 1,
+    "text": "Give your Battlecruiser +6 Attack.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120285,
+    "id": "BG31_HERO_801pta2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 2,
+    "text": "Give your Battlecruiser +8 Attack.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120286,
+    "id": "BG31_HERO_801pta3",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 3,
+    "text": "Give your Battlecruiser +11 Attack.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120287,
+    "id": "BG31_HERO_801pta4",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 4,
+    "text": "Give your Battlecruiser +15 Attack.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120288,
+    "id": "BG31_HERO_801pta5",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 5,
+    "text": "Give your Battlecruiser +20 Attack.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120289,
+    "id": "BG31_HERO_801pta6",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "Give your Battlecruiser +28 Attack.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120290,
+    "id": "BG31_HERO_801pta7",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "Give your Battlecruiser +40 Attack.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 118710,
+    "id": "BG31_HERO_801ptae",
+    "name": "Hyperflight Rotors",
+    "set": "BATTLEGROUNDS",
+    "text": "+0 Attack.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120260,
+    "id": "BG31_HERO_801ptb",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 1,
+    "text": "Give your Battlecruiser +6 Health.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120291,
+    "id": "BG31_HERO_801ptb2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 2,
+    "text": "Give your Battlecruiser +8 Health.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120292,
+    "id": "BG31_HERO_801ptb3",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 3,
+    "text": "Give your Battlecruiser +11 Health.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120293,
+    "id": "BG31_HERO_801ptb4",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 4,
+    "text": "Give your Battlecruiser +15 Health.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120294,
+    "id": "BG31_HERO_801ptb5",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 5,
+    "text": "Give your Battlecruiser +20 Health.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120295,
+    "id": "BG31_HERO_801ptb6",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "Give your Battlecruiser +28 Health.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120296,
+    "id": "BG31_HERO_801ptb7",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "Give your Battlecruiser +40 Health.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120445,
+    "id": "BG31_HERO_801ptbe",
+    "name": "Smart Servos",
+    "set": "BATTLEGROUNDS",
+    "text": "+0 Health.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120261,
+    "id": "BG31_HERO_801ptc",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 1,
+    "text": "[x]Give your Battlecruiser\n\"<b>Start of Combat:</b> Deal\n3 damage to the highest-\nHealth enemy minion.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120297,
+    "id": "BG31_HERO_801ptc2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 2,
+    "text": "[x]Give your Battlecruiser\n\"<b>Start of Combat:</b> Deal\n6 damage to the highest-\nHealth enemy minion.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120298,
+    "id": "BG31_HERO_801ptc3",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 3,
+    "text": "[x]Give your Battlecruiser\n\"<b>Start of Combat:</b> Deal\n9 damage to the highest-\nHealth enemy minion.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120309,
+    "id": "BG31_HERO_801ptc4",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 4,
+    "text": "[x]Give your Battlecruiser\n\"<b>Start of Combat:</b> Deal\n18 damage to the highest-\nHealth enemy minion.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120310,
+    "id": "BG31_HERO_801ptc5",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 5,
+    "text": "[x]Give your Battlecruiser\n\"<b>Start of Combat:</b> Deal\n24 damage to the highest-\nHealth enemy minion.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120311,
+    "id": "BG31_HERO_801ptc6",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "[x]Give your Battlecruiser\n\"<b>Start of Combat:</b> Deal\n30 damage to the highest-\nHealth enemy minion.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120312,
+    "id": "BG31_HERO_801ptc7",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "[x]Give your Battlecruiser\n\"<b>Start of Combat:</b> Deal\n40 damage to the highest-\nHealth enemy minion.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "collectionText": "<b>Start of Combat:</b> Deal {0} damage to the highest-Health enemy minion, twice.",
+    "dbfId": 120281,
+    "id": "BG31_HERO_801ptce",
+    "name": "Yamato Cannon",
+    "set": "BATTLEGROUNDS",
+    "text": "<b>Start of Combat:</b> Deal 0 damage to the highest-Health enemy minion.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120262,
+    "id": "BG31_HERO_801ptd",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Ballistics",
+    "referencedTags": [
+        "BACON_RALLY"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 1,
+    "text": "[x]Give your Battlecruiser\n\"<b>Rally:</b> Give your other\nminions +2 Attack.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120313,
+    "id": "BG31_HERO_801ptd2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Ballistics",
+    "referencedTags": [
+        "BACON_RALLY"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 2,
+    "text": "[x]Give your Battlecruiser\n\"<b>Rally:</b> Give your other\nminions +3 Attack.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120314,
+    "id": "BG31_HERO_801ptd3",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Ballistics",
+    "referencedTags": [
+        "BACON_RALLY"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 3,
+    "text": "[x]Give your Battlecruiser\n\"<b>Rally:</b> Give your other\nminions +4 Attack.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120315,
+    "id": "BG31_HERO_801ptd4",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Ballistics",
+    "referencedTags": [
+        "BACON_RALLY"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 4,
+    "text": "[x]Give your Battlecruiser\n\"<b>Rally:</b> Give your other\nminions +5 Attack.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120316,
+    "id": "BG31_HERO_801ptd5",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Ballistics",
+    "referencedTags": [
+        "BACON_RALLY"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 5,
+    "text": "[x]Give your Battlecruiser\n\"<b>Rally:</b> Give your other\nminions +6 Attack.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120317,
+    "id": "BG31_HERO_801ptd6",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Ballistics",
+    "referencedTags": [
+        "BACON_RALLY"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "[x]Give your Battlecruiser\n\"<b>Rally:</b> Give your other\nminions +8 Attack.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120318,
+    "id": "BG31_HERO_801ptd7",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Ballistics",
+    "referencedTags": [
+        "BACON_RALLY"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "[x]Give your Battlecruiser\n\"<b>Rally:</b> Give your other\nminions +10 Attack.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120282,
+    "id": "BG31_HERO_801ptde",
+    "name": "Advanced Ballistics",
+    "set": "BATTLEGROUNDS",
+    "text": "<b>Rally:</b> give your other minions +0 Attack.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120765,
+    "id": "BG31_HERO_801ptde2",
+    "name": "Advanced Ballistics",
+    "set": "BATTLEGROUNDS",
+    "text": "+0/+0.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120263,
+    "id": "BG31_HERO_801pte",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Caduceus Reactor",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 1,
+    "text": "[x]Give your Battlecruiser\n\"<b>Deathrattle:</b> Give your\nleft-most minion\n+1/+1.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120319,
+    "id": "BG31_HERO_801pte2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Caduceus Reactor",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 2,
+    "text": "[x]Give your Battlecruiser\n\"<b>Deathrattle:</b> Give your\nleft-most minion\n+2/+2.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120320,
+    "id": "BG31_HERO_801pte3",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Caduceus Reactor",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 3,
+    "text": "[x]Give your Battlecruiser\n\"<b>Deathrattle:</b> Give your\nleft-most minion\n+4/+4.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120321,
+    "id": "BG31_HERO_801pte4",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Caduceus Reactor",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 4,
+    "text": "[x]Give your Battlecruiser\n\"<b>Deathrattle:</b> Give your\nleft-most minion\n+7/+7.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120322,
+    "id": "BG31_HERO_801pte5",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Caduceus Reactor",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 5,
+    "text": "[x]Give your Battlecruiser\n\"<b>Deathrattle:</b> Give your\nleft-most minion\n+10/+10.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120323,
+    "id": "BG31_HERO_801pte6",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Caduceus Reactor",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "[x]Give your Battlecruiser\n\"<b>Deathrattle:</b> Give your\nleft-most minion\n+15/+15.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120324,
+    "id": "BG31_HERO_801pte7",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Caduceus Reactor",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "[x]Give your Battlecruiser\n\"<b>Deathrattle:</b> Give your\nleft-most minion\n+25/+25.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120278,
+    "id": "BG31_HERO_801ptee",
+    "name": "Caduceus Reactor",
+    "set": "BATTLEGROUNDS",
+    "text": "<b>Deathrattle:</b> Give your left-most minion +0/+0.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120766,
+    "id": "BG31_HERO_801ptee2",
+    "name": "Caduceus Reactor",
+    "set": "BATTLEGROUNDS",
+    "text": "+0/+0.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 3,
+    "dbfId": 120265,
+    "id": "BG31_HERO_801ptf",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Construction",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 4,
+    "text": "[x]Give your Battlecruiser\n\"1 Battlecruiser Upgrade\nyou buy each turn is free.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120325,
+    "id": "BG31_HERO_801ptf2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Construction",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 5,
+    "text": "[x]Give your Battlecruiser\n\"1 Battlecruiser Upgrade\nyou buy each turn is free.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120326,
+    "id": "BG31_HERO_801ptf3",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Construction",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "[x]Give your Battlecruiser\n\"1 Battlecruiser Upgrade\nyou buy each turn is free.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 120327,
+    "id": "BG31_HERO_801ptf4",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Advanced Construction",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "[x]Give your Battlecruiser\n\"1 Battlecruiser Upgrade\nyou buy each turn is free.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120268,
+    "id": "BG31_HERO_801ptfe",
+    "name": "Advanced Construction",
+    "set": "BATTLEGROUNDS",
+    "text": "One Battlecruiser Upgrade you buy each turn is free.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 4,
+    "dbfId": 120272,
+    "id": "BG31_HERO_801pth",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Fortified Bunker",
+    "referencedTags": [
+        "MAGNETIC"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 5,
+    "text": "[x]Give your Battlecruiser\n\"At the end of your turn,\nget a random <b>Magnetic</b>\nMech.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 3,
+    "dbfId": 120331,
+    "id": "BG31_HERO_801pth2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Fortified Bunker",
+    "referencedTags": [
+        "MAGNETIC"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "[x]Give your Battlecruiser\n\"At the end of your turn,\nget a random <b>Magnetic</b>\nMech.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 2,
+    "dbfId": 120332,
+    "id": "BG31_HERO_801pth3",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Fortified Bunker",
+    "referencedTags": [
+        "MAGNETIC"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "[x]Give your Battlecruiser\n\"At the end of your turn,\nget a random <b>Magnetic</b>\nMech.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120444,
+    "id": "BG31_HERO_801pthe",
+    "name": "Fortified Bunker",
+    "set": "BATTLEGROUNDS",
+    "text": "At the end of your turn, get a random <b>Magnetic</b> Mech.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 5,
+    "dbfId": 120275,
+    "id": "BG31_HERO_801pti",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Missile Pod",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "Make your Battlecruiser's Yamato Cannon trigger twice.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 3,
+    "dbfId": 120333,
+    "id": "BG31_HERO_801pti2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Missile Pod",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "Make your Battlecruiser's Yamato Cannon trigger twice.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 110324,
+    "id": "BG31_HERO_801ptie",
+    "mechanics": [
+        "ENCHANTMENT_INVISIBLE"
+    ],
+    "name": "Missile Pod Active",
+    "set": "BATTLEGROUNDS",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 6,
+    "dbfId": 120277,
+    "id": "BG31_HERO_801ptj",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Ultra-Capacitor",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 6,
+    "text": "[x]Give your Battlecruiser\n<b>Reborn</b> and \"This is\n<b>Reborn</b> with full Health\nand enchantments.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 4,
+    "dbfId": 120334,
+    "id": "BG31_HERO_801ptj2",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Ultra-Capacitor",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "UPGRADE",
+    "techLevel": 7,
+    "text": "[x]Give your Battlecruiser\n<b>Reborn</b> and \"This is\n<b>Reborn</b> with full Health\nand enchantments.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 119513,
+    "id": "BG31_HERO_801ptje",
+    "name": "Ultra-Capacitor",
+    "set": "BATTLEGROUNDS",
+    "text": "<b>Reborn</b> with full health and enchantments.",
+    "type": "ENCHANTMENT"
+},
+{
+    "artist": "Marta Vives Poch",
+    "battlegroundsRelatedCard": 58512,
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 130838,
+    "id": "BG35_MagicItem_820",
+    "name": "Safety Patch",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "GREATER_TRINKET",
+    "text": "Cast Ice Block.\nGain 5 Gold.",
+    "type": "BATTLEGROUND_TRINKET"
+},
+{
+    "attack": 1,
+    "battlegroundsPremiumDbfId": 133025,
+    "cardClass": "HUNTER",
+    "cost": 0,
+    "dbfId": 133024,
+    "health": 1,
+    "id": "BG36_200t",
+    "name": "Foraging Bat",
+    "race": "BEAST",
+    "races": [
+        "BEAST"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 1,
+    "type": "MINION"
+},
+{
+    "attack": 2,
+    "battlegroundsNormalDbfId": 133024,
+    "cardClass": "HUNTER",
+    "cost": 0,
+    "dbfId": 133025,
+    "health": 2,
+    "id": "BG36_200_Gt",
+    "name": "Foraging Bat",
+    "race": "BEAST",
+    "races": [
+        "BEAST"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 1,
+    "type": "MINION"
+},
+{
+    "attack": 2,
+    "battlegroundsPremiumDbfId": 108716,
+    "cardClass": "HUNTER",
+    "cost": 0,
+    "dbfId": 108715,
+    "health": 2,
+    "id": "BG29_801t",
+    "mechanics": [
+        "TAUNT"
+    ],
+    "name": "Silver Fledgling",
+    "race": "BEAST",
+    "races": [
+        "BEAST"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 1,
+    "text": "<b>Taunt</b>",
+    "type": "MINION"
+},
+{
+    "attack": 4,
+    "battlegroundsNormalDbfId": 108715,
+    "cardClass": "HUNTER",
+    "cost": 0,
+    "dbfId": 108716,
+    "health": 4,
+    "id": "BG29_801_Gt",
+    "mechanics": [
+        "TAUNT"
+    ],
+    "name": "Silver Fledgling",
+    "race": "BEAST",
+    "races": [
+        "BEAST"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 1,
+    "text": "<b>Taunt</b>",
+    "type": "MINION"
+}
 ]

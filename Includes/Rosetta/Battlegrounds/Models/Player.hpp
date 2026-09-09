@@ -10,6 +10,7 @@
 #include <Rosetta/Battlegrounds/Models/Hero.hpp>
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
 #include <Rosetta/Battlegrounds/Models/Tavern.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Tasks/TaskStack.hpp>
 #include <Rosetta/Battlegrounds/Zones/FieldZone.hpp>
 #include <Rosetta/Battlegrounds/Zones/HandZone.hpp>
@@ -17,6 +18,7 @@
 #include <array>
 #include <functional>
 #include <limits>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -43,6 +45,11 @@ class Player
 
     //! Prepare a list of minions in Tavern for purchase.
     void PrepareTavern();
+    //! Resolve Coilfang Elite's "appears in the Tavern" trigger for only
+    //! offers created by this preparation.  The pool indices that were
+    //! already visible are supplied so frozen/retained offers do not retrigger.
+    void GrantCoilfangSpellcraftForFreshOffers(
+        const std::set<int>& existingPoolIndices);
     //! Called by HandZone after a card is successfully acquired.
     void OnCardAcquired(const CardData& card);
 
@@ -77,6 +84,8 @@ class Player
     //! Relics of the Deep grants one Spellcraft at each recruit start.
     void ResolveRelicsOfTheDeepStartTurn();
     void ResolveMechGyverDeath();
+    //! Lift Off's Fortified Bunker gives a random Magnetic Mech at recruit end.
+    void ResolveLiftOffEndTurn();
     //! Arms Fodder refreshes from Woodland Defiler end-of-turn triggers.
     void ResolveFodderDefilerEndTurn();
     void ResolveEnigmaticHeadstoneEndTurn();
@@ -88,6 +97,18 @@ class Player
     //! The call is made by every authoritative summon path after insertion
     //! and ordinary SUMMON observers have seen the entity.
     void ApplySummonTrinkets(Minion& summoned);
+    //! Resolves Trinkets whose trigger is an attempted summon that cannot fit
+    //! on the friendly warband (Mug of the Sire).
+    void ApplySummonOverflowTrinkets();
+    //! Re-apply Mechagon Adapter after a friendly Mech loses Divine Shield.
+    //! Notify combat-only Divine Shield-loss observers.  Despite the legacy
+    //! callback name, this event is race-independent (Divine Signet observes
+    //! every friendly minion, not only Mechs).
+    void OnFriendlyDivineShieldLost(Minion& minion);
+    //! Tiger Carving buffs another friendly minion after friendly damage.
+    void OnFriendlyMinionDamaged(Minion& minion);
+    //! Belcher Portrait grants +4/+4 when a friendly minion loses Venomous.
+    void OnFriendlyVenomousLost(Minion& minion);
     //! Applies Ancestral Automaton's lifetime "other summoned" scaling and
     //! records the summon for this player.  The counter is player-local and
     //! therefore survives zone changes while remaining isolated per opponent.
@@ -95,7 +116,17 @@ class Player
     //! Resolves Mechagnome Interpreter for a successfully played or
     //! magnetized friendly Mech.
     void ApplyMechagnomeInterpreterBonus(Minion& target);
+    //! Resolves Trinkets whose text listens to a successful Magnetize.
+    //! This is shared by ordinary hand plays and modal Discover attachments.
+    void ApplyAfterMagnetizeTrinkets(Minion& target);
     void RefreshSousChefHeroPowerUses();
+    //! Resolve Buddy observers after a successful Hero Power.  A non-zero
+    //! target entity ID identifies the friendly minion selected by the
+    //! action; carrying identity rather than a mutable slot keeps duplicate
+    //! Hero Power replays attached to the same entity.
+    void ResolveHeroPowerUseBuddies(std::uint64_t targetEntityID = 0,
+                                    int repeats = 1,
+                                    bool includeUseObservers = true);
     //! Applies Watfin only after Detective for Hire commits a correct guess.
     void ResolveWatfinGuess(bool correct, const Card& guessedMinion);
     //! Resolves Zippers only when a canonical helpful-card pool is available.
@@ -110,7 +141,13 @@ class Player
     void ApplyPersistentRaceStatsExcept(Race race, int attack, int health,
                                         std::uint64_t excludedEntityID);
     //! Resolves discover-triggered player auras after a choice is committed.
-    void ResolveDiscoverTriggers();
+    //! Resolve effects that listen to a committed minion Discover.  The
+    //! stable entity ID is supplied by the commit path so effects cannot
+    //! accidentally target an unrelated owned minion or a Tavern offer.
+    void ResolveDiscoverTriggers(std::uint64_t discoveredEntityID = 0);
+    //! Applies Burth to a Discover result that may still be a transient
+    //! Magnetic attachment rather than an entity in hand or on the board.
+    void ApplyBurthDiscoverBuff(Minion& discovered);
     void ApplySpellRaceBuff(Race race, int attack, int health, bool includeHand);
     void ApplySpellSpecialBuff(int mode, int attack, int health);
     //! Resolve a supported Tavern spell without charging gold. Used by
@@ -118,6 +155,8 @@ class Player
     bool CastTavernSpellFree(const std::string& cardID, int amount = 1,
                              int targetIdx = -1);
     void ApplyTavernRaceBuff(Race race, int attack, int health);
+    //! True when an active portrait modifier is currently owned by this player.
+    bool HasActivePortrait(PortraitEffect effect) const noexcept;
     void ArmNextBoughtStats(int sourceIndex, int multiplier);
 
     //! Purchases a minion from Tavern's field.
@@ -140,6 +179,8 @@ class Player
     // snapshot from consuming the queued resurrection during start-of-combat.
     bool TryResolveRapidReanimationIfSpace(FieldZone& field);
     bool BeginFantasticTreasureOffer();
+    //! Opens the Greater Trinket offer moved by Ornate Clock, if armed.
+    bool BeginOrnateClockOffer();
     bool BeginWarpGateChoice();
     bool BeginWhodunitQuestChoice();
     bool TryResolveWarpGateReward();
@@ -266,9 +307,15 @@ class Player
     //! Resolves persistent Trinket effects after any successful Tavern spell,
     //! including modal/Choose-One completion paths.
     void ApplyTavernSpellTrinkets();
+    //! Applies Daggerspine Thrasher's one random temporary keyword after a
+    //! successful spell resolution.  Kept beside the shared Tavern-spell
+    //! completion hook so modal/free/generated casts cannot bypass it.
+    void ApplyDaggerspineThrasherSpellCast();
     void ApplyAfterPlayCardTrinkets(Race playedRace = Race::INVALID,
-                                    bool magnetic = false);
-    void ApplyAfterRebornTrinkets();
+                                    bool magnetic = false,
+                                    bool playedDemon = false,
+                                    bool playedMurloc = false);
+    void ApplyAfterRebornTrinkets(const Minion* reborn = nullptr);
     void ApplyStartCombatTrinkets();
     void ResolveStartTurnTrinkets();
     bool ShouldDuplicateDragonBattlecry() const noexcept;
@@ -319,6 +366,10 @@ class Player
 
     //! Completes recruit phase.
     void CompleteRecruit();
+    //! Resolves Hackerfin's generated Battlecry payload after the source has
+    //! entered the recruit field.  The generated CardDef is intentionally
+    //! empty because the payload depends on the complete current warband.
+    void ResolveHackerfinBattlecry(Minion& source);
     void ResolveRecruitEndDeaths();
     void ResolveDarkGiftEndTurnTriggers();
     //! Resolve Sulfuras' end-of-recruit trigger on the left/right edges.
@@ -348,12 +399,16 @@ class Player
     //! Dispatches a positive persistent attack gain to friendly listeners.
     //! The event is emitted by Minion's explicit persistent-stat APIs only.
     void DispatchMinionAttackGain(Minion& target, int amount);
+    //! Dispatches a positive persistent health gain to friendly listeners.
+    //! The event is emitted by Minion's explicit persistent-stat APIs only.
+    void DispatchMinionHealthGain(Minion& target, int amount);
+    //! Amount belonging to the currently-dispatched health-gain event.
+    //! Valid only while a GAIN_HEALTH trigger is resolving.
+    int LastMinionHealthGain() const noexcept { return lastMinionHealthGain; }
     void CheckAzsharaAmbition();
     //! Commits a supported damaging hero-power activation and dispatches the
     //! actual damage exactly once. Generic card damage must not use this.
     bool ResolveDamagingHeroPower(int actualDamage);
-    //! Resolves Buddy effects that listen for a successful Hero Power use.
-    void ResolveHeroPowerUseBuddies();
 
     PlayState playState = PlayState::INVALID;
     std::size_t idx = 0;
@@ -367,6 +422,8 @@ class Player
     int armor = 0;
     int currentTier = 0;
     int coinToUpgradeTavern = 0;
+    int lastMinionHealthGain = 0;
+    bool dispatchingMinionHealthGain = false;
 
     Tavern tavern;
     HandZone hand;
@@ -386,6 +443,8 @@ class Player
     //! Lifetime friendly Eternal Knight deaths used by its wherever-this-is
     //! aura; incremented only by authoritative death processing.
     int eternalKnightsDiedThisGame = 0;
+    //! Lifetime friendly Undead deaths used by the Eternal Portrait aura.
+    int undeadDiedThisGame = 0;
     //! Lifetime Ancestral Automatons summoned by this player, including
     //! entities that subsequently died or moved to another zone.
     int ancestralAutomatonsSummonedThisGame = 0;

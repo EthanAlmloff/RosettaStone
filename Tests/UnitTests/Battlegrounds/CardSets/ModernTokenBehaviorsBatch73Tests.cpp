@@ -3,6 +3,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AfterSellRaceStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BloodGemRaceBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackGainHealthTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TemporarySelfStatsTask.hpp>
 #include <map>
 #include <variant>
 
@@ -44,4 +46,30 @@ TEST_CASE("[Batch73] Timewarped Skipper gives one or two tier-one minions to han
   CHECK(std::holds_alternative<SimpleTasks::RandomCardToHandTask>(golden.front()));
   CHECK(std::get<SimpleTasks::RandomCardToHandTask>(golden.front()).GetTier() == 1);
   CHECK(std::get<SimpleTasks::RandomCardToHandTask>(golden.front()).GetAmount() == 2);
+}
+
+TEST_CASE("[Batch73] Tentacle observes only different friendly minions") {
+  std::map<std::string, CardDef> cards;
+  GeneratedBehaviorMappings::AddAll(cards);
+  for (const auto* id : {"TB_BaconShop_HERO_29_Buddy",
+                         "TB_BaconShop_HERO_29_Buddy_G"}) {
+    const auto& trigger = cards.at(id).power.GetTrigger().value();
+    CHECK(trigger.GetTriggerSource() == TriggerSource::MINIONS_EXCEPT_SELF);
+    CHECK(trigger.GetTasks().size() == 2);
+    CHECK(std::holds_alternative<SimpleTasks::TemporarySelfStatsTask>(
+        trigger.GetTasks()[0]));
+    CHECK(std::holds_alternative<SimpleTasks::TemporarySelfStatsTask>(
+        trigger.GetTasks()[1]));
+  }
+}
+
+TEST_CASE("[Batch73] Sinestra's health gain task is combat-only") {
+  std::map<std::string, CardDef> cards;
+  GeneratedBehaviorMappings::AddAll(cards);
+  for (const auto* id : {"TB_BaconShop_HERO_52_Buddy",
+                         "TB_BaconShop_HERO_52_Buddy_G"}) {
+    const auto& tasks = cards.at(id).power.GetTrigger()->GetTasks();
+    REQUIRE(tasks.size() == 1);
+    CHECK(std::holds_alternative<SimpleTasks::AttackGainHealthTask>(tasks[0]));
+  }
 }

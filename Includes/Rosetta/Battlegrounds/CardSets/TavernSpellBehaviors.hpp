@@ -155,6 +155,8 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     if (id == "BG23_004_Gt") return { 0, 4, 12, TavernSpellEffect::TARGET_STATS_AND_TAUNT };
     if (id == "BG23_007t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_WINDFURY, Race::NAGA };
     if (id == "BG23_007_Gt") return { 0, 4, 4, TavernSpellEffect::TARGET_STATS_AND_WINDFURY, Race::NAGA };
+    if (id == "BG26_502t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS };
+    if (id == "BG26_502_Gt") return { 0, 4, 4, TavernSpellEffect::TARGET_STATS };
     if (id == "BG23_008t") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP };
     if (id == "BG23_008_Gt") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_TEMP };
     if (id == "BG31_830t") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::NAGA };
@@ -164,6 +166,11 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
         return { 0, 2, 2, TavernSpellEffect::TARGET_STATS_AND_REBORN, Race::BEAST };
     if (id == "BG30_MagicItem_714t")
         return { 0, 30, 30, TavernSpellEffect::TARGET_STATS_NEXT_TURN };
+    if (id == "BG29_879t")
+        return { 0, 0, 0, TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY };
+    if (id == "BG29_879t_G")
+        return { 0, 0, 0, TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY,
+                 Race::INVALID, 0, 2 };
     if (id == "BG32_835t")
         return { 0, 1, 1, TavernSpellEffect::TAVERN_SPELL_STATS_PERMANENT };
     if (id == "BG32_835_Gt")

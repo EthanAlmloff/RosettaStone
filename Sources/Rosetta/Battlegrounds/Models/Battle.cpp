@@ -6,6 +6,7 @@
 
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch3.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch8.hpp>
@@ -21,6 +22,7 @@
 #include <array>
 #include <cstdlib>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 
 using Random = effolkronium::random_thread_local;
@@ -132,6 +134,36 @@ Battle::Battle(Player& player1, Player& player2)
     m_player2.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
+    // Caduceus Reactor is a dynamic Deathrattle payload on the copied
+    // Battlecruiser.  Arm the combat entity only; Battle's normal destroy
+    // pipeline then applies the transfer to the left-most surviving minion.
+    const auto armLiftOffReactor = [](Player& owner) {
+        if (owner.season14.liftOffDeathrattleAttack == 0 &&
+            owner.season14.liftOffDeathrattleHealth == 0) return;
+        owner.battleField.ForEachAlive([&owner](MinionData& data) {
+            auto& minion = data.value();
+            if (minion.GetCardID() == "BG31_HERO_801pt" ||
+                minion.GetCardID() == "BG31_HERO_801pt_G")
+                minion.SetDeathrattleStatTransfer(
+                    owner.season14.liftOffDeathrattleAttack,
+                    owner.season14.liftOffDeathrattleHealth);
+        });
+    };
+    armLiftOffReactor(m_player1);
+    armLiftOffReactor(m_player2);
+    const auto armLiftOffUltraCapacitor = [](Player& owner) {
+        if (!owner.season14.liftOffUltraCapacitor) return;
+        owner.battleField.ForEachAlive([](MinionData& data) {
+            auto& minion = data.value();
+            if (minion.GetCardID() == "BG31_HERO_801pt" ||
+                minion.GetCardID() == "BG31_HERO_801pt_G") {
+                minion.SetReborn(true);
+                minion.SetRebornFullHealth(true);
+            }
+        });
+    };
+    armLiftOffUltraCapacitor(m_player1);
+    armLiftOffUltraCapacitor(m_player2);
     // Elder Taggawag snapshots the warband's distinct races at the combat
     // boundary.  The gain is combat-only, so apply it to the copied Buddy and
     // never commit it back to recruitField.  Exclude the source Buddy from
@@ -201,7 +233,11 @@ Battle::Battle(Player& player1, Player& player2)
     const auto summonHandSnapshot = [](Player& owner, FieldZone& field) {
         auto snapshots = owner.season14.TakeCombatHandSummons();
         for (auto& [snapshot, count] : snapshots) {
-            for (int i = 0; i < count && !field.IsFull(); ++i) {
+            for (int i = 0; i < count; ++i) {
+                if (field.IsFull()) {
+                    owner.ApplySummonOverflowTrinkets();
+                    break;
+                }
                 Minion copy{snapshot};
                 // A combat-only copy is a fresh entity.  Preserve the full
                 // card instance (stats, keywords, enchantments and tasks),
@@ -311,9 +347,13 @@ Battle::Battle(Player& player1, Player& player2)
     const auto summonBeetles = [](Player& owner, FieldZone& field) {
         const auto casts = owner.season14.TakeCombatStartBeetles();
         const Card beetleCard = Cards::FindCardByID("BG28_603t");
-        for (std::size_t cast = 0; cast < casts && !field.IsFull(); ++cast)
-            for (int i = 0; i < 2 && !field.IsFull(); ++i)
+        for (std::size_t cast = 0; cast < casts; ++cast)
+            for (int i = 0; i < 2; ++i)
             {
+                if (field.IsFull()) {
+                    owner.ApplySummonOverflowTrinkets();
+                    break;
+                }
                 Minion beetle{ beetleCard };
                 owner.ApplyFreshMinionModifiers(beetle);
                 field.Add(beetle);
@@ -370,6 +410,41 @@ void Battle::Initialize()
     m_p1EclipsionAttacks = 0;
     m_p2EclipsionAttacks = 0;
     m_shadowyConstructTriggers.clear();
+    const auto resolveCarrierInterceptors = [this](Player& owner,
+                                                    FieldZone& own,
+                                                    FieldZone& enemy) {
+        const int count = owner.season14.carrierInterceptors;
+        owner.season14.carrierInterceptors = 0;
+        const auto card = Cards::FindCardByDbfID(113175);
+        if (count <= 0 || card.dbfID == 0) return;
+        for (int i = 0; i < count; ++i) {
+            if (own.IsFull()) {
+                owner.ApplySummonOverflowTrinkets();
+                break;
+            }
+            Minion interceptor(card);
+            owner.ApplyFreshMinionModifiers(interceptor);
+            interceptor.getPlayerCallback = [&owner]() -> Player& { return owner; };
+            if (owner.getNextCardIndexCallback)
+                interceptor.SetIndex(owner.getNextCardIndexCallback());
+            own.Add(interceptor, own.GetCount());
+            Minion& added = own[own.GetCount() - 1];
+            own.ForEachAlive([&added](MinionData& data) {
+                data.value().ActivateTrigger(TriggerType::SUMMON, added);
+            });
+            if (enemy.GetCount() == 0) continue;
+            std::vector<Minion*> targets;
+            enemy.ForEachAlive([&targets](MinionData& data) {
+                if (!data.value().HasStealth()) targets.push_back(&data.value());
+            });
+            if (targets.empty()) continue;
+            auto* target = targets[Random::get<std::size_t>(0, targets.size() - 1)];
+            target->TakeDamage(added);
+            ProcessDestroy(true);
+        }
+    };
+    resolveCarrierInterceptors(m_player1, m_p1Field, m_p2Field);
+    resolveCarrierInterceptors(m_player2, m_p2Field, m_p1Field);
     const auto fireLockAndLoad = [this](Player& owner, FieldZone& own,
                                         FieldZone& enemy) {
         const auto before = own.GetCount();
@@ -411,6 +486,18 @@ void Battle::Initialize()
     m_player2.season14.ResetGeneratedRewardTumblingAvenge();
     m_player1.season14.ResetTrinketAvengeProgress();
     m_player2.season14.ResetTrinketAvengeProgress();
+    for (auto& trinket : m_player1.season14.trinkets)
+        if (FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
+            TrinketEffect::START_COMBAT_FIRST_SUMMON_COPY) {
+            trinket.triggerProgress = 0;
+            trinket.pendingFirstSummon.reset();
+        }
+    for (auto& trinket : m_player2.season14.trinkets)
+        if (FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
+            TrinketEffect::START_COMBAT_FIRST_SUMMON_COPY) {
+            trinket.triggerProgress = 0;
+            trinket.pendingFirstSummon.reset();
+        }
     m_player1.season14.ResetBroodmotherAvenge();
     m_player2.season14.ResetBroodmotherAvenge();
     m_player1.ApplyStartCombatTrinkets();
@@ -420,7 +507,11 @@ void Battle::Initialize()
     // Combat.  The token is omitted when the copied board is full; otherwise
     // it enters at the right edge and SUMMON observers see the fresh entity.
     const auto summonTentacle = [](Player& owner, FieldZone& field) {
-        if (owner.season14.heroPowerDbfID != 86014 || field.IsFull()) return;
+        if (owner.season14.heroPowerDbfID != 86014) return;
+        if (field.IsFull()) {
+            owner.ApplySummonOverflowTrinkets();
+            return;
+        }
         const Card token = Cards::FindCardByDbfID(86227);
         if (token.id.empty()) return;
         Minion summoned(token);
@@ -642,27 +733,134 @@ void Battle::Initialize()
     applyGiftLeftAttack(m_p1Field);
     applyGiftLeftAttack(m_p2Field);
 
+    // Yamato Cannon is attached to the recruit-side Battlecruiser but fires
+    // from the combat copy.  Select the highest-health enemy independently
+    // for each trigger (Missile Pod supplies the second trigger), preserving
+    // the simulator's normal damage/death pipeline.
+    const auto resolveLiftOffYamato = [this](Player& owner, FieldZone& enemy) {
+        if (owner.season14.liftOffYamatoDamage <= 0) return;
+        const int repeats = owner.season14.liftOffMissilePod ? 2 : 1;
+        for (int repeat = 0; repeat < repeats; ++repeat) {
+            Minion* highest = nullptr;
+            enemy.ForEachAlive([&highest](MinionData& data) {
+                auto& candidate = data.value();
+                if (highest == nullptr || candidate.GetHealth() > highest->GetHealth())
+                    highest = &candidate;
+            });
+            if (highest == nullptr) break;
+            highest->TakeDamage(owner.season14.liftOffYamatoDamage);
+            ProcessDestroy(true);
+        }
+    };
+    resolveLiftOffYamato(m_player1, m_p2Field);
+    resolveLiftOffYamato(m_player2, m_p1Field);
+
+    // Start-of-Combat is a pass over the combat board as it existed when the
+    // pass began.  Snapshot entity IDs before dispatch: a start effect may
+    // summon a minion, and visiting that new minion in the same pass would
+    // make its effect timing depend on array capacity/iteration details.
+    // The snapshot is also required by Wind Chimes below: its extra trigger
+    // must repeat the original effects once, rather than recursively
+    // re-visiting minions created by the first pass.
+    const auto snapshotStartCombat = [](FieldZone& field) {
+        std::vector<std::uint64_t> entities;
+        field.ForEach([&entities](MinionData& data) {
+            entities.push_back(static_cast<std::uint64_t>(data.value().GetIndex()));
+        });
+        return entities;
+    };
+    const auto p1StartCombatEntities = snapshotStartCombat(m_p1Field);
+    const auto p2StartCombatEntities = snapshotStartCombat(m_p2Field);
+    const auto runStartCombat = [](Player& owner, FieldZone& field,
+                                   const std::vector<std::uint64_t>& entities) {
+        for (const auto entityID : entities) {
+            for (int i = 0; i < field.GetCount(); ++i) {
+                auto& minion = field[static_cast<std::size_t>(i)];
+                if (static_cast<std::uint64_t>(minion.GetIndex()) != entityID ||
+                    minion.IsDestroyed())
+                    continue;
+                minion.ActivateTask(PowerType::START_OF_COMBAT, owner);
+                break;
+            }
+        }
+    };
     if (m_turn == Turn::PLAYER1)
     {
-        m_p1Field.ForEach([this](MinionData& minion) {
-            minion.value().ActivateTask(PowerType::START_OF_COMBAT, m_player1);
-        });
-        m_p2Field.ForEach([this](MinionData& minion) {
-            minion.value().ActivateTask(PowerType::START_OF_COMBAT, m_player2);
-        });
+        runStartCombat(m_player1, m_p1Field, p1StartCombatEntities);
+        runStartCombat(m_player2, m_p2Field, p2StartCombatEntities);
     }
     else
     {
-        m_p2Field.ForEach([this](MinionData& minion) {
-            minion.value().ActivateTask(PowerType::START_OF_COMBAT, m_player2);
-        });
-        m_p1Field.ForEach([this](MinionData& minion) {
-            minion.value().ActivateTask(PowerType::START_OF_COMBAT, m_player1);
-        });
+        runStartCombat(m_player2, m_p2Field, p2StartCombatEntities);
+        runStartCombat(m_player1, m_p1Field, p1StartCombatEntities);
     }
 
     m_player1.ResolveTierMinionStartCombat();
     m_player2.ResolveTierMinionStartCombat();
+
+    // Valdrakken Wind Chimes repeats every friendly Start-of-Combat effect
+    // once after the ordinary pass. Reuse the authoritative task dispatch
+    // so card-specific ordering and generated effects remain intact.
+    const auto repeatStartCombat = [](Player& owner, FieldZone& field,
+                                      const std::vector<std::uint64_t>& entities) {
+        bool repeatAllEffects = false;
+        int repeatFirstEffectCount = 0;
+        for (const auto& trinket : owner.season14.trinkets) {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto behavior = FindTrinketBehavior(
+                Cards::FindCardByDbfID(trinket.dbfID).id);
+            if (behavior.effect == TrinketEffect::START_COMBAT_EXTRA_TRIGGER)
+                repeatAllEffects = true;
+            else if (behavior.portraitEffect ==
+                     PortraitEffect::PROMO_START_COMBAT_EXTRA_TRIGGER)
+                ++repeatFirstEffectCount;
+        }
+        std::optional<std::uint64_t> firstStartCombatEntity;
+        for (const auto entityID : entities) {
+            for (int i = 0; i < field.GetCount(); ++i) {
+                auto& minion = field[static_cast<std::size_t>(i)];
+                if (static_cast<std::uint64_t>(minion.GetIndex()) != entityID ||
+                    minion.IsDestroyed() ||
+                    minion.GetTasks(PowerType::START_OF_COMBAT).empty())
+                    continue;
+                firstStartCombatEntity = entityID;
+                break;
+            }
+            if (firstStartCombatEntity.has_value()) break;
+        }
+        if (repeatAllEffects) {
+            for (const auto entityID : entities) {
+                for (int i = 0; i < field.GetCount(); ++i) {
+                    auto& minion = field[static_cast<std::size_t>(i)];
+                    if (static_cast<std::uint64_t>(minion.GetIndex()) != entityID ||
+                        minion.IsDestroyed())
+                        continue;
+                    minion.ActivateTask(PowerType::START_OF_COMBAT, owner);
+                    break;
+                }
+            }
+        }
+        // Promo Portrait is intentionally narrower than Wind Chimes: each
+        // active portrait repeats only the first actual Start-of-Combat
+        // effect in the original board snapshot.  Checking the task list
+        // avoids treating a preceding vanilla minion with no effect as the
+        // printed "first" effect, and the snapshot prevents newly summoned
+        // minions from becoming eligible in this same extra pass.
+        for (int repeat = 0; repeat < repeatFirstEffectCount; ++repeat) {
+            if (!firstStartCombatEntity.has_value()) break;
+            for (int i = 0; i < field.GetCount(); ++i) {
+                auto& minion = field[static_cast<std::size_t>(i)];
+                if (static_cast<std::uint64_t>(minion.GetIndex()) !=
+                        *firstStartCombatEntity ||
+                    minion.IsDestroyed())
+                    continue;
+                minion.ActivateTask(PowerType::START_OF_COMBAT, owner);
+                break;
+            }
+        }
+    };
+    repeatStartCombat(m_player1, m_p1Field, p1StartCombatEntities);
+    repeatStartCombat(m_player2, m_p2Field, p2StartCombatEntities);
 
     // Illidan's start-of-combat power buffs the current edge minions and
     // queues each edge for one immediate attack.  Resolve these attacks after
@@ -978,13 +1176,29 @@ bool Battle::Attack()
             (m_turn == Turn::PLAYER1) ? m_player1 : m_player2, attacker,
             target);
     });
+    // Lift Off's Advanced Ballistics is a player-owned Rally payload on the
+    // hero's Battlecruiser.  It is not a static CardDef task because the
+    // amount is selected by the bought upgrade tier.  Resolve it once at the
+    // attack declaration boundary, excluding the Battlecruiser itself.
+    if ((attacker.GetCardID() == "BG31_HERO_801pt" ||
+         attacker.GetCardID() == "BG31_HERO_801pt_G") &&
+        attackerOwner.season14.liftOffRallyAttack > 0)
+    {
+        const auto amount = attackerOwner.season14.liftOffRallyAttack;
+        attackerField.ForEachAlive([&attacker, amount](MinionData& data) {
+            if (data.value().GetIndex() != attacker.GetIndex())
+                data.value().SetAttack(data.value().GetAttack() + amount);
+        });
+    }
     // Jailbird Juggernaut's Rally queues a Blood Gem Golem to attack the
     // already-selected target first. Resolve it here, after all Rally tasks
     // have run, so inserting the Golem cannot invalidate the active attacker
     // or target references during task dispatch.
     for (const auto& pending : attackerOwner.season14.TakeBloodGemGolemAttacks()) {
         const Card golemCard = Cards::FindCardByID("BG30_MagicItem_442t");
-        if (!golemCard.id.empty() && !attackerField.IsFull()) {
+        if (!golemCard.id.empty() && attackerField.IsFull()) {
+            attackerOwner.ApplySummonOverflowTrinkets();
+        } else if (!golemCard.id.empty()) {
             Minion golem{golemCard};
             golem.SetAttack(pending.attack);
             golem.SetHealth(pending.health);
@@ -1047,10 +1261,11 @@ bool Battle::Attack()
     int eclipsionLimit = 0;
     attackerField.ForEachAlive([&eclipsionLimit](const MinionData& data) {
         const auto& id = data.value().GetCardID();
-        if (id == "TB_BaconShop_HERO_08_Buddy")
-            eclipsionLimit = std::max(eclipsionLimit, 1);
-        else if (id == "TB_BaconShop_HERO_08_Buddy_G")
-            eclipsionLimit = std::max(eclipsionLimit, 2);
+        const auto lifecycle = CardDefs::FindCardDefByID(id).lifecycle;
+        if (lifecycle == CardLifecycle::BUDDY_ECLIPSION)
+            // Each owned Buddy contributes its own "first" attack allowance;
+            // multiple copies therefore stack (normal +1, golden +2).
+            eclipsionLimit += id.ends_with("_G") ? 2 : 1;
     });
     if (*eclipsionAttacks < eclipsionLimit) {
         attackerAfterRally.SetImmuneWhileAttacking(true);
@@ -1529,8 +1744,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
         // prints four damage (eight golden) per packet, while each packet
         // independently chooses a
         // currently live enemy target.
-        if (removedMinion.GetCardID() == "TB_BaconShop_HERO_17_Buddy" ||
-            removedMinion.GetCardID() == "TB_BaconShop_HERO_17_Buddy_G") {
+        if (CardDefs::FindCardDefByID(removedMinion.GetCardID()).lifecycle ==
+            CardLifecycle::BUDDY_ELEMENTIUM_SQUIRREL_BOMB) {
             const int packetDamage = removedMinion.GetCardID().ends_with("_G") ? 8 : 4;
             const auto mechDeaths = owner.season14.CountCombatDeadMinions(Race::MECHANICAL);
             FieldZone& enemyField = &owner == &m_player1 ? m_p2Field : m_p1Field;
@@ -1634,6 +1849,18 @@ void Battle::ProcessDestroy(bool beforeAttack)
             owner.recruitField.ForEachAlive([&owner](MinionData& data) {
                 data.value().ApplyEternalKnightDeathCount(
                     owner.eternalKnightsDiedThisGame);
+            });
+        }
+        if (removedMinion.HasRace(Race::UNDEAD) &&
+            owner.HasActivePortrait(PortraitEffect::ETERNAL_KNIGHT_UNDEAD_STATS)) {
+            ++owner.undeadDiedThisGame;
+            owner.battleField.ForEachAlive([&owner](MinionData& data) {
+                data.value().ApplyEternalKnightUndeadDeathCount(
+                    owner.undeadDiedThisGame);
+            });
+            owner.recruitField.ForEachAlive([&owner](MinionData& data) {
+                data.value().ApplyEternalKnightUndeadDeathCount(
+                    owner.undeadDiedThisGame);
             });
         }
         if (owner.season14.heroPowerDbfID == 66484 &&
@@ -1895,7 +2122,9 @@ void Battle::ProcessDestroy(bool beforeAttack)
         {
             FieldZone& ownerField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
             Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
-            if (!ownerField.IsFull())
+            if (ownerField.IsFull()) {
+                owner.ApplySummonOverflowTrinkets();
+            } else
             {
                 const Card token = Cards::FindCardByDbfID(79728);
                 if (!token.id.empty())
@@ -1926,7 +2155,9 @@ void Battle::ProcessDestroy(bool beforeAttack)
             // just of this combat copy.  Consume it even when the board is
             // full and no revived copy can be summoned.
             ConsumeRebornInRecruitField(owner, removedMinion);
-            if (!ownerField.IsFull())
+            if (ownerField.IsFull()) {
+                owner.ApplySummonOverflowTrinkets();
+            } else
             {
                 removedMinion.ReviveWithReborn();
                 int summonPosition = removedMinion.GetLastFieldPos();
@@ -1951,7 +2182,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     alive.value().ActivateTrigger(TriggerType::REBORN,
                                                   removedMinion);
                 });
-                owner.ApplyAfterRebornTrinkets();
+                owner.ApplyAfterRebornTrinkets(&removedMinion);
             }
         }
 
@@ -2011,13 +2242,12 @@ void Battle::ProcessDestroy(bool beforeAttack)
         if (owner.season14.heroPowerDbfID == 82114 &&
             owner.season14.AdvanceBroodmotherAvenge())
         {
-            if (!combatField.IsFull()) {
-                const auto token = Cards::FindCardByDbfID(82117);
-                Minion whelp(token);
-                const int whelpStats = 1 + owner.season14.broodmotherWhelpBonus;
-                whelp.SetAttack(whelpStats);
-                whelp.SetHealth(whelpStats);
-                if (owner.SummonCombatSnapshot(std::move(whelp))) {
+            const auto token = Cards::FindCardByDbfID(82117);
+            Minion whelp(token);
+            const int whelpStats = 1 + owner.season14.broodmotherWhelpBonus;
+            whelp.SetAttack(whelpStats);
+            whelp.SetHealth(whelpStats);
+            if (!token.id.empty() && owner.SummonCombatSnapshot(std::move(whelp))) {
                 auto& enemy = (&combatField == &m_p1Field) ? m_p2Field : m_p1Field;
                 if (HasAttackableTarget(enemy)) {
                     Minion& summoned = combatField[combatField.GetCount() - 1];
@@ -2027,22 +2257,47 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     summoned.TakeDamage(target);
                     ProcessDestroy(false);
                 }
-                }
             }
             owner.season14.ImproveBroodmotherWhelp();
         }
         const auto trinketAvenger = owner.season14.OnTrinketFriendlyMinionDied();
-        if (trinketAvenger.first != 0 || trinketAvenger.second != 0)
+        if (trinketAvenger.attack != 0 || trinketAvenger.health != 0 ||
+            trinketAvenger.summonBeetles > 0)
         {
             ApplyPermanentAvengeBonus(
-                owner, combatField, trinketAvenger.first,
-                trinketAvenger.second);
+                owner, combatField, trinketAvenger.attack,
+                trinketAvenger.health);
             // Gilnean Thorned Rose deals one damage to the same friendly
             // minions after granting the permanent stats.  Keep this on the
             // combat copy; reconciliation only commits the stat delta.
-            combatField.ForEachAlive([](MinionData& data) {
-                data.value().SetHealth(data.value().GetHealth() - 1);
-            });
+            if (trinketAvenger.dealDamage)
+                combatField.ForEachAlive([](MinionData& data) {
+                    data.value().SetHealth(data.value().GetHealth() - 1);
+                });
+        if (trinketAvenger.summonBeetles > 0) {
+            const Card beetleCard = Cards::FindCardByID("BG28_603t");
+            for (std::int32_t i = 0; i < trinketAvenger.summonBeetles; ++i) {
+                if (combatField.IsFull()) {
+                    owner.ApplySummonOverflowTrinkets();
+                    break;
+                }
+                Minion beetle{beetleCard};
+                owner.ApplyFreshMinionModifiers(beetle);
+                beetle.getPlayerCallback = [&owner]() -> Player& {
+                    return owner;
+                };
+                if (owner.getNextCardIndexCallback)
+                    beetle.SetIndex(owner.getNextCardIndexCallback());
+                combatField.Add(beetle);
+                Minion& summoned = combatField[combatField.GetCount() - 1];
+                summoned.SetTaunt(true);
+                owner.ApplyTamuzoCombatSummon(summoned);
+                combatField.ForEachAlive([&summoned](MinionData& alive) {
+                    alive.value().ActivateTrigger(TriggerType::SUMMON, summoned);
+                });
+                owner.ApplySummonTrinkets(summoned);
+            }
+        }
         }
     }
 

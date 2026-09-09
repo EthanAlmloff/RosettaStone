@@ -3,8 +3,10 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomBountyToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CopyTargetBattlecryTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GoldenizeTierMinionTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSummonFromPoolTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MinionOfferingTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTauntBuffSelfTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Enchants/Effects.hpp>
@@ -15,6 +17,16 @@
 #include <vector>
 namespace RosettaStone::Battlegrounds {
 void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) {
+  // These are generated premium entities for already-supported parents.  The
+  // Brann premium uses the Player battlecry-repeat lifecycle (three total
+  // resolutions), while Primalfin's premium opens two independent Murloc
+  // Discover choices through the canonical offering task.
+  cards.emplace("TB_BaconUps_045", CardDef{});
+  Power primalfinGolden;
+  primalfinGolden.AddBattlecryTask(
+      SimpleTasks::MinionOfferingTask{Race::MURLOC, 1, 7, 3, true});
+  cards.emplace("TB_BaconUps_089", CardDef{std::move(primalfinGolden)});
+
   auto add = [&cards](const char* id, int amount) {
     Power power; Trigger trigger{TriggerType::DEATH};
     trigger.SetTriggerSource(TriggerSource::FRIENDLY);
@@ -80,6 +92,14 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
   // selected after simultaneous deaths and zone compaction.
   cards.emplace("TB_BaconShop_HERO_41_Buddy", CardDef{});
   cards.emplace("TB_BaconShop_HERO_41_Buddy_G", CardDef{});
+
+  // Burth's trigger is owned by Player::ResolveDiscoverTriggers so the
+  // selected hand entity can be identified by stable entity ID.  Keep both
+  // canonical CardDefs registered: the normal/golden payload and its
+  // per-instance improvement are defined in BuddyBehaviors.hpp and must not
+  // be mistaken for metadata-only rows.
+  cards.emplace("TB_BaconShop_HERO_90_Buddy", CardDef{});
+  cards.emplace("TB_BaconShop_HERO_90_Buddy_G", CardDef{});
 
   // Fish of N'Zoth copies the just-resolved friendly deathrattle twice at
   // the combat lifecycle boundary; its CardDef is intentionally empty.
@@ -173,7 +193,10 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
   cards.emplace("TB_BaconShop_HERO_57_Buddy", CardDef{});
   cards.emplace("TB_BaconShop_HERO_57_Buddy_G", CardDef{});
 
-  // These lifecycle-owned buddies deliberately have no fixed CardDef task:
+  // These lifecycle-owned buddies use explicit lifecycle definitions rather
+  // than empty CardDefs. Their exact target set/state is available only at
+  // the owning phase boundary, where the simulator resolves the tagged
+  // definition below.
   // their exact target set is only available at the owning phase boundary.
   // Apostle replaces Tavern offers one (two golden) tiers higher;
   // Eclipsion grants the first one (two golden) attacks immunity; first one (two golden) attacks immunity is consumed at the attack boundary.
@@ -182,16 +205,16 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
   // Elementium Squirrel Bomb deals 4 (8 golden) per friendly Mech that died this combat;
   // the golden form doubles the damage.
   // Player/Game/Battle consume these IDs at those authoritative boundaries.
-  cards.emplace("TB_BaconShop_HERO_02_Buddy", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_02_Buddy_G", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_08_Buddy", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_08_Buddy_G", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_11_Buddy", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_11_Buddy_G", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_12_Buddy", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_12_Buddy_G", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_17_Buddy", CardDef{});
-  cards.emplace("TB_BaconShop_HERO_17_Buddy_G", CardDef{});
+  cards.emplace("TB_BaconShop_HERO_02_Buddy", CardDef{CardLifecycle::BUDDY_APOSTLE});
+  cards.emplace("TB_BaconShop_HERO_02_Buddy_G", CardDef{CardLifecycle::BUDDY_APOSTLE});
+  cards.emplace("TB_BaconShop_HERO_08_Buddy", CardDef{CardLifecycle::BUDDY_ECLIPSION});
+  cards.emplace("TB_BaconShop_HERO_08_Buddy_G", CardDef{CardLifecycle::BUDDY_ECLIPSION});
+  cards.emplace("TB_BaconShop_HERO_11_Buddy", CardDef{CardLifecycle::BUDDY_LUCIFRON});
+  cards.emplace("TB_BaconShop_HERO_11_Buddy_G", CardDef{CardLifecycle::BUDDY_LUCIFRON});
+  cards.emplace("TB_BaconShop_HERO_12_Buddy", CardDef{CardLifecycle::BUDDY_PIGEON_LORD});
+  cards.emplace("TB_BaconShop_HERO_12_Buddy_G", CardDef{CardLifecycle::BUDDY_PIGEON_LORD});
+  cards.emplace("TB_BaconShop_HERO_17_Buddy", CardDef{CardLifecycle::BUDDY_ELEMENTIUM_SQUIRREL_BOMB});
+  cards.emplace("TB_BaconShop_HERO_17_Buddy_G", CardDef{CardLifecycle::BUDDY_ELEMENTIUM_SQUIRREL_BOMB});
 
   // Mawsworn Soulkeeper summons only Undead from the supported pool; the
   // golden form doubles the number of summons.
@@ -288,5 +311,23 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
   // Player::DispatchHeroDamage so armor and combat damage remain distinct.
   cards.emplace("TB_BaconShop_HERO_25_Buddy", CardDef{});
   cards.emplace("TB_BaconShop_HERO_25_Buddy_G", CardDef{});
+
+  // Mini-Zerek is a targeted Battlecry: the Tavern target becomes the
+  // Buddy.  CopyTargetBattlecryTask performs the authoritative replacement
+  // (including preserving the source entity/zone); the golden Buddy uses the
+  // target's premium definition.  This pair is intentionally executable,
+  // rather than an empty metadata marker.
+  Power miniZerek;
+  miniZerek.AddBattlecryTask(SimpleTasks::CopyTargetBattlecryTask{});
+  cards.emplace("BG31_HERO_005_Buddy", CardDef{
+      std::move(miniZerek),
+      {{PlayReq::REQ_TARGET_TO_PLAY, 0},
+       {PlayReq::REQ_TAVERN_MINION_TARGET, 0}}});
+  Power miniZerekGolden;
+  miniZerekGolden.AddBattlecryTask(SimpleTasks::CopyTargetBattlecryTask{true});
+  cards.emplace("BG31_HERO_005_Buddy_G", CardDef{
+      std::move(miniZerekGolden),
+      {{PlayReq::REQ_TARGET_TO_PLAY, 0},
+       {PlayReq::REQ_TAVERN_MINION_TARGET, 0}}});
 }
 }

@@ -5,6 +5,7 @@
 // property of any third parties.
 
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 #include <Rosetta/Battlegrounds/Games/Game.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Managers/GameManager.hpp>
@@ -16,7 +17,9 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <cassert>
 #include <algorithm>
+#include <limits>
 #include <unordered_set>
 #include <utility>
 
@@ -29,6 +32,22 @@ class OpponentNotFound final : public std::logic_error
  public:
     using std::logic_error::logic_error;
 };
+
+// Rank/pairing keeps its historical int-based tuple representation, while
+// Player::idx is size_t.  Player indices are bounded by the fixed lobby size;
+// keep the conversion explicit and make that invariant checkable in debug
+// builds instead of relying on an implicit narrowing conversion.
+int PlayerIndexForRank(std::size_t index)
+{
+    assert(index <= static_cast<std::size_t>(std::numeric_limits<int>::max()));
+    return static_cast<int>(index);
+}
+
+int ZonePositionForIndex(std::size_t index)
+{
+    assert(index <= static_cast<std::size_t>(std::numeric_limits<int>::max()));
+    return static_cast<int>(index);
+}
 }  // namespace
 
 namespace RosettaStone::Battlegrounds
@@ -157,7 +176,7 @@ void Game::Start()
         auto old = tavern.fieldZone.Remove(tavern.fieldZone[slot]);
         m_gameState.minionPool.ReturnMinion(old.GetPoolIndex());
         player.ApplyFreshTavernMinionModifiers(replacement);
-        tavern.fieldZone.Add(replacement, slot);
+        tavern.fieldZone.Add(replacement, ZonePositionForIndex(slot));
         return true;
     };
 
@@ -339,6 +358,18 @@ void Game::Start()
         player.hand.SetAddCallback([playerPtr = &player](const CardData& card) {
             playerPtr->OnCardAcquired(card);
         });
+        player.hand.SetMinionAddCallback([playerPtr = &player](Minion& minion) {
+            const bool retainedBySamePlayer =
+                minion.GetOwnerToken() == static_cast<const void*>(playerPtr);
+            minion.getPlayerCallback = [playerPtr]() -> Player& { return *playerPtr; };
+            minion.SetOwnerToken(static_cast<const void*>(playerPtr));
+            // Retain identity for a same-player zone move, but never let a
+            // card copied/transferred from another player's hand retain the
+            // old player's entity ID.
+            if ((!retainedBySamePlayer || minion.GetIndex() < 0) &&
+                playerPtr->getNextCardIndexCallback)
+                minion.SetIndex(playerPtr->getNextCardIndexCallback());
+        });
         player.upgradeTavernCallback = upgradeTavernCallback;
         player.completeRecruitCallback = completeRecruitCallback;
         player.getOpponentPlayerCallback = getOpponentPlayerCallback;
@@ -422,6 +453,9 @@ void Game::Recruit()
         player.season14.firstMinionPlayedThisTurn = false;
         player.season14.battlecryBuysThisTurn = 0;
         player.season14.minionsPlayedThisTurn = 0;
+        // Cliffdiver Sticker scales from Battlecries triggered this recruit
+        // turn, never from the lifetime Battlecry counter.
+        player.season14.battlecriesTriggered = 0;
         player.season14.heroPowerUsed = false;
         player.season14.heroPowerBatch3State = 0;
         player.recruitField.ForEach([](MinionData& minion) {
@@ -464,16 +498,6 @@ void Game::Recruit()
         player.GrantTrinketStartTurnCards();
 
         player.RefreshSpellcraft();
-        if (player.season14.generatedRewardStealthEntityID != 0)
-        {
-            const auto entityID = player.season14.generatedRewardStealthEntityID;
-            player.recruitField.ForEachAlive([entityID](MinionData& data) {
-                auto& minion = data.value();
-                if (static_cast<std::uint64_t>(minion.GetIndex()) == entityID)
-                    minion.SetGameTag(GameTag::STEALTH, 0);
-            });
-            player.season14.generatedRewardStealthEntityID = 0;
-        }
         player.hand.ForEach([](std::optional<CardData>& card) {
             if (card.has_value() && std::holds_alternative<Minion>(card.value()))
                 std::get<Minion>(card.value()).SetHandLocked(false);
@@ -496,6 +520,7 @@ void Game::Recruit()
         player.ResolveStartTurnTrinkets();
         player.TryResolveWarpGateReward();
         player.BeginSpawningPoolMorphChoice();
+        player.BeginOrnateClockOffer();
         player.BeginFantasticTreasureOffer();
         player.recruitField.ForEachAlive([](MinionData& data) {
             if (data.value().HasTimeTurning())
@@ -600,6 +625,7 @@ void Game::CompleteRecruitPhase()
         if (player.playState == PlayState::PLAYING)
         {
             player.ResolveRecruitEndDeaths();
+            player.ResolveLiftOffEndTurn();
             player.ResolveFodderDefilerEndTurn();
             player.ResolveEnigmaticHeadstoneEndTurn();
             player.ResolveTrinketEndTurn();
@@ -701,6 +727,50 @@ void Game::CompleteRecruitPhase()
                         });
                         continue;
                     }
+                    if (behavior.effect ==
+                        TrinketEffect::END_TURN_LEFTMOST_MINION_STATS_PER_SPELL)
+                    {
+                        // Charming Panpipes always selects the left-most
+                        // warband minion.  Its payload improves permanently
+                        // once per successful Tavern spell; each Trinket
+                        // copy carries its own progress counter.
+                        if (player.recruitField.GetCount() > 0) {
+                            auto& minion = player.recruitField[0];
+                            minion.SetAttack(minion.GetAttack() +
+                                             behavior.attack +
+                                             trinket.triggerProgress);
+                            minion.SetHealth(minion.GetHealth() +
+                                             behavior.health +
+                                             trinket.triggerProgress);
+                        }
+                        continue;
+                    }
+                    if (behavior.effect == TrinketEffect::END_TURN_LEFT_STATS_PER_BATTLECRY)
+                    {
+                        const int scale = player.season14.battlecriesTriggered;
+                        int selected = 0;
+                        player.recruitField.ForEachAlive([&](MinionData& data) {
+                            if (selected >= 2) return;
+                            auto& minion = data.value();
+                            minion.SetAttack(minion.GetAttack() + behavior.attack + scale);
+                            minion.SetHealth(minion.GetHealth() + behavior.health + scale);
+                            ++selected;
+                        });
+                        continue;
+                    }
+                    if (behavior.effect == TrinketEffect::END_TURN_LEFTMOST_STATS_PER_BATTLECRY)
+                    {
+                        const int scale = player.season14.battlecriesTriggered;
+                        bool selected = false;
+                        player.recruitField.ForEachAlive([&behavior, scale, &selected](MinionData& data) {
+                            if (selected) return;
+                            auto& minion = data.value();
+                            minion.SetAttack(minion.GetAttack() + behavior.attack + scale);
+                            minion.SetHealth(minion.GetHealth() + behavior.health + scale);
+                            selected = true;
+                        });
+                        continue;
+                    }
                     if (behavior.effect == TrinketEffect::END_TURN_UNDEAD_ATTACK)
                     {
                         player.ApplyPersistentRaceStats(behavior.race,
@@ -755,19 +825,67 @@ void Game::CompleteRecruitPhase()
                     }
                 }
             }
+            // Young Murk-Eye Sticker repeats the Battlecries of the two
+            // edge minions once at recruit end. Snapshot entity identities so
+            // a Battlecry that mutates the board cannot retarget the pass.
+            for (const auto& trinket : player.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                if (FindTrinketBehavior(
+                        Cards::FindCardByDbfID(trinket.dbfID).id).effect !=
+                    TrinketEffect::END_TURN_BATTLECRY_TRIGGER)
+                    continue;
+                std::vector<std::uint64_t> selected;
+                player.recruitField.ForEachAlive([&selected](MinionData& data) {
+                    if (selected.size() < 2)
+                        selected.push_back(static_cast<std::uint64_t>(data.value().GetIndex()));
+                });
+                if (player.recruitField.GetCount() > 2) {
+                    std::uint64_t right = selected.back();
+                    player.recruitField.ForEachAlive([&right](MinionData& data) {
+                        right = static_cast<std::uint64_t>(data.value().GetIndex());
+                    });
+                    selected[1] = right;
+                }
+                for (const auto entityID : selected) {
+                    for (int i = 0; i < player.recruitField.GetCount(); ++i) {
+                        auto& minion = player.recruitField[static_cast<std::size_t>(i)];
+                        if (static_cast<std::uint64_t>(minion.GetIndex()) != entityID ||
+                            minion.IsDestroyed()) continue;
+                        // Battlegrounds uses POWER for a minion's Battlecry
+                        // task; PowerType has no separate BATTLECRY value.
+                        minion.ActivateTask(PowerType::POWER, player);
+                        break;
+                    }
+                }
+                break;
+            }
             // Resolve ordinary minion end-of-turn triggers after the final
             // recruit action and before combat.  Trigger dispatch is kept on
             // the authoritative board instances so generated effects (such
             // as Cataclysmic Harbinger's last-spell copy) cannot be skipped.
             const int endTurnPasses = player.season14.HasGeneratedRewardGhastlyMask() ? 2 : 1;
             int resolvedEndTurnPasses = endTurnPasses;
-            player.recruitField.ForEachAlive([&resolvedEndTurnPasses](const MinionData& data) {
+            int lucifronExtraPasses = 0;
+            player.recruitField.ForEachAlive([&lucifronExtraPasses](const MinionData& data) {
                 const auto& id = data.value().GetCardID();
-                if (id == "TB_BaconShop_HERO_11_Buddy")
-                    resolvedEndTurnPasses = std::max(resolvedEndTurnPasses, 2);
-                else if (id == "TB_BaconShop_HERO_11_Buddy_G")
-                    resolvedEndTurnPasses = std::max(resolvedEndTurnPasses, 3);
+                if (CardDefs::FindCardDefByID(id).lifecycle ==
+                    CardLifecycle::BUDDY_LUCIFRON)
+                    lucifronExtraPasses += id.ends_with("_G") ? 2 : 1;
             });
+            resolvedEndTurnPasses = std::max(resolvedEndTurnPasses,
+                1 + lucifronExtraPasses);
+            for (const auto& trinket : player.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                if (FindTrinketBehavior(
+                        Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
+                    TrinketEffect::END_TURN_EXTRA_TRIGGER)
+                {
+                    resolvedEndTurnPasses = std::max(resolvedEndTurnPasses, 2);
+                    break;
+                }
+            }
             for (int pass = 0; pass < resolvedEndTurnPasses; ++pass) {
                 player.recruitField.ForEachAlive([](MinionData& data) {
                     auto& minion = data.value();
@@ -1129,7 +1247,7 @@ void Game::GameOver()
         // Seats eliminated before the immediate win already own the lower
         // placement numbers from ProcessDefeat; continue at the current live
         // seat count so those ranks are not duplicated.
-        int nextRank = m_gameState.numRemainPlayer;
+        int nextRank = PlayerIndexForRank(m_gameState.numRemainPlayer);
         winner->rank = 1;
         for (auto& player : m_gameState.players)
         {
@@ -1171,7 +1289,8 @@ void Game::DetermineOpponent()
         // Determine player to fight the ghost
         const std::size_t playerIdx = DeterminePlayerToFightGhost(playerData);
         m_playerFightPair.emplace_back(
-            std::make_tuple(playerIdx, m_gameState.ghostPlayerIdx));
+            std::make_tuple(PlayerIndexForRank(playerIdx),
+                            PlayerIndexForRank(m_gameState.ghostPlayerIdx)));
 
         // Pair a list of players
         PairPlayers(playerData);
@@ -1196,7 +1315,7 @@ std::vector<std::tuple<int, int>> Game::CalculateRank()
         }
 
         playerData.emplace_back(
-            std::make_tuple(player.idx, player.hero.health));
+            std::make_tuple(PlayerIndexForRank(player.idx), player.hero.health));
     }
 
     std::sort(playerData.begin(), playerData.end(),

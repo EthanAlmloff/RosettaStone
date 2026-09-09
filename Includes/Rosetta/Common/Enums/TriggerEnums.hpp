@@ -29,6 +29,7 @@ enum class TriggerType
     ZONE,  //!< The effect will be triggered when an entity enters any types of
            //!< zone.
     GAIN_ATTACK,  //!< The effect will be triggered when an entity gains attack.
+    GAIN_HEALTH,  //!< The effect will be triggered when an entity gains health.
     GIVE_HEAL,    //!< The effect will be triggered when a playable heals a
                   //!< character.
     TAKE_HEAL,    //!< The effect will be triggered when a character is healed.

@@ -1,2 +1,5 @@
 X(REQ_LACKEY_TARGET)
+// Battlegrounds-only target selector for Battlecries that choose a minion
+// still in Bob's Tavern rather than a minion on the recruit board.
+X(REQ_TAVERN_MINION_TARGET)
 X(REQ_TARGET_IF_AVAILABLE_AND_MAXIMUM_CARDS_IN_DECK)

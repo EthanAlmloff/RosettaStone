@@ -106,7 +106,8 @@ void EventCounterBehaviors::AddAll(std::map<std::string, CardDef>& cards)
             if (selfBuff)
                 trigger.SetCondition(SelfCondition{[](Minion& played) { return played.HasRace(Race::NAGA); }});
             trigger.SetTasks({SimpleTasks::SpellCountRaceBuffTask{
-                Race::NAGA, spec.amount, spec.health, spec.scaling, selfBuff}});
+                Race::NAGA, spec.amount, spec.health, spec.scaling, selfBuff,
+                spec.id == "BG31_035" || spec.id == "BG31_035_G"}});
         }
         else if (spec.effect == "distinct_spell_race_buff")
             trigger.SetTasks({SimpleTasks::DistinctSpellRaceBuffTask{spec.amount, spec.health, spec.scaling}});

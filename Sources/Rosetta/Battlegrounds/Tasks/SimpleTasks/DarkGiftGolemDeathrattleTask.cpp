@@ -3,7 +3,10 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DarkGiftGolemDeathrattleTask.hpp>
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus DarkGiftGolemDeathrattleTask::Run(Player& player, Minion& source) {
-  if (player.GetField().IsFull()) return TaskStatus::STOP;
+  if (player.GetField().IsFull()) {
+    player.ApplySummonOverflowTrinkets();
+    return TaskStatus::STOP;
+  }
   // The pinned 36.4 snapshot's generic Golem token is Blood Golem; Damaged
   // Golem is a separate Harvest Golem deathrattle token and is not equivalent.
   const Card card = Cards::FindCardByID("BG30_MagicItem_442t");

@@ -63,6 +63,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CastSpellBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackingMinionBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackGainHealthTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/HealthGainHealthTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TemporarySelfStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/OnePerTypeRallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRaceBuffTask.hpp>
@@ -139,6 +141,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSpellcraftToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/QuilboarBloodGolemDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTauntBuffSelfTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ProtossBehaviorTask.hpp>
 
 #include <variant>
 
@@ -179,8 +182,9 @@ using TaskType =
                  SimpleTasks::MagnetizationSelfBuffTask,
                  SimpleTasks::CastTavernSpellOnAdjacentTask,
                  SimpleTasks::RebornAttackTask,
-                 SimpleTasks::PersistentRaceBuffTask, SimpleTasks::PersistentBeetleBuffTask, SimpleTasks::RandomChromadrakeToHandTask, SimpleTasks::BattlecryTavernSpellDiscountTask, SimpleTasks::EndTurnTavernSpellStatsTask, SimpleTasks::BattlecrySpentGoldRaceHealthTask, SimpleTasks::PersistentTavernTierBuffTask, SimpleTasks::ArmRefreshRandomShopStatsTask, SimpleTasks::ArmFodderRefreshTask, SimpleTasks::TriggerLeftmostDeathrattleTask, SimpleTasks::SummonTrackedAvengeCardsTask, SimpleTasks::SpellCastSelfScalingTask, SimpleTasks::SpellCastOnSelfHealthTask, SimpleTasks::ApplyMinionStatBuffTask, SimpleTasks::AttackingMinionBuffTask, SimpleTasks::AttackGainHealthTask,
+                 SimpleTasks::PersistentRaceBuffTask, SimpleTasks::PersistentBeetleBuffTask, SimpleTasks::RandomChromadrakeToHandTask, SimpleTasks::BattlecryTavernSpellDiscountTask, SimpleTasks::EndTurnTavernSpellStatsTask, SimpleTasks::BattlecrySpentGoldRaceHealthTask, SimpleTasks::PersistentTavernTierBuffTask, SimpleTasks::ArmRefreshRandomShopStatsTask, SimpleTasks::ArmFodderRefreshTask, SimpleTasks::TriggerLeftmostDeathrattleTask, SimpleTasks::SummonTrackedAvengeCardsTask, SimpleTasks::SpellCastSelfScalingTask, SimpleTasks::SpellCastOnSelfHealthTask, SimpleTasks::ApplyMinionStatBuffTask, SimpleTasks::AttackingMinionBuffTask, SimpleTasks::AttackGainHealthTask, SimpleTasks::TemporarySelfStatsTask,
                  SimpleTasks::OnePerTypeRallyBuffTask,
+                 SimpleTasks::HealthGainHealthTask,
                  SimpleTasks::AfterSellRaceStatsTask,
                  SimpleTasks::SummonedMinionStatMultiplierTask,
                  SimpleTasks::RallyTavernSpellHealthBonusTask,
@@ -246,7 +250,8 @@ using TaskType =
                  SimpleTasks::StartCombatHandSelfCopyTask,
                  SimpleTasks::StartCombatPirateScallywagTask,
                  SimpleTasks::TriggerAdjacentBattlecryTask,
-                 SimpleTasks::CopyTargetBattlecryTask>;
+                 SimpleTasks::CopyTargetBattlecryTask,
+                 SimpleTasks::ProtossBehaviorTask>;
 }  // namespace RosettaStone::Battlegrounds
 
 #endif  // ROSETTASTONE_BATTLEGROUNDS_TASK_TYPE_HPP

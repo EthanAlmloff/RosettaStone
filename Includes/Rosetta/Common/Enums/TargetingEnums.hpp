@@ -20,6 +20,7 @@ enum class TargetingType
     ALL_MINIONS,
     FRIENDLY_MINIONS,
     ENEMY_MINIONS,
+    TAVERN_MINIONS,
     HEROES
 };
 

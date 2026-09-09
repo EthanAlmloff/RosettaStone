@@ -472,6 +472,8 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     pendingHeroPowerReplayRemaining = 0;
     pendingHeroPowerReplayTier = 0;
     pendingHeroPowerReplayRace = 0;
+    pendingPrimalfinDiscoverRemaining = 0;
+    pendingPrimalfinDiscoverSourceEntityID = 0;
     heroPowerAvailable = available;
     heroPowerUsed = false;
     luckyRollCooldown = 0;
@@ -479,14 +481,27 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     heroPowerBatch2 = {};
     heroPowerBatch4 = {};
     heroPowerBatch3State = 0;
+    imperialDefenderCopiesUsed = 0;
     recruitTurnNumber = 0;
     warpGateBuyCount = 0;
     warpGateSelectedDbfID = 0;
     warpGateRewardDbfID = 0;
+    protossCostReduction = 0;
+    carrierInterceptors = 0;
     spawningPoolDiscount = 0;
     spawningPoolLarvaEntityID = 0;
     spawningPoolUnlocked = false;
     liftOffBattlecruiserEntityID = 0;
+    liftOffUpgradeTier = 0;
+    liftOffUpgradesBoughtThisTurn = 0;
+    liftOffFreeUpgradeAvailable = false;
+    liftOffYamatoDamage = 0;
+    liftOffRallyAttack = 0;
+    liftOffDeathrattleAttack = 0;
+    liftOffDeathrattleHealth = 0;
+    liftOffFortifiedBunker = false;
+    liftOffMissilePod = false;
+    liftOffUltraCapacitor = false;
     heroPowerBatch5 = {};
     heroPowerBatch6 = {};
     heroPowerBatch7 = {};
@@ -635,6 +650,9 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     trinketFreeSpellUses = trinketFreeSpellUsesPerTurn;
     if (luckyRollCooldown > 0) --luckyRollCooldown;
     goldSpentThisTurn = 0;
+    imperialDefenderCopiesUsed = 0;
+    liftOffUpgradesBoughtThisTurn = 0;
+    liftOffFreeUpgradeAvailable = false;
     soldMinionsThisTurn = 0;
     temporaryMinionPurchaseCost = -1;
     buddyAvengeDeaths = 0;
@@ -652,6 +670,8 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     discoverReplayRemaining = 0;
     discoverReplaySourceSpellDbfID = 0;
     discoverReplayTargetEntityID = 0;
+    pendingPrimalfinDiscoverRemaining = 0;
+    pendingPrimalfinDiscoverSourceEntityID = 0;
     if (imprisonedTurns > 0) --imprisonedTurns;
     // Reclaimed Souls' preceding-combat records remain available until its
     // Discover is committed during this recruit phase.
@@ -902,7 +922,7 @@ std::int32_t Season14State::UpgradeCost(std::int32_t baseCost) const
 {
     const auto withBatch1 = heroPowerBatch1.UpgradeCost(baseCost);
     const auto batch8 = Season14HeroPowerBatch8Modifiers(heroPowerDbfID);
-    auto result = withBatch1 + batch8.upgradeCostDelta;
+    auto result = withBatch1 + batch8.upgradeCostDelta - refreshUpgradeCostDiscount;
     for (const auto& trinket : trinkets)
     {
         if (!trinket.active) continue;
@@ -930,6 +950,11 @@ std::size_t Season14State::TavernOfferCount(std::size_t baseCount) const
             ? static_cast<std::int32_t>(7 > baseCount ? 7 - baseCount : 0)
             : 0;
     const auto adjustedDelta = delta + extraTrainingSlots;
+    const auto targetCount = std::max<std::size_t>(
+        baseCount + static_cast<std::size_t>(std::max(0, adjustedDelta)),
+        static_cast<std::size_t>(std::max(0, trinketMinimumShopSlots)));
+    if (targetCount > baseCount + static_cast<std::size_t>(std::max(0, adjustedDelta)))
+        return targetCount;
     if (adjustedDelta < 0)
     {
         const auto reduction = static_cast<std::size_t>(-adjustedDelta);
@@ -977,8 +1002,14 @@ bool Season14State::ApplyHeroPowerBatch5Activation(
 
 void Season14State::ArmHigherTierRefresh(std::int32_t count)
 {
-    heroPowerBatch2.higherTierRefreshMinions =
-        std::max<std::int32_t>(0, count);
+    heroPowerBatch2.higherTierRefreshMinions = std::max<std::int32_t>(
+        0, heroPowerBatch2.higherTierRefreshMinions + count);
+}
+
+void Season14State::ArmTierSixOnlyRefresh(std::int32_t count)
+{
+    trinketTierSixOnlyRefreshes = std::max<std::int32_t>(
+        0, trinketTierSixOnlyRefreshes + count);
 }
 
 std::int32_t Season14State::TakeHigherTierRefresh()
@@ -986,6 +1017,31 @@ std::int32_t Season14State::TakeHigherTierRefresh()
     const auto count = heroPowerBatch2.higherTierRefreshMinions;
     heroPowerBatch2.higherTierRefreshMinions = 0;
     return count;
+}
+
+std::int32_t Season14State::TakeTierSixOnlyRefresh()
+{
+    const auto count = trinketTierSixOnlyRefreshes;
+    trinketTierSixOnlyRefreshes = 0;
+    return count;
+}
+
+void Season14State::BeginRefreshTavern()
+{
+    for (auto& trinket : trinkets)
+    {
+        if (!trinket.active || trinket.remainingUses == 0) continue;
+        const auto behavior = FindTrinketBehavior(
+            Cards::FindCardByDbfID(trinket.dbfID).id);
+        if (behavior.effect == TrinketEffect::TIER_SIX_ONLY_REFRESH &&
+            behavior.value > 0 && trinket.triggerProgress < behavior.value)
+        {
+            ++trinket.triggerProgress;
+            ArmTierSixOnlyRefresh(1);
+        }
+    }
+    if (trinketHigherTierRefreshes > 0)
+        ArmHigherTierRefresh(trinketHigherTierRefreshes);
 }
 
 bool Season14State::ShouldFreezeRemainingTavern() const
@@ -1107,10 +1163,6 @@ void Season14State::OnRefreshTavern(bool refreshSucceeded)
     ResolveSeason14HeroPowerBatch1Event(
         heroPowerDbfID, Season14HeroPowerBatch1Event::REFRESH_TAVERN,
         heroPowerBatch1, refreshSucceeded);
-    if (refreshSucceeded && trinketHigherTierRefreshes > 0)
-    {
-        ArmHigherTierRefresh(trinketHigherTierRefreshes);
-    }
     if (refreshSucceeded)
     {
         for (auto& trinket : trinkets)
@@ -1118,12 +1170,22 @@ void Season14State::OnRefreshTavern(bool refreshSucceeded)
             if (!trinket.active || trinket.remainingUses == 0) continue;
             const auto behavior = FindTrinketBehavior(
                 Cards::FindCardByDbfID(trinket.dbfID).id);
-            if (behavior.effect != TrinketEffect::REFRESH_SHOP_STATS ||
-                behavior.value <= 0) continue;
-            if (++trinket.triggerProgress >= behavior.value)
+            if (behavior.effect == TrinketEffect::REFRESH_SHOP_STATS &&
+                behavior.value > 0 &&
+                ++trinket.triggerProgress >= behavior.value)
             {
                 trinket.triggerProgress = 0;
                 AddPersistentShopStats(behavior.amount, behavior.amount);
+            }
+            if (behavior.effect ==
+                    TrinketEffect::REFRESH_HIGHEST_TIER_HEALTH_PURCHASE &&
+                behavior.value > 0 &&
+                ++trinket.triggerProgress >= behavior.value)
+            {
+                trinket.triggerProgress = 0;
+                // `statScale` is a typed, per-instance one-shot armed flag;
+                // it is consumed only after the qualifying minion is bought.
+                trinket.statScale = 1;
             }
         }
         for (const auto& trinket : trinkets)
@@ -1138,6 +1200,14 @@ void Season14State::OnRefreshTavern(bool refreshSucceeded)
                 refreshShopStatsDeltaAttack += behavior.attack;
                 refreshShopStatsDeltaHealth += behavior.health;
             }
+        }
+        for (const auto& trinket : trinkets)
+        {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto behavior = FindTrinketBehavior(
+                Cards::FindCardByDbfID(trinket.dbfID).id);
+            if (behavior.effect == TrinketEffect::REFRESH_UPGRADE_COST_DISCOUNT)
+                refreshUpgradeCostDiscount += behavior.amount;
         }
     }
 }
@@ -1236,6 +1306,14 @@ void Season14State::ResetTrinketAvengeProgress() noexcept
                 Cards::FindCardByDbfID(trinket.dbfID).id);
             if (behavior.effect == TrinketEffect::AVENGE_MINION_STATS)
                 trinket.triggerProgress = 0;
+            // Avenge progress is combat-local for every Avenge Trinket,
+            // including Beetle Band and the Tavern-spell Avenge variant.
+            // Leaving these out would carry partial deaths into the next
+            // combat and fire at the wrong threshold.
+            if (behavior.effect == TrinketEffect::AVENGE_SUMMON_BEETLES)
+                trinket.triggerProgress = 0;
+            if (behavior.effect == TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK)
+                trinket.triggerProgress = 0;
             if (behavior.effect == TrinketEffect::SUMMON_DIVINE_SHIELD)
                 trinket.triggerProgress = 0;
             if (behavior.effect == TrinketEffect::FIRST_DEATH_MAX_STATS_RANDOM)
@@ -1246,7 +1324,15 @@ void Season14State::ResetTrinketAvengeProgress() noexcept
                 trinket.triggerProgress = 0;
             if (behavior.effect == TrinketEffect::START_COMBAT_DRAGON_SHIELDS)
                 trinket.triggerProgress = 0;
+            if (behavior.effect ==
+                TrinketEffect::AFTER_DIVINE_SHIELD_LOST_RANDOM_SPELL)
+                trinket.triggerProgress = 0;
             if (behavior.effect == TrinketEffect::ATTACKING_DRAGON_DIVINE_SHIELD)
+                trinket.triggerProgress = 0;
+            // Funeral Wreath's three-copy allowance is combat-local.  Keep
+            // each persistent Trinket instance independent, but clear its
+            // consumed trigger count when the next combat begins.
+            if (behavior.effect == TrinketEffect::AFTER_REBORN_COPY)
                 trinket.triggerProgress = 0;
         }
     }
@@ -1296,29 +1382,38 @@ bool Season14State::MaybeBeginNagaConquest(std::int32_t totalAttack) noexcept
     return true;
 }
 
-std::pair<std::int32_t, std::int32_t>
+TrinketAvengeResult
 Season14State::OnTrinketFriendlyMinionDied()
 {
-    std::pair<std::int32_t, std::int32_t> result{0, 0};
+    TrinketAvengeResult result{};
     for (auto& trinket : trinkets)
     {
         if (!trinket.active || trinket.remainingUses == 0) continue;
         const auto behavior = FindTrinketBehavior(
             Cards::FindCardByDbfID(trinket.dbfID).id);
         if ((behavior.effect != TrinketEffect::AVENGE_MINION_STATS &&
+             behavior.effect != TrinketEffect::AVENGE_SUMMON_BEETLES &&
              behavior.effect != TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK) ||
             behavior.value <= 0) continue;
         if (++trinket.triggerProgress >= behavior.value)
         {
             trinket.triggerProgress = 0;
+            if (behavior.effect == TrinketEffect::AVENGE_SUMMON_BEETLES) {
+                result.summonBeetles += behavior.amount;
+                continue;
+            }
             if (behavior.effect == TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK)
             {
                 AddTavernSpellAttackBonus(behavior.attack);
                 AddTavernSpellHealthBonus(behavior.health);
                 continue;
             }
-            result.first += behavior.attack;
-            result.second += behavior.health;
+            result.attack += behavior.attack;
+            result.health += behavior.health;
+            // Gilnean Thorned Rose is the only current Avenge Trinket whose
+            // printed payload also damages the surviving friendly minions.
+            if (Cards::FindCardByDbfID(trinket.dbfID).id == "BG30_MagicItem_864")
+                result.dealDamage = true;
         }
     }
     return result;
@@ -1352,11 +1447,16 @@ void Season14State::OnTavernSpellResolved(bool spellResolved,
             persistentMinionAttack += behavior.attack;
             spellMinionAttackDelta += behavior.attack;
         }
+        if (behavior.effect == TrinketEffect::ARM_FODDER_REFRESH)
+            ArmFoddersNextRefresh();
         if (behavior.effect == TrinketEffect::SPELL_CAST_MINION_STATS)
         {
             spellCastMinionAttackDelta += behavior.attack;
             spellCastMinionHealthDelta += behavior.health;
         }
+        if (behavior.effect ==
+            TrinketEffect::END_TURN_LEFTMOST_MINION_STATS_PER_SPELL)
+            ++trinket.triggerProgress;
         if (spellOnMinion && behavior.effect == TrinketEffect::TAVERN_SPELL_STATS)
         {
             // Honeycomb Ring's improvement lasts only for this recruit turn.
@@ -1377,6 +1477,22 @@ void Season14State::OnTavernSpellResolved(bool spellResolved,
         {
             trinket.triggerProgress = 0;
             pendingSpellCountGold += behavior.amount > 0 ? behavior.amount : 1;
+        }
+        if (behavior.effect == TrinketEffect::SPELL_COUNT_BLOOD_GEMS &&
+            behavior.value > 0 && behavior.amount > 0)
+        {
+            // Keep the remainder on this Trinket instance across recruit
+            // turns. The loop also makes the invariant correct for any
+            // caller that batches successful resolutions. Bloodbound
+            // Earrings repeat indefinitely; the printed `(N left!)` counter
+            // is this remainder, not a lifetime activation budget.
+            ++trinket.triggerProgress;
+            while (trinket.triggerProgress >= behavior.value &&
+                   trinket.remainingUses > 0)
+            {
+                trinket.triggerProgress -= behavior.value;
+                pendingSpellCountBloodGems += behavior.amount;
+            }
         }
     }
     if (sourceDbfID > 0) lastTavernSpellDbfID = sourceDbfID;
@@ -1611,6 +1727,19 @@ Season14State::FutureLobsterStats() const noexcept
     return { futureLobsterAttack, futureLobsterHealth };
 }
 
+void Season14State::ImproveFutureDeepBlues(std::int32_t attack,
+                                           std::int32_t health) noexcept
+{
+    futureDeepBluesAttack += attack;
+    futureDeepBluesHealth += health;
+}
+
+std::pair<std::int32_t, std::int32_t>
+Season14State::FutureDeepBluesStats() const noexcept
+{
+    return { futureDeepBluesAttack, futureDeepBluesHealth };
+}
+
 void Season14State::ImproveFutureBallers(std::int32_t attack,
                                          std::int32_t health)
 {
@@ -1811,6 +1940,10 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
             case TrinketEffect::HIGHER_TIER_REFRESH:
                 ++trinketHigherTierRefreshes;
                 break;
+            case TrinketEffect::TIER_SIX_ONLY_REFRESH:
+                // Per-turn progress is consumed at the next successful
+                // refresh; no persistent aura is needed at acquisition.
+                break;
             case TrinketEffect::MAX_GOLD:
                 trinketMaxGoldDelta += behavior.value;
                 break;
@@ -1818,8 +1951,26 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 trinketImmediateGold += behavior.value;
                 trinketMaxGoldDelta += behavior.value;
                 break;
+            case TrinketEffect::SAFETY_PATCH:
+                // Safety Patch pays its five Gold at acquisition in Player;
+                // unlike deferred start-turn rewards it must not be queued.
+                break;
             case TrinketEffect::IMMEDIATE_GOLD:
                 trinketImmediateGold += behavior.value;
+                if (card.id == "BG32_MagicItem_271")
+                    ornateClockGreaterNextTurn = true;
+                break;
+            case TrinketEffect::ACQUIRE_FIXED_CARD_AND_TAVERN_SLOTS:
+                // The fixed card is granted by Player::AcquireTrinket below;
+                // this state-owned delta keeps the seven-offer target active
+                // for both the current and future Tavern fills.
+                trinketMinimumShopSlots =
+                    std::max(trinketMinimumShopSlots, behavior.value);
+                break;
+            case TrinketEffect::SHOP_STATS_AND_TAVERN_SLOTS:
+                AddPersistentShopStats(behavior.attack, behavior.health);
+                trinketMinimumShopSlots =
+                    std::max(trinketMinimumShopSlots, behavior.value);
                 break;
             case TrinketEffect::ACQUIRE_RANDOM_FRIENDLY_COPY:
                 // The copy is resolved by Player at acquisition/start-turn;
@@ -1882,6 +2033,10 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 // Resolution duplication is executor-owned and never grants
                 // another hero-power use.
                 break;
+            case TrinketEffect::HERO_POWER_EXTRA_USE:
+                // Per-turn entitlement is refreshed by Player at recruit
+                // start; do not mutate the shared availability state here.
+                break;
         }
     }
 }
@@ -1917,6 +2072,9 @@ bool Season14State::ConsumeEffect(
 
 void Season14State::Emit(Season14Event event)
 {
+    if (event == Season14Event::RECRUIT_START ||
+        event == Season14Event::COMBAT_START)
+        iceBlockImmune = false;
     if (event == Season14Event::COMBAT_START)
     {
         combatKillProgress = 0;

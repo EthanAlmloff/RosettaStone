@@ -10,7 +10,7 @@
 using Random=effolkronium::random_thread_local;
 namespace RosettaStone::Battlegrounds::SimpleTasks
 {
-TaskStatus RandomBountyToHandTask::Run(Player& player, Minion&)
+TaskStatus RandomBountyToHandTask::Run(Player& player)
 {
     if (m_amount <= 0 || player.hand.IsFull()) return TaskStatus::STOP;
 
@@ -34,6 +34,11 @@ TaskStatus RandomBountyToHandTask::Run(Player& player, Minion&)
         player.hand.Add(CardData{Spell{*pool[Random::get<std::size_t>(
             0, pool.size() - 1)]}});
     return TaskStatus::COMPLETE;
+}
+
+TaskStatus RandomBountyToHandTask::Run(Player& player, Minion&)
+{
+    return Run(player);
 }
 
 TaskStatus RandomBountyToHandTask::Run(Player& player, Minion& source,

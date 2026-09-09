@@ -68,9 +68,17 @@
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch66.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch67.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch70.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch71.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch72.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch73.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch74.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch75.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch76.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernTokenBehaviorsBatch77.hpp>
 #include <Rosetta/Battlegrounds/CardSets/GeneratedBehaviorMappings.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch31.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch26.hpp>
+#include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch27.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch25.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatch29.hpp>
 #include <Rosetta/Battlegrounds/CardSets/ModernMinionBehaviorsBatchBaller.hpp>
@@ -80,6 +88,10 @@
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DamageTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ProtossBehaviorTask.hpp>
+
+#include <array>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -152,6 +164,13 @@ CardDefs::CardDefs()
     ModernMinionBehaviorsBatch66::AddAll(m_data);
     ModernTokenBehaviorsBatch67::AddAll(m_data);
     ModernTokenBehaviorsBatch70::AddAll(m_data);
+    ModernTokenBehaviorsBatch71::AddAll(m_data);
+    ModernTokenBehaviorsBatch72::AddAll(m_data);
+    ModernTokenBehaviorsBatch73::AddAll(m_data);
+    ModernTokenBehaviorsBatch74::AddAll(m_data);
+    ModernTokenBehaviorsBatch75::AddAll(m_data);
+    ModernTokenBehaviorsBatch76::AddAll(m_data);
+    ModernTokenBehaviorsBatch77::AddAll(m_data);
     GeneratedBehaviorMappings::AddAll(m_data);
     { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG19_010t", 1}); m_data.emplace("BG19_010", CardDef{std::move(p)}); }
     { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG19_010_Gt", 1}); m_data.emplace("BG19_010_G", CardDef{std::move(p)}); }
@@ -163,11 +182,123 @@ CardDefs::CardDefs()
     // Token of the Old Gods is consumed by Player::PlaySpell only after its
     // two-stage transform modal is successfully opened.
     m_data.emplace("BG30_MagicItem_416t", CardDef{});
+    // Season 14 Spellcraft Trinket tokens resolve through the reviewed
+    // TavernSpellBehavior target executors; expose their CardDefs so the
+    // generated hand cards are accepted by CardLoader.
+    m_data.emplace("BG30_MagicItem_429t", CardDef{});
+    m_data.emplace("BG36_MagicItem_208t", CardDef{});
     // MechGyver's threshold/reward is owned by Player::ResolveMechGyverDeath;
     // this marker makes CardLoader expose the passive hero power.
     m_data.emplace("BG22_HERO_200p", CardDef{});
+    // Lift Off upgrades are resolved by Player because they mutate the
+    // hero-owned Battlecruiser and carry a refresh/tier counter.  Register
+    // every pinned normal and progressive spell here so CardLoader exposes
+    // them as executable generated entities instead of metadata-only cards.
+    constexpr std::array<const char*, 46> liftOffUpgrades = {
+        "BG31_HERO_801pta", "BG31_HERO_801pta2", "BG31_HERO_801pta3",
+        "BG31_HERO_801pta4", "BG31_HERO_801pta5", "BG31_HERO_801pta6",
+        "BG31_HERO_801pta7", "BG31_HERO_801ptb", "BG31_HERO_801ptb2",
+        "BG31_HERO_801ptb3", "BG31_HERO_801ptb4", "BG31_HERO_801ptb5",
+        "BG31_HERO_801ptb6", "BG31_HERO_801ptb7", "BG31_HERO_801ptc",
+        "BG31_HERO_801ptc2", "BG31_HERO_801ptc3", "BG31_HERO_801ptc4",
+        "BG31_HERO_801ptc5", "BG31_HERO_801ptc6", "BG31_HERO_801ptc7",
+        "BG31_HERO_801ptd", "BG31_HERO_801ptd2", "BG31_HERO_801ptd3",
+        "BG31_HERO_801ptd4", "BG31_HERO_801ptd5", "BG31_HERO_801ptd6",
+        "BG31_HERO_801ptd7", "BG31_HERO_801pte", "BG31_HERO_801pte2",
+        "BG31_HERO_801pte3", "BG31_HERO_801pte4", "BG31_HERO_801pte5",
+        "BG31_HERO_801pte6", "BG31_HERO_801pte7", "BG31_HERO_801ptf",
+        "BG31_HERO_801ptf2", "BG31_HERO_801ptf3", "BG31_HERO_801ptf4",
+        "BG31_HERO_801pth", "BG31_HERO_801pth2", "BG31_HERO_801pth3",
+        "BG31_HERO_801pti", "BG31_HERO_801pti2", "BG31_HERO_801ptj",
+        "BG31_HERO_801ptj2"};
+    for (const auto id : liftOffUpgrades) m_data.emplace(id, CardDef{});
+    // Warp Gate's Protoss offerings are hero-generated (not Tavern-pool
+    // cards), so register the exact pinned SC entities as executable static
+    // card definitions.  Their generation/selection remains owned by Player;
+    // an absent definition must never be substituted with another race.
+    constexpr std::array<const char*, 9> warpGateProtoss = {
+        "SC_751t", "SC_752", "SC_756", "SC_758", "SC_762",
+        "SC_763", "SC_764", "SC_765", "SC_783"};
+    for (const auto id : warpGateProtoss) m_data.emplace(id, CardDef{});
+    // Carrier's Interceptor and the Templar merge result are generated
+    // entities, not Warp Gate choices.  Register both exact source IDs so
+    // CardLoader metadata can instantiate them through the normal CardDefs
+    // path when Carrier combat or the Archon transformation resolves.
+    m_data.emplace("SC_756t", CardDef{});
+    m_data.emplace("SC_671t1", CardDef{});
+    // Curator Sticker's two fixed rewards are generated entities owned by
+    // ModernTokenBehaviorsBatch76, which is registered above.
+    // Protoss Battlecries that affect "all enemies" use a dedicated task so
+    // the enemy hero is included as well as the enemy board.  A plain
+    // DamageTask only visits minions and would silently under-apply these
+    // printed effects.
+    {
+        Power p;
+        p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::COLOSSUS_DAMAGE});
+        p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::COLOSSUS_DAMAGE});
+        m_data.insert_or_assign("SC_758", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::HIGH_TEMPLAR_DAMAGE});
+        m_data.insert_or_assign("SC_765", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::MOTHERSHIP_REWARD});
+        p.AddDeathrattleTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::MOTHERSHIP_REWARD});
+        m_data.insert_or_assign("SC_762", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::IMMORTAL_DOUBLE});
+        m_data.insert_or_assign("SC_763", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        p.AddDeathrattleTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::SENTRY_DISCOUNT});
+        m_data.insert_or_assign("SC_764", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::VOID_RAY_BONUS});
+        m_data.insert_or_assign("SC_783", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::DARK_TEMPLAR_DESTROY});
+        m_data.insert_or_assign("SC_752", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        Trigger t{TriggerType::TURN_END};
+        t.SetTriggerSource(TriggerSource::SELF);
+        t.SetTasks({SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::CARRIER_END_TURN}});
+        p.AddTrigger(std::move(t));
+        m_data.insert_or_assign("SC_756", CardDef{std::move(p)});
+    }
+    {
+        Power p;
+        Trigger t{TriggerType::TURN_END};
+        t.SetTriggerSource(TriggerSource::SELF);
+        t.SetTasks({SimpleTasks::ProtossBehaviorTask{
+            SimpleTasks::ProtossBehaviorTask::Effect::ARCHON_END_TURN}});
+        p.AddTrigger(std::move(t));
+        m_data.insert_or_assign("SC_671t1", CardDef{std::move(p)});
+    }
     ModernMinionBehaviorsBatch31::AddAll(m_data);
     ModernMinionBehaviorsBatch26::AddAll(m_data);
+    ModernMinionBehaviorsBatch27::AddAll(m_data);
     ModernMinionBehaviorsBatch25::AddAll(m_data);
     ModernMinionBehaviorsBatch29::AddAll(m_data);
     ModernMinionBehaviorsBatchBaller::AddAll(m_data);

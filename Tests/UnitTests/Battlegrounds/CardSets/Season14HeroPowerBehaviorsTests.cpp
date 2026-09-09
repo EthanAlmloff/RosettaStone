@@ -51,6 +51,10 @@ TEST_CASE("[Season14HeroPowerBehaviors] - Batch10 has exact pinned ownership")
 
 TEST_CASE("[Season14HeroPowerBehaviors] - Warp Gate has a pinned Protoss pool")
 {
+    CHECK(IsWarpGateHeroPowerDbfID(119196));
+    CHECK(WARP_GATE_LIFECYCLE.buyThreshold == 14);
+    CHECK(WARP_GATE_LIFECYCLE.choiceCount == 2);
+    CHECK(!IsWarpGateHeroPowerDbfID(119197));
     CHECK(WARP_GATE_PROTOSS_DBF_IDS.size() == 9);
     CHECK(IsWarpGateProtossDbfID(WARP_GATE_PROTOSS_DBF_IDS[0]));
     CHECK(IsWarpGateProtossDbfID(WARP_GATE_PROTOSS_DBF_IDS[8]));

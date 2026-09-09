@@ -11,6 +11,7 @@
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemAttackerTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ProtossBehaviorTask.hpp>
 #include <effolkronium/random.hpp>
 
 #include <utility>
@@ -90,6 +91,16 @@ void Minion::SetIndex(int index)
     m_index = index;
 }
 
+const void* Minion::GetOwnerToken() const noexcept
+{
+    return m_ownerToken;
+}
+
+void Minion::SetOwnerToken(const void* token) noexcept
+{
+    m_ownerToken = token;
+}
+
 int Minion::GetPoolIndex() const
 {
     return m_poolIdx;
@@ -141,8 +152,11 @@ void Minion::SetGameTag(GameTag tag, int value)
             }
             else
             {
+                const bool wasDivineShielded = m_hasDivineShield;
                 m_hasDivineShield = false;
                 m_divineShieldHitsRemaining = 0;
+                if (wasDivineShielded && getPlayerCallback)
+                    getPlayerCallback().OnFriendlyDivineShieldLost(*this);
             }
             break;
         case GameTag::WINDFURY:
@@ -153,8 +167,13 @@ void Minion::SetGameTag(GameTag tag, int value)
             break;
         case GameTag::POISONOUS:
         case GameTag::VENOMOUS:
+        {
+            const bool hadVenomous = m_hasVenomous;
             m_hasVenomous = value == 1 ? true : false;
+            if (hadVenomous && !m_hasVenomous && getPlayerCallback)
+                getPlayerCallback().OnFriendlyVenomousLost(*this);
             break;
+        }
         case GameTag::STEALTH:
             m_hasStealth = value == 1 ? true : false;
             break;
@@ -172,7 +191,17 @@ bool Minion::HasRace(Race race) const
 {
     if (m_amalgamation && race != Race::INVALID && race != Race::ALL)
         return true;
+    const auto index = static_cast<std::size_t>(race);
+    if (race != Race::INVALID && index < m_extraRaces.size() && m_extraRaces[index])
+        return true;
     return m_card.HasRace(race);
+}
+
+void Minion::AddRace(Race race) noexcept
+{
+    if (race == Race::INVALID || race == Race::ALL) return;
+    const auto index = static_cast<std::size_t>(race);
+    if (index < m_extraRaces.size()) m_extraRaces[index] = true;
 }
 
 bool Minion::IsMagnetic() const
@@ -239,10 +268,18 @@ void Minion::MagnetizeOnto(Minion& target) const
                 mirrors.push_back(&candidate);
         });
         if (!mirrors.empty()) {
-            owner.magnetizationMirrorInProgress = true;
+                owner.magnetizationMirrorInProgress = true;
             for (auto* mirror : mirrors) {
                 const int repeats = mirror->GetCardID() == "BG26_149_G" ? 2 : 1;
-                for (int i = 0; i < repeats; ++i) MagnetizeOnto(*mirror);
+                for (int i = 0; i < repeats; ++i) {
+                    const auto before = mirror->GetMagnetizationCount();
+                    MagnetizeOnto(*mirror);
+                    // A Beatboxer mirror is itself a successful friendly
+                    // Magnetize event and must advance target-local passive
+                    // Trinkets independently of the original attachment.
+                    if (mirror->GetMagnetizationCount() > before)
+                        owner.ApplyAfterMagnetizeTrinkets(*mirror);
+                }
             }
             owner.magnetizationMirrorInProgress = false;
         }
@@ -481,6 +518,258 @@ bool Minion::CanMakeGolden() const
     return !Cards::FindCardByDbfID(m_card.premiumDbfID).id.empty();
 }
 
+bool Minion::MergeIntoGolden(const Minion& other)
+{
+    if (&other == this || IsGolden() || other.IsGolden() ||
+        IsTemporarilyGolden() || other.IsTemporarilyGolden() ||
+        !CanMakeGolden())
+        return false;
+
+    const Card thisCard = Cards::FindCardByDbfID(GetDbfID());
+    const Card otherCard = Cards::FindCardByDbfID(other.GetDbfID());
+    if (thisCard.normalDbfID != 0 || otherCard.normalDbfID != 0 ||
+        thisCard.dbfID == 0 || otherCard.dbfID == 0 ||
+        thisCard.dbfID != otherCard.dbfID ||
+        thisCard.premiumDbfID == 0)
+        return false;
+
+    // Triple formation combines the copies' enchantment deltas with the
+    // premium base stats.  Capture the task suffixes before MakeGolden():
+    // printed tasks belong to the card definition and are supplied by the
+    // premium card, while tasks appended at runtime are instance provenance
+    // and must survive from both source copies.
+    const auto appendDynamic = [](auto& destination, const auto& source,
+                                  std::size_t baseline) {
+        for (std::size_t i = baseline; i < source.size(); ++i)
+            destination.emplace_back(source[i]);
+    };
+    const auto thisBattlecry = m_card.power.GetBattlecryTask();
+    const auto thisStartCombat = m_card.power.GetStartCombatTask();
+    const auto thisDeathrattle = m_card.power.GetDeathrattleTask();
+    const auto thisRally = m_card.power.GetRallyTask();
+    const auto otherBattlecry = other.m_card.power.GetBattlecryTask();
+    const auto otherStartCombat = other.m_card.power.GetStartCombatTask();
+    const auto otherDeathrattle = other.m_card.power.GetDeathrattleTask();
+    const auto otherRally = other.m_card.power.GetRallyTask();
+    const auto baseBattlecry = thisCard.power.GetBattlecryTask().size();
+    const auto baseStartCombat = thisCard.power.GetStartCombatTask().size();
+    const auto baseDeathrattle = thisCard.power.GetDeathrattleTask().size();
+    const auto baseRally = thisCard.power.GetRallyTask().size();
+
+    const int normalAttack = thisCard.GetAttack();
+    const int normalHealth = thisCard.GetHealth();
+    const int attackDelta = (m_attack - normalAttack) +
+                            (other.m_attack - normalAttack);
+    const int healthDelta = (m_health - normalHealth) +
+                            (other.m_health - normalHealth);
+    const int maxHealthDelta = (m_maxHealth - normalHealth) +
+                               (other.m_maxHealth - normalHealth);
+
+    // These fields are instance-owned permanent/enchantment provenance.  A
+    // triple retains both copies' contributions, rather than merely keeping
+    // whichever copy happened to be selected as the survivor.
+    const auto sum = [](auto left, auto right) { return left + right; };
+    const int globalAttack = sum(m_globalMinionAttack, other.m_globalMinionAttack);
+    const int lobsterAttack = sum(m_futureLobsterAttack, other.m_futureLobsterAttack);
+    const int lobsterHealth = sum(m_futureLobsterHealth, other.m_futureLobsterHealth);
+    const int ballerAttack = sum(m_futureBallerAttack, other.m_futureBallerAttack);
+    const int ballerHealth = sum(m_futureBallerHealth, other.m_futureBallerHealth);
+    const int persistentAttack = sum(m_persistentMinionAttack, other.m_persistentMinionAttack);
+    const int persistentHealth = sum(m_persistentMinionHealth, other.m_persistentMinionHealth);
+    const int persistentTierAttack = sum(m_persistentTierMinionAttack, other.m_persistentTierMinionAttack);
+    const int persistentTierHealth = sum(m_persistentTierMinionHealth, other.m_persistentTierMinionHealth);
+    const int spellImprovement = sum(m_startCombatSpellImprovement, other.m_startCombatSpellImprovement);
+    const int discoverBuffAttack = sum(m_discoverBuffAttack, other.m_discoverBuffAttack);
+    const int discoverBuffHealth = sum(m_discoverBuffHealth, other.m_discoverBuffHealth);
+    const int bloodGems = sum(m_bloodGemCount, other.m_bloodGemCount);
+    const int bloodGemsThisTurn = sum(m_bloodGemCountThisTurn, other.m_bloodGemCountThisTurn);
+    const int bloodGemAttack = sum(m_bloodGemAttack, other.m_bloodGemAttack);
+    const int bloodGemHealth = sum(m_bloodGemHealth, other.m_bloodGemHealth);
+    const int combatAttack = sum(m_combatPersistentAttack, other.m_combatPersistentAttack);
+    const int combatHealth = sum(m_combatPersistentHealth, other.m_combatPersistentHealth);
+    const auto combatKeywords = m_combatPersistentKeywords | other.m_combatPersistentKeywords;
+    const int playAttack = sum(m_playCardAttackBonus, other.m_playCardAttackBonus);
+    const int playHealth = sum(m_playCardHealthBonus, other.m_playCardHealthBonus);
+    const int deathAttack = sum(m_deathrattleAttackTransfer, other.m_deathrattleAttackTransfer);
+    const int deathHealth = sum(m_deathrattleHealthTransfer, other.m_deathrattleHealthTransfer);
+    const int skyGolemDeaths = sum(m_skyGolemDeathrattleCount, other.m_skyGolemDeathrattleCount);
+    const int knightDeaths = sum(m_eternalKnightDeathCountApplied, other.m_eternalKnightDeathCountApplied);
+    const int knightUndeadDeaths = sum(m_eternalKnightUndeadDeathCountApplied, other.m_eternalKnightUndeadDeathCountApplied);
+    const int damageDealt = sum(m_damageDealt, other.m_damageDealt);
+    const int magnetizations = sum(m_magnetizationCount, other.m_magnetizationCount);
+    const int temporaryAttack = sum(m_temporaryAttack, other.m_temporaryAttack);
+    const int temporaryHealth = sum(m_temporaryHealth, other.m_temporaryHealth);
+    const int frenzyUses = std::max(m_frenzyUses, other.m_frenzyUses);
+    const int buyTriggerUses = std::max(m_buyTriggerUses, other.m_buyTriggerUses);
+    const int steadyAttack = sum(m_steadyGrowthAttack, other.m_steadyGrowthAttack);
+    const int steadyHealth = sum(m_steadyGrowthHealth, other.m_steadyGrowthHealth);
+    const int avengeDeaths = sum(m_avengeDeaths, other.m_avengeDeaths);
+    const int threshold = std::max(m_attackThresholdDivineShield,
+                                   other.m_attackThresholdDivineShield);
+    const bool thresholdTriggered = m_attackThresholdTriggered ||
+                                    other.m_attackThresholdTriggered;
+    const int spendThresholdCount = sum(m_spendGoldThresholdCount,
+                                        other.m_spendGoldThresholdCount);
+    const int darkGiftAttack = sum(m_darkGiftCounterAttack,
+                                   other.m_darkGiftCounterAttack);
+    const int darkGiftHealth = sum(m_darkGiftCounterHealth,
+                                   other.m_darkGiftCounterHealth);
+    const int incubation = std::max(m_incubationTurnsRemaining,
+                                    other.m_incubationTurnsRemaining);
+    const int replication = std::max(m_replicationTurnsRemaining,
+                                     other.m_replicationTurnsRemaining);
+    const int patientScout = std::max(m_patientScoutTurns,
+                                      other.m_patientScoutTurns);
+    const int spellcraftUses = std::max(m_spellcraftUsesRemaining,
+                                        other.m_spellcraftUsesRemaining);
+    const int felboarCounter = std::max(m_felboarSpellCounter,
+                                        other.m_felboarSpellCounter);
+    const int kodoUses = std::max(m_kodoSummonUses, other.m_kodoSummonUses);
+    const int activateUses = std::max(m_activateUses, other.m_activateUses);
+    const int startDeathrattleTriggers = std::max(
+        m_startCombatDeathrattleTriggers, other.m_startCombatDeathrattleTriggers);
+    const int startLeftAttackTriggers = std::max(
+        m_startCombatLeftAttackTriggers, other.m_startCombatLeftAttackTriggers);
+    const int eggHatch = std::max(m_eggHatchTurnsRemaining,
+                                  other.m_eggHatchTurnsRemaining);
+    if (m_affinityRace != Race::INVALID && other.m_affinityRace != Race::INVALID &&
+        m_affinityRace != other.m_affinityRace)
+        return false;
+    const Race affinityRace = m_affinityRace != Race::INVALID
+                                  ? m_affinityRace
+                                  : other.m_affinityRace;
+    const int affinityTurns = std::max(m_affinityTurns, other.m_affinityTurns);
+    if (m_darkGiftCounterKind != 0 && other.m_darkGiftCounterKind != 0 &&
+        m_darkGiftCounterKind != other.m_darkGiftCounterKind)
+        return false;
+    const int darkGiftKind = m_darkGiftCounterKind != 0
+                                 ? m_darkGiftCounterKind
+                                 : other.m_darkGiftCounterKind;
+
+    if (!MakeGolden()) return false;
+
+    m_attack = m_card.GetAttack() + attackDelta;
+    m_health = m_card.GetHealth() + healthDelta;
+    m_maxHealth = m_card.GetHealth() + maxHealthDelta;
+    m_globalMinionAttack = globalAttack;
+    m_futureLobsterAttack = lobsterAttack;
+    m_futureLobsterHealth = lobsterHealth;
+    m_futureBallerAttack = ballerAttack;
+    m_futureBallerHealth = ballerHealth;
+    m_persistentMinionAttack = persistentAttack;
+    m_persistentMinionHealth = persistentHealth;
+    m_persistentTierMinionAttack = persistentTierAttack;
+    m_persistentTierMinionHealth = persistentTierHealth;
+    for (std::size_t i = 0; i < m_persistentRaceAttack.size(); ++i) {
+        m_persistentRaceAttack[i] += other.m_persistentRaceAttack[i];
+        m_persistentRaceHealth[i] += other.m_persistentRaceHealth[i];
+    }
+    m_startCombatSpellImprovement = spellImprovement;
+    m_discoverBuffAttack = discoverBuffAttack;
+    m_discoverBuffHealth = discoverBuffHealth;
+    m_bloodGemCount = bloodGems;
+    m_bloodGemCountThisTurn = bloodGemsThisTurn;
+    m_bloodGemAttack = bloodGemAttack;
+    m_bloodGemHealth = bloodGemHealth;
+    m_combatPersistentAttack = combatAttack;
+    m_combatPersistentHealth = combatHealth;
+    m_combatPersistentKeywords = combatKeywords;
+    m_playCardAttackBonus = playAttack;
+    m_playCardHealthBonus = playHealth;
+    m_deathrattleAttackTransfer = deathAttack;
+    m_deathrattleHealthTransfer = deathHealth;
+    m_deathrattleStatTransferToAll = m_deathrattleStatTransferToAll || other.m_deathrattleStatTransferToAll;
+    m_earthElementalDeathrattle = m_earthElementalDeathrattle || other.m_earthElementalDeathrattle;
+    m_skyGolemDeathrattleCount = skyGolemDeaths;
+    m_eternalKnightDeathCountApplied = knightDeaths;
+    m_eternalKnightUndeadDeathCountApplied = knightUndeadDeaths;
+    m_damageDealt = damageDealt;
+    m_magnetizationCount = magnetizations;
+    m_temporaryAttack = temporaryAttack;
+    m_temporaryHealth = temporaryHealth;
+    m_temporaryTaunt = m_temporaryTaunt || other.m_temporaryTaunt;
+    m_temporaryDivineShield = m_temporaryDivineShield || other.m_temporaryDivineShield;
+    m_temporaryReborn = m_temporaryReborn || other.m_temporaryReborn;
+    m_temporaryWindfury = m_temporaryWindfury || other.m_temporaryWindfury;
+    m_temporaryMegaWindfury = m_temporaryMegaWindfury || other.m_temporaryMegaWindfury;
+    m_temporaryVenomous = m_temporaryVenomous || other.m_temporaryVenomous;
+    m_temporaryStealth = m_temporaryStealth || other.m_temporaryStealth;
+    m_frenzyUses = frenzyUses;
+    m_buyTriggerUses = buyTriggerUses;
+    m_steadyGrowthAttack = steadyAttack;
+    m_steadyGrowthHealth = steadyHealth;
+    m_avengeDeaths = avengeDeaths;
+    m_attackThresholdDivineShield = threshold;
+    m_attackThresholdTriggered = thresholdTriggered;
+    m_endTurnBattlecryTrigger = m_endTurnBattlecryTrigger || other.m_endTurnBattlecryTrigger;
+    m_spendGoldThresholdFired = m_spendGoldThresholdFired || other.m_spendGoldThresholdFired;
+    m_spendGoldThresholdCount = spendThresholdCount;
+    m_treasureParrotRewarded = m_treasureParrotRewarded || other.m_treasureParrotRewarded;
+    m_heroDamageThresholdFired = m_heroDamageThresholdFired || other.m_heroDamageThresholdFired;
+    m_darkGiftCounterAttack = darkGiftAttack;
+    m_darkGiftCounterHealth = darkGiftHealth;
+    m_darkGiftCounterKind = darkGiftKind;
+    m_incubationTurnsRemaining = incubation;
+    m_replicationTurnsRemaining = replication;
+    m_patientScoutTurns = patientScout;
+    m_spellcraftUsesRemaining = spellcraftUses;
+    m_zestyShakerUsed = m_zestyShakerUsed || other.m_zestyShakerUsed;
+    m_felboarSpellCounter = felboarCounter;
+    m_kodoSummonUses = kodoUses;
+    m_activateUses = activateUses;
+    m_startCombatDeathrattleTriggers = static_cast<std::uint8_t>(startDeathrattleTriggers);
+    m_startCombatLeftAttackTriggers = static_cast<std::uint8_t>(startLeftAttackTriggers);
+    m_immuneWhileAttacking = m_immuneWhileAttacking || other.m_immuneWhileAttacking;
+    m_isAttacking = m_isAttacking || other.m_isAttacking;
+    m_eggHatchTurnsRemaining = eggHatch;
+    m_affinityRace = affinityRace;
+    m_affinityTurns = affinityTurns;
+    m_polarization = m_polarization || other.m_polarization;
+
+    // Runtime keywords and one-shot/provenance flags are retained if either
+    // source carried them.  The surviving entity's zone/index/owner remain
+    // authoritative, so removing the other copy cannot reorder it.
+    m_hasDeathrattle = m_hasDeathrattle || other.m_hasDeathrattle;
+    m_hasTaunt = m_hasTaunt || other.m_hasTaunt;
+    m_hasDivineShield = m_hasDivineShield || other.m_hasDivineShield;
+    m_divineShieldHitsRemaining = std::max(m_divineShieldHitsRemaining, other.m_divineShieldHitsRemaining);
+    m_hasReborn = m_hasReborn || other.m_hasReborn;
+    m_rebornFullHealth = m_rebornFullHealth || other.m_rebornFullHealth;
+    m_hasWindfury = m_hasWindfury || other.m_hasWindfury;
+    m_hasMegaWindfury = m_hasMegaWindfury || other.m_hasMegaWindfury;
+    m_hasVenomous = m_hasVenomous || other.m_hasVenomous;
+    m_hasStealth = m_hasStealth || other.m_hasStealth;
+    m_isFrozen = m_isFrozen || other.m_isFrozen;
+    m_handLocked = m_handLocked || other.m_handLocked;
+    m_combinedChooseOne = m_combinedChooseOne || other.m_combinedChooseOne;
+    m_diesAtRecruitEnd = m_diesAtRecruitEnd || other.m_diesAtRecruitEnd;
+    m_magnetizationArmed = m_magnetizationArmed || other.m_magnetizationArmed;
+    m_permanentSpellcraft = m_permanentSpellcraft || other.m_permanentSpellcraft;
+    m_tarecgosaBlessing = m_tarecgosaBlessing || other.m_tarecgosaBlessing;
+    m_timeTurning = m_timeTurning || other.m_timeTurning;
+    m_amalgamation = m_amalgamation || other.m_amalgamation;
+    for (std::size_t i = 0; i < m_extraRaces.size(); ++i)
+        m_extraRaces[i] = m_extraRaces[i] || other.m_extraRaces[i];
+    if (m_taughtTavernSpell.empty()) m_taughtTavernSpell = other.m_taughtTavernSpell;
+    if (m_lastDamageSourceIndex < 0) {
+        m_lastDamageSourceIndex = other.m_lastDamageSourceIndex;
+        m_lastDamageSourceCardID = other.m_lastDamageSourceCardID;
+    }
+    for (const auto& id : other.m_temporaryEnchantmentIDs)
+        if (std::find(m_temporaryEnchantmentIDs.begin(), m_temporaryEnchantmentIDs.end(), id) == m_temporaryEnchantmentIDs.end())
+            m_temporaryEnchantmentIDs.push_back(id);
+
+    appendDynamic(m_card.power.GetBattlecryTask(), thisBattlecry, baseBattlecry);
+    appendDynamic(m_card.power.GetBattlecryTask(), otherBattlecry, baseBattlecry);
+    appendDynamic(m_card.power.GetStartCombatTask(), thisStartCombat, baseStartCombat);
+    appendDynamic(m_card.power.GetStartCombatTask(), otherStartCombat, baseStartCombat);
+    appendDynamic(m_card.power.GetDeathrattleTask(), thisDeathrattle, baseDeathrattle);
+    appendDynamic(m_card.power.GetDeathrattleTask(), otherDeathrattle, baseDeathrattle);
+    appendDynamic(m_card.power.GetRallyTask(), thisRally, baseRally);
+    appendDynamic(m_card.power.GetRallyTask(), otherRally, baseRally);
+    return true;
+}
+
 bool Minion::MakeGoldenUntilNextTurn()
 {
     // A second cast in the same turn must not replace the original snapshot:
@@ -523,6 +812,21 @@ void Minion::ApplyEternalKnightDeathCount(int count)
     m_attack += 4 * multiplier * delta;
     m_health += 2 * multiplier * delta;
     m_eternalKnightDeathCountApplied = count;
+}
+
+void Minion::ApplyEternalKnightUndeadDeathCount(int count)
+{
+    if (count <= m_eternalKnightUndeadDeathCountApplied ||
+        (m_card.id != "BG25_008" && m_card.id != "BG25_008_G"))
+        return;
+    // Eternal Portrait is an external +4/+2 aura. It applies the same
+    // payload to normal and golden Eternal Knights; only the Knight's own
+    // printed wherever-this-is text doubles with the golden card.
+    const int multiplier = 1;
+    const int delta = count - m_eternalKnightUndeadDeathCountApplied;
+    m_attack += 4 * multiplier * delta;
+    m_health += 2 * multiplier * delta;
+    m_eternalKnightUndeadDeathCountApplied = count;
 }
 
 bool Minion::TransformTo(Card replacement)
@@ -626,6 +930,7 @@ void Minion::ApplyFutureBallerStats(int attack, int health)
 void Minion::ApplyPersistentMinionStats(int attack, int health)
 {
     int gainedAttack = 0;
+    int gainedHealth = 0;
     if (attack > m_persistentMinionAttack)
     {
         gainedAttack = attack - m_persistentMinionAttack;
@@ -634,16 +939,19 @@ void Minion::ApplyPersistentMinionStats(int attack, int health)
     }
     if (health > m_persistentMinionHealth)
     {
-        m_health += health - m_persistentMinionHealth;
+        gainedHealth = health - m_persistentMinionHealth;
+        m_health += gainedHealth;
         m_persistentMinionHealth = health;
     }
     NotifyPersistentAttackGain(gainedAttack);
+    NotifyPersistentHealthGain(gainedHealth);
 }
 
 void Minion::ApplyPersistentTierMinionStats(int tier, int attack, int health)
 {
     if (GetTier() > tier) return;
     int gainedAttack = 0;
+    int gainedHealth = 0;
     if (attack > m_persistentTierMinionAttack)
     {
         gainedAttack = attack - m_persistentTierMinionAttack;
@@ -652,10 +960,12 @@ void Minion::ApplyPersistentTierMinionStats(int tier, int attack, int health)
     }
     if (health > m_persistentTierMinionHealth)
     {
-        m_health += health - m_persistentTierMinionHealth;
+        gainedHealth = health - m_persistentTierMinionHealth;
+        m_health += gainedHealth;
         m_persistentTierMinionHealth = health;
     }
     NotifyPersistentAttackGain(gainedAttack);
+    NotifyPersistentHealthGain(gainedHealth);
 }
 
 void Minion::ApplyPersistentRaceStats(Race race, int attack, int health)
@@ -663,6 +973,7 @@ void Minion::ApplyPersistentRaceStats(Race race, int attack, int health)
     const auto index = static_cast<std::size_t>(race);
     if (index >= m_persistentRaceAttack.size() || !HasRace(race)) return;
     int gainedAttack = 0;
+    int gainedHealth = 0;
     if (attack > m_persistentRaceAttack[index])
     {
         gainedAttack = attack - m_persistentRaceAttack[index];
@@ -671,10 +982,12 @@ void Minion::ApplyPersistentRaceStats(Race race, int attack, int health)
     }
     if (health > m_persistentRaceHealth[index])
     {
-        m_health += health - m_persistentRaceHealth[index];
+        gainedHealth = health - m_persistentRaceHealth[index];
+        m_health += gainedHealth;
         m_persistentRaceHealth[index] = health;
     }
     NotifyPersistentAttackGain(gainedAttack);
+    NotifyPersistentHealthGain(gainedHealth);
 }
 
 void Minion::ApplyBloodGem(int attack, int health)
@@ -762,12 +1075,19 @@ void Minion::ApplyCombatPersistentStats(int attack, int health)
     m_combatPersistentAttack += attack;
     m_combatPersistentHealth += health;
     NotifyPersistentAttackGain(attack);
+    NotifyPersistentHealthGain(health);
 }
 
 void Minion::NotifyPersistentAttackGain(int amount)
 {
     if (amount > 0 && getPlayerCallback)
         getPlayerCallback().DispatchMinionAttackGain(*this, amount);
+}
+
+void Minion::NotifyPersistentHealthGain(int amount)
+{
+    if (amount > 0 && getPlayerCallback)
+        getPlayerCallback().DispatchMinionHealthGain(*this, amount);
 }
 
 void Minion::ApplyCombatPersistentKeyword(GameTag tag)
@@ -897,6 +1217,23 @@ void Minion::ApplyTemporaryEnchantment(TemporaryEnchantment kind, int attack,
     }
 }
 
+void Minion::RecordTemporaryEnchantment(std::string_view enchantmentID)
+{
+    if (enchantmentID.empty()) return;
+    const auto found = std::find(m_temporaryEnchantmentIDs.begin(),
+                                 m_temporaryEnchantmentIDs.end(),
+                                 enchantmentID);
+    if (found == m_temporaryEnchantmentIDs.end())
+        m_temporaryEnchantmentIDs.emplace_back(enchantmentID);
+}
+
+bool Minion::HasTemporaryEnchantment(std::string_view enchantmentID) const
+{
+    return std::find(m_temporaryEnchantmentIDs.begin(),
+                     m_temporaryEnchantmentIDs.end(), enchantmentID) !=
+           m_temporaryEnchantmentIDs.end();
+}
+
 void Minion::ExpireTemporaryEffects()
 {
     SetAttack(GetAttack() - m_temporaryAttack);
@@ -924,6 +1261,7 @@ void Minion::ExpireTemporaryEffects()
     m_temporaryMegaWindfury = false;
     m_temporaryVenomous = false;
     m_temporaryStealth = false;
+    m_temporaryEnchantmentIDs.clear();
 
     // Temporary Golden conversions change card identity (and therefore
     // golden-only powers) but must not erase stats, buffs, zone identity, or
@@ -1114,7 +1452,7 @@ int Minion::GetAttackCount() const
 
 void Minion::ReviveWithReborn()
 {
-    m_health = 1;
+    m_health = m_rebornFullHealth ? m_maxHealth : 1;
     m_isDestroyed = false;
     m_hasReborn = false;
 }
@@ -1145,6 +1483,11 @@ void Minion::TakeDamage(Minion& source)
         {
             m_hasDivineShield = false;
         }
+        if (!m_hasDivineShield && getPlayerCallback)
+        {
+            getPlayerCallback().OnFriendlyDivineShieldLost(*this);
+            getPlayerCallback().OnFriendlyMinionDamaged(*this);
+        }
         return;
     }
 
@@ -1167,6 +1510,8 @@ void Minion::TakeDamage(Minion& source)
         ++m_frenzyUses;
         ActivateTrigger(TriggerType::TAKE_DAMAGE, *this);
     }
+    if (damage > 0 && getPlayerCallback)
+        getPlayerCallback().OnFriendlyMinionDamaged(*this);
 }
 
 void Minion::SetTaunt(bool taunt)
@@ -1190,6 +1535,8 @@ void Minion::TakeDamage(int amount)
         ++m_frenzyUses;
         ActivateTrigger(TriggerType::TAKE_DAMAGE, *this);
     }
+    if (amount > 0 && getPlayerCallback)
+        getPlayerCallback().OnFriendlyMinionDamaged(*this);
 }
 
 bool Minion::IsDestroyed() const
@@ -1214,6 +1561,17 @@ bool Minion::IsPlayableByCardReq(Player& player) const
 
 bool Minion::HasAnyValidPlayTargets(Player& player) const
 {
+    if (m_card.targetingType == TargetingType::TAVERN_MINIONS)
+    {
+        for (auto& minion : player.tavern.fieldZone.GetAll())
+        {
+            if (!minion.IsDestroyed() && !minion.GetCardID().empty() &&
+                m_card.TargetingRequirements(minion))
+                return true;
+        }
+        return false;
+    }
+
     bool friendlyMinions = false;
 
     switch (m_card.targetingType)
@@ -1259,6 +1617,14 @@ bool Minion::IsValidPlayTarget(Player& player, int targetIdx)
         }
 
         return false;
+    }
+    else if (m_card.targetingType == TargetingType::TAVERN_MINIONS)
+    {
+        if (targetIdx < 0 || targetIdx >= player.tavern.fieldZone.GetCount())
+            return false;
+        Minion& target = player.tavern.fieldZone[static_cast<std::size_t>(targetIdx)];
+        return !target.IsDestroyed() && !target.GetCardID().empty() &&
+               m_card.TargetingRequirements(target);
     }
     else
     {
@@ -1373,6 +1739,12 @@ void Minion::ActivateTask(PowerType type, Player& player)
         // Tavern resolver. Unknown/unimplemented identities fail closed.
         if (spell.id.empty() || behavior.effect == TavernSpellEffect::NONE)
             return;
+        // Magicfin Apprentice's Battlecry is represented by the taught-spell
+        // payload rather than a normal POWER task.  Keep the lifetime
+        // Battlecry counter (and Dark Gift Battlecry counter) aligned with
+        // ordinary Battlecry dispatches before resolving that payload.
+        player.season14.RecordBattlecry();
+        player.AdvanceDarkGiftCounters(1);
         player.season14.pendingTaughtSpell =
             {true, static_cast<std::uint64_t>(GetIndex()), spell.dbfID};
         (void)player.CastTavernSpellFree(TaughtTavernSpell(), 1);
@@ -1458,19 +1830,22 @@ void Minion::ActivateTask(PowerType type, Player& player)
 
 void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
 {
-    // Weebomination's printed effect is a targeted Battlecry, not an
-    // end-of-turn aura.  Keep the calculation at the Battlecry dispatch
-    // boundary so Brann/other Battlecry replays resolve it once per replay,
-    // against the hero health at that moment.  Armor is deliberately not
-    // included: the hero's current Health is compared with its effective
-    // starting maximum (including hero start-health modifiers).
+    const auto tasks = GetTasks(type);
+    ActivateTask(type, player, target, tasks);
+}
+
+void Minion::ActivateTask(PowerType type, Player& player, Minion& target,
+                          const std::vector<TaskType>& tasks)
+{
+    // Weebomination's printed effect is an end-of-turn aura, not a
+    // Battlecry.  Keep the calculation at its targeted dispatch boundary;
+    // this path must not advance the lifetime Battlecry counter used by
+    // Murky Sticker.
     if (type == PowerType::POWER &&
         (GetCardID() == "TB_BaconShop_HERO_34_Buddy" ||
          GetCardID() == "TB_BaconShop_HERO_34_Buddy_G"))
     {
         if (&target == this || target.IsDestroyed()) return;
-        player.season14.RecordBattlecry();
-        player.AdvanceDarkGiftCounters(1);
         const int maxHealth = player.season14.heroPowerBatch1.StartingHealth(
             player.hero.card.GetHealth());
         const int missingHealth = std::max(0, maxHealth - player.hero.health);
@@ -1478,7 +1853,6 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
         target.SetHealth(target.GetHealth() + multiplier * missingHealth);
         return;
     }
-    auto tasks = GetTasks(type);
     if (tasks.empty())
     {
         return;
@@ -1665,6 +2039,12 @@ void Minion::AdvanceIncubation()
 int Minion::IncubationTurnsRemaining() const
 {
     return m_incubationTurnsRemaining;
+}
+
+bool Minion::AdvanceEggHatch() noexcept
+{
+    if (m_eggHatchTurnsRemaining <= 0) return false;
+    return --m_eggHatchTurnsRemaining == 0;
 }
 
 void Minion::SetReplication(int turns)
@@ -1910,6 +2290,14 @@ int Minion::TriggerAvenge(Player& player)
                     ++after[std::string(std::get<Minion>(player.hand[i]).GetCardID())];
             for (const auto& [id, count] : after) for (int n = 0; n < count - before[id]; ++n) player.season14.TrackCombatAvengeCard(id);
         }
+        else if (definition->effect == AvengeEffect::ADD_RANDOM_PROTOSS)
+        {
+            // Mothership's golden payload is represented by cardCount (1/2),
+            // preserving the exact normal/golden Avenge fan-out and the
+            // canonical Warp Gate Protoss eligibility filter.
+            SimpleTasks::ProtossBehaviorTask::AddProtossToHand(
+                player, definition->cardCount);
+        }
         else if (definition->effect == AvengeEffect::PROGRESSIVE_END_TURN)
         {
             player.season14.progressiveAvengeAttack += definition->attack;
@@ -1920,8 +2308,14 @@ int Minion::TriggerAvenge(Player& player)
             // ``attack`` stores the number of Blood Gems to play; unlike a
             // stat buff this must flow through Player's authoritative gem
             // resolver so race bonuses and persistent gem state apply.
+            const bool portraitAllMinions =
+                player.HasActivePortrait(PortraitEffect::BRISTLEBACH_ALL_MINIONS) &&
+                (GetCardID() == "BG26_157" || GetCardID() == "BG26_157_G");
             player.GetField().ForEachAlive([&](MinionData& data) {
-                if (!data.value().HasRace(definition->race)) return;
+                if (!portraitAllMinions)
+                {
+                    if (!data.value().HasRace(definition->race)) return;
+                }
                 for (int i = 0; i < definition->attack; ++i)
                     player.ApplyBloodGemTo(data.value());
             });

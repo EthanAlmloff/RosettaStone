@@ -14,7 +14,9 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -63,6 +65,15 @@ class Minion
     //! \param index The value of index.
     void SetIndex(int index);
 
+    //! Returns the non-owning player identity used to distinguish a retained
+    //! instance move from a cross-player hand transfer.  This is deliberately
+    //! opaque; gameplay code must continue to use getPlayerCallback for the
+    //! actual owner reference.
+    const void* GetOwnerToken() const noexcept;
+
+    //! Records the owning-player identity for zone lifecycle bookkeeping.
+    void SetOwnerToken(const void* token) noexcept;
+
     //! Returns the value of pool index.
     //! \return The value of pool index.
     int GetPoolIndex() const;
@@ -102,6 +113,7 @@ class Minion
     //! \param race The tribe to test.
     //! \return true when this minion has the requested tribe.
     bool HasRace(Race race) const;
+    void AddRace(Race race) noexcept;
     void SetAmalgamation(bool enabled = true) noexcept { m_amalgamation = enabled; }
     //! Tarecgosa's Blessing keeps combat bonus keywords and doubles explicit
     //! combat stat gains when the combat copy is reconciled.
@@ -207,6 +219,11 @@ class Minion
     //! Returns whether this instance can be converted to a supported premium
     //! entity without mutating it.
     bool CanMakeGolden() const;
+    //! Converts this instance to golden by merging a second matching copy.
+    //! The surviving instance keeps its zone/index/provenance while the
+    //! second instance's persistent stats, runtime keywords, enchantment
+    //! records, and dynamic power payloads are folded into it.
+    bool MergeIntoGolden(const Minion& other);
     //! Replaces card identity while preserving this instance's zone, stats,
     //! callbacks, and mutable keyword state.
     bool TransformTo(Card replacement);
@@ -243,6 +260,16 @@ class Minion
     { ++m_startCombatSpellImprovement; }
     int StartCombatSpellImprovement() const noexcept
     { return m_startCombatSpellImprovement; }
+
+    //! Burth's Discover payload is instance-owned: each Buddy copy improves
+    //! its own future Discover buff, independently of other owned copies.
+    void ImproveDiscoverBuff(int attack = 1, int health = 1) noexcept
+    {
+        m_discoverBuffAttack += attack;
+        m_discoverBuffHealth += health;
+    }
+    int DiscoverBuffAttack() const noexcept { return m_discoverBuffAttack; }
+    int DiscoverBuffHealth() const noexcept { return m_discoverBuffHealth; }
 
     //! Applies one Blood Gem's resolved stats and records the permanent
     //! instance count used by observation/diagnostics.
@@ -288,6 +315,16 @@ class Minion
     //! expiry bookkeeping.
     void ApplyTemporaryEnchantment(TemporaryEnchantment kind, int attack = 0,
                                    int health = 0);
+
+    //! Record the canonical child identity for a temporary lifecycle effect.
+    //! The payload is still owned by the typed temporary-state fields above;
+    //! this identity is retained for replay/observation and auditability.
+    void RecordTemporaryEnchantment(std::string_view enchantmentID);
+    bool HasTemporaryEnchantment(std::string_view enchantmentID) const;
+    const std::vector<std::string>& GetTemporaryEnchantments() const noexcept
+    {
+        return m_temporaryEnchantmentIDs;
+    }
     //! Applies the cumulative Falling Sky Golem deathrattle aura exactly once
     //! per observed deathrattle.  The applied count is instance state so an
     //! existing minion can safely pass through fresh-modifier setup again.
@@ -295,6 +332,9 @@ class Minion
     //! Applies the owning player's cumulative Eternal Knight death aura
     //! exactly once per newly observed friendly Knight death.
     void ApplyEternalKnightDeathCount(int count);
+    //! Applies the Eternal Portrait's cumulative +4/+2-per-friendly-Undead
+    //! death aura exactly once per newly observed death.
+    void ApplyEternalKnightUndeadDeathCount(int count);
     void ExpireTemporaryEffects();
     //! Resets the per-recruit-turn Lava Lurker Spellcraft allowance.
     void ResetSpellcraftUses() noexcept;
@@ -409,6 +449,9 @@ class Minion
     void SetIncubation(int turns = 2);
     void AdvanceIncubation();
     int IncubationTurnsRemaining() const;
+    void SetEggHatch(int turns = 1) noexcept { if (turns > 0) m_eggHatchTurnsRemaining = turns; }
+    bool AdvanceEggHatch() noexcept;
+    int EggHatchTurnsRemaining() const noexcept { return m_eggHatchTurnsRemaining; }
     //! Number of completed recruit turns Patient Scout has waited.
     void AdvancePatientScout() noexcept { if (m_patientScoutTurns < 6) ++m_patientScoutTurns; }
     int PatientScoutTurns() const noexcept { return m_patientScoutTurns; }
@@ -423,6 +466,9 @@ class Minion
     //! Revives this minion according to the Reborn keyword.
     //! The revived copy has one Health and cannot Reborn again.
     void ReviveWithReborn();
+    //! Ultra-Capacitor makes this entity's Reborn return at full health.
+    void SetRebornFullHealth(bool enabled) noexcept { m_rebornFullHealth = enabled; }
+    bool RebornFullHealth() const noexcept { return m_rebornFullHealth; }
 
     //! Returns whether this Tavern entity is frozen.
     //! \return true if this entity is frozen, false otherwise.
@@ -498,6 +544,11 @@ class Minion
     //! \param player The owner of the minion.
     //! \param target The target.
     void ActivateTask(PowerType type, Player& player, Minion& target);
+    //! Replays a previously captured task list against a stable target. A
+    //! targeted Battlecry can transform its source while resolving; retriggers
+    //! must still execute the original Battlecry task list.
+    void ActivateTask(PowerType type, Player& player, Minion& target,
+                      const std::vector<TaskType>& tasks);
 
     //! Resolves this minion's Rally effect after a friendly attack is
     //! declared. The target is the selected opposing minion.
@@ -509,6 +560,13 @@ class Minion
     bool RequiresPlayTarget() const noexcept
     {
         return m_card.mustHaveToTargetToPlay;
+    }
+
+    //! Returns whether this card's play target is a live minion in Bob's
+    //! Tavern rather than a minion on the recruit board.
+    bool RequiresTavernMinionTarget() const noexcept
+    {
+        return m_card.targetingType == TargetingType::TAVERN_MINIONS;
     }
     int TriggerAvenge(Player& player);
     void ResetAvengeProgress();
@@ -529,11 +587,13 @@ class Minion
 
  private:
     void NotifyPersistentAttackGain(int amount);
+    void NotifyPersistentHealthGain(int amount);
 
  private:
     Card m_card;
     int m_index = -1;
     int m_poolIdx = -1;
+    const void* m_ownerToken = nullptr;
 
     ZoneType m_zoneType = ZoneType::INVALID;
     int m_zonePos = -1;
@@ -555,6 +615,8 @@ class Minion
     std::array<int, 40> m_persistentRaceAttack{};
     std::array<int, 40> m_persistentRaceHealth{};
     int m_startCombatSpellImprovement = 0;
+    int m_discoverBuffAttack = 0;
+    int m_discoverBuffHealth = 0;
     int m_buyTriggerUses = 0;
     int m_bloodGemCount = 0;
     int m_bloodGemCountThisTurn = 0;
@@ -592,6 +654,7 @@ class Minion
     bool m_earthElementalDeathrattle = false;
     int m_skyGolemDeathrattleCount = 0;
     int m_eternalKnightDeathCountApplied = 0;
+    int m_eternalKnightUndeadDeathCountApplied = 0;
     int m_darkGiftCounterAttack = 0;
     int m_darkGiftCounterHealth = 0;
     int m_darkGiftCounterKind = 0;
@@ -604,6 +667,7 @@ class Minion
     bool m_hasDivineShield = false;
     int m_divineShieldHitsRemaining = 0;
     bool m_hasReborn = false;
+    bool m_rebornFullHealth = false;
     bool m_hasWindfury = false;
     bool m_hasMegaWindfury = false;
     int m_temporaryAttack = 0;
@@ -616,6 +680,7 @@ class Minion
     bool m_temporaryVenomous = false;
     bool m_temporaryStealth = false;
     std::optional<Card> m_temporaryGoldenOriginalCard;
+    std::vector<std::string> m_temporaryEnchantmentIDs;
     int m_spellcraftUsesRemaining = 0;
     bool m_permanentSpellcraft = false;
     bool m_zestyShakerUsed = false;
@@ -639,6 +704,8 @@ class Minion
     bool m_immuneWhileAttacking = false;
     bool m_isAttacking = false;
     bool m_amalgamation = false;
+    std::array<bool, 64> m_extraRaces{};
+    int m_eggHatchTurnsRemaining = 0;
     bool m_timeTurning = false;
     int m_lastDamageSourceIndex = -1;
     std::string m_lastDamageSourceCardID;

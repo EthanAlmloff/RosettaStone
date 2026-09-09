@@ -181,7 +181,8 @@ void Minion::Silence()
     }
 
     EraseIf(game->oneTurnEffects, [this](const auto& effect) {
-        return effect.first->GetGameTag(ENTITY_ID) == GetGameTag(ENTITY_ID);
+        return effect.first->GetGameTag(GameTag::ENTITY_ID) ==
+               GetGameTag(GameTag::ENTITY_ID);
     });
 
     if (activatedTrigger)

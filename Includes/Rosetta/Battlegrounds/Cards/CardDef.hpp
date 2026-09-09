@@ -13,6 +13,24 @@
 
 namespace RosettaStone::Battlegrounds
 {
+//! Behavior owned by an authoritative phase/lifecycle boundary rather than
+//! by a fixed Power task graph. Explicit tagging prevents an empty CardDef
+//! from being mistaken for an unimplemented entity.
+enum class CardLifecycle : unsigned char
+{
+    NONE,
+    BUDDY_APOSTLE,
+    BUDDY_ECLIPSION,
+    BUDDY_LUCIFRON,
+    BUDDY_PIGEON_LORD,
+    BUDDY_ELEMENTIUM_SQUIRREL_BOMB,
+    // Choose-One minions and their generated option entities are resolved
+    // by Player's modal state machine.  The lifecycle tag keeps the
+    // authoritative ownership explicit without attaching a second Power
+    // graph (which would execute the branch twice).
+    CHOOSE_ONE_SOURCE,
+    CHOOSE_ONE_OPTION,
+};
 //!
 //! \brief CardDef class.
 //!
@@ -28,6 +46,9 @@ class CardDef
     //! \param _power The power data.
     explicit CardDef(Power _power);
 
+    //! Constructs a definition resolved by the named simulator lifecycle.
+    explicit CardDef(CardLifecycle lifecycle) : lifecycle(lifecycle) {}
+
     //! Constructs card def with given \p _power and \p _playReqs.
     //! \param _power The power data.
     //! \param _playReqs The play requirements data.
@@ -41,6 +62,7 @@ class CardDef
 
     Power power;
     std::map<PlayReq, int> playReqs;
+    CardLifecycle lifecycle = CardLifecycle::NONE;
 };
 }  // namespace RosettaStone::Battlegrounds
 

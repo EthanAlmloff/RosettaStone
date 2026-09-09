@@ -12,6 +12,12 @@ namespace RosettaStone::Battlegrounds
 //! this registry owns only the authoritative trigger turn.
 //! Offering generation remains an explicit caller responsibility and must fail closed.
 //! A pinned Timewarp pool is required before constructing the public modal.
+//! Concretely, the pinned Patch 36.4 card snapshot contains the two trigger
+//! powers (DBFs 127697 and 129174) but no Timewarp offer entities, offer DBF
+//! list, or authoritative selection text/effect records.  Do not derive a
+//! pool from generic minions or guessed DBFs: until that external 36.4 pool
+//! artifact is supplied, both visits remain lifecycle-only and unsupported
+//! for behavior coverage.
 enum class Season14HeroPowerBatch7Kind : std::uint8_t
 {
     MINOR_TIMEWARP,

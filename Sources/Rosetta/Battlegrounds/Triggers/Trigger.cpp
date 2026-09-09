@@ -132,6 +132,7 @@ void Trigger::Run(Minion& owner, Minion& source)
             if (m_triggerType == TriggerType::REBORN ||
                 m_triggerType == TriggerType::SUMMON ||
                 m_triggerType == TriggerType::GAIN_ATTACK ||
+                m_triggerType == TriggerType::GAIN_HEALTH ||
                 m_triggerType == TriggerType::SELL_MINION)
                 _task.Run(owner.getPlayerCallback(), owner, source);
             else

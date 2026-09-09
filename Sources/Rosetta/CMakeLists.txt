@@ -19,6 +19,13 @@ file(GLOB_RECURSE headers CONFIGURE_DEPENDS
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
+# GeneratedBehaviorCards.cpp is a generator staging artifact.  It mirrors the
+# declarative rows while a review is in progress, but the live CardDefs
+# registry is owned by the canonical GeneratedBehaviorMappings.cpp unit.  Do
+# not let the recursive source glob link both definitions of
+# GeneratedBehaviorMappings::AddAll (MSVC reports LNK4006/LNK2005).
+list(FILTER sources EXCLUDE REGEX "/GeneratedBehaviorCards\\.cpp$")
+
 # Custom-build event
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(rosettastone_header_gen_py ${root_dir}/Scripts/header_gen.py)

@@ -6,7 +6,11 @@
 using Random = effolkronium::random_thread_local;
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus RandomSummonFromPoolTask::Run(Player& player, Minion& source) {
-  if (!player.isInCombat || player.GetField().IsFull()) return TaskStatus::STOP;
+  if (!player.isInCombat) return TaskStatus::STOP;
+  if (player.GetField().IsFull()) {
+    player.ApplySummonOverflowTrinkets();
+    return TaskStatus::STOP;
+  }
   std::vector<const Card*> candidates;
   for (const auto& card : Cards::GetAllCards()) {
     if (!card.isBattlegroundsPoolMinion || card.GetCardType() != CardType::MINION) continue;

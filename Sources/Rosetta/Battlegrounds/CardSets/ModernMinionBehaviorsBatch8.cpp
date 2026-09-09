@@ -40,7 +40,7 @@ void AddRaceDeathrattleBuff(std::map<std::string, CardDef>& cards,
     {
         power.AddDeathrattleTask(std::move(task));
     }
-    cards.emplace(id, CardDef{ std::move(power) });
+    cards.insert_or_assign(id, CardDef{ std::move(power) });
 }
 
 void AddStatEnchantment(std::map<std::string, CardDef>& cards, const char* id,
@@ -110,6 +110,21 @@ void AddDeflectOBot(std::map<std::string, CardDef>& cards, const char* id,
     cards.emplace(id, CardDef{ std::move(power) });
 }
 
+void AddIchoron(std::map<std::string, CardDef>& cards, const char* id,
+                const char* childID)
+{
+    Power power;
+    Trigger trigger{ TriggerType::AFTER_PLAY_MINION };
+    // The event source is the newly played minion; the owner is the Ichoron
+    // instance.  TARGET preserves that instance identity for the lifecycle
+    // task instead of reselecting an arbitrary Elemental on the board.
+    trigger.SetTriggerSource(TriggerSource::MINIONS_EXCEPT_SELF);
+    trigger.SetCondition(SelfCondition::IsRace(Race::ELEMENTAL));
+    trigger.SetTasks({ AddEnchantmentTask{ childID, EntityType::TARGET } });
+    power.AddTrigger(std::move(trigger));
+    cards.insert_or_assign(id, CardDef{ std::move(power) });
+}
+
 void AddMoltenRock(std::map<std::string, CardDef>& cards, const char* id,
                    const char* enchantmentID)
 {
@@ -138,6 +153,22 @@ void ModernMinionBehaviorsBatch8::AddAll(
     AddRaceDeathrattleBuff(cards, "TB_BaconUps_085", "BGS_018e", Race::BEAST,
                            2);
     AddStatEnchantment(cards, "BGS_018e", 5, 5);
+
+    // Ichoron grants the played Elemental the exact pinned child identity.
+    // The normal child expires at the next recruit turn; the golden child is
+    // permanent.  AddEnchantmentTask routes these IDs through the typed
+    // lifecycle helper rather than Generic::AddEnchantment.
+    // Explicit owner literals keep the generated coverage scanner tied to
+    // the pinned parent records; AddIchoron then replaces these placeholders
+    // with the executable trigger definitions.
+    cards.emplace("BG31_812", CardDef{});
+    cards.emplace("BG31_812_G", CardDef{});
+    AddIchoron(cards, "BG31_812", "BG31_812e");
+    AddIchoron(cards, "BG31_812_G", "BG31_812e2");
+    // Keep both canonical child IDs resolvable even though the lifecycle task
+    // owns their payload and expiry semantics.
+    cards.emplace("BG31_812e", CardDef{});
+    cards.emplace("BG31_812e2", CardDef{});
 
     // Kalecgos, Arcane Aspect: after a Battlecry minion is played, give your
     // Dragons +1/+1.  The linked golden copy doubles the enchantment.  As

@@ -104,7 +104,7 @@ TaskStatus ActivateRandomTavernSpellsTask::Run(Player& p) {
                         const bool hasOpenKeyword =
                             !target.HasDivineShield() || !target.HasReborn() ||
                             !target.HasWindfury() || !target.HasVenomous() ||
-                            !target.HasTaunt();
+                            !target.HasTaunt() || !target.HasStealth();
                         legalTarget = legalTarget ||
                             hasOpenKeyword &&
                             (behavior.race == Race::INVALID ||

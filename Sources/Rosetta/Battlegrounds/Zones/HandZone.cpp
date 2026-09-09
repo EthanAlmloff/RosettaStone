@@ -53,6 +53,9 @@ void HandZone::Add(CardData card, int zonePos)
     std::visit([this](auto& _card) { return _card.SetZoneType(m_type); },
                m_cards[pos].value());
 
+    if (m_minionAddCallback && std::holds_alternative<Minion>(m_cards[pos].value()))
+        m_minionAddCallback(std::get<Minion>(m_cards[pos].value()));
+
     Reposition(pos);
     if (m_addCallback)
         m_addCallback(m_cards[pos].value());

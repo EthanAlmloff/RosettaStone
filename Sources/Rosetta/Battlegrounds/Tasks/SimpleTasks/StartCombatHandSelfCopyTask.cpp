@@ -2,7 +2,10 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/StartCombatHandSelfCopyTask.hpp>
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus StartCombatHandSelfCopyTask::Run(Player& p, Minion& source) {
-    if (p.GetField().IsFull()) return TaskStatus::STOP;
+    if (p.GetField().IsFull()) {
+        p.ApplySummonOverflowTrinkets();
+        return TaskStatus::STOP;
+    }
     const auto id = source.GetCardID(); const Minion* snapshot = nullptr;
     p.hand.ForEach([&](const std::optional<CardData>& entry) { if (!snapshot && std::holds_alternative<Minion>(*entry) && std::get<Minion>(*entry).GetCardID() == id) snapshot = &std::get<Minion>(*entry); });
     if (!snapshot) return TaskStatus::STOP;

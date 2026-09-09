@@ -1,7 +1,9 @@
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTavernSpellToHandTask.hpp>
 #include <effolkronium/random.hpp>
+#include <algorithm>
 #include <utility>
 #include <vector>
 using Random = effolkronium::random_thread_local;
@@ -14,6 +16,13 @@ TaskStatus RandomTavernSpellToHandTask::Run(Player& player) {
   for (const auto& card : Cards::GetAllCards()) {
     if (!card.isBattlegroundsPoolSpell) continue;
     if (card.GetCardType() != CardType::SPELL && card.GetCardType() != CardType::BATTLEGROUND_SPELL) continue;
+    // Metadata only identifies the Tavern-spell pool; it does not prove that
+    // this simulator can resolve the spell.  Generated rewards must stay in
+    // the same behavior-backed subset as random spell activation, otherwise
+    // Secret Schematic (and other random-spell rewards) can hand out a card
+    // that cannot be played by the simulator.
+    if (FindTavernSpellBehavior(card.id).effect == TavernSpellEffect::NONE)
+        continue;
     // Pool entries are normal definitions.  Premium/generated spell rows
     // must not become an accidental second pool or bypass normal creation.
     if (card.normalDbfID != 0) continue;
@@ -24,8 +33,17 @@ TaskStatus RandomTavernSpellToHandTask::Run(Player& player) {
     pool.push_back(&card);
   }
   if (pool.empty()) return TaskStatus::STOP;
-  for (int i = 0; i < m_amount && !player.hand.IsFull(); ++i) {
-    Spell generated{*pool[Random::get<std::size_t>(0, pool.size() - 1)]};
+  // Cookie's Stirring Rod asks for distinct spells; older callers retain
+  // replacement semantics unless they opt into this mode.
+  if (m_distinct) Random::shuffle(pool.begin(), pool.end());
+  const auto count = m_distinct
+      ? std::min<std::size_t>(static_cast<std::size_t>(m_amount), pool.size())
+      : static_cast<std::size_t>(m_amount);
+  for (std::size_t i = 0; i < count && !player.hand.IsFull(); ++i) {
+    const auto index = m_distinct
+        ? i
+        : Random::get<std::size_t>(0, pool.size() - 1);
+    Spell generated{*pool[index]};
     player.hand.Add(CardData{std::move(generated)});
   }
   return TaskStatus::COMPLETE;

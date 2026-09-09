@@ -4,7 +4,11 @@
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus QuilboarBloodGolemDeathrattleTask::Run(Player& player, Minion& source)
 {
-    if (player.GetField().IsFull() || source.GetBloodGemCount() <= 0) return TaskStatus::STOP;
+    if (source.GetBloodGemCount() <= 0) return TaskStatus::STOP;
+    if (player.GetField().IsFull()) {
+        player.ApplySummonOverflowTrinkets();
+        return TaskStatus::STOP;
+    }
     const auto card = Cards::FindCardByID("BG30_MagicItem_442t");
     if (card.id.empty()) return TaskStatus::STOP;
     Minion golem{card};

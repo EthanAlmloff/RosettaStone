@@ -15,7 +15,12 @@ TaskStatus MagnetizeSatelliteTask::Run(Player&, Minion&, Minion& target) {
  for(int i=0;i<m_repeats;++i){
    Minion satellite{card}; satellite.SetAttack(m_attack); satellite.SetHealth(m_health);
    if (!satellite.CanMagnetizeTo(target)) return TaskStatus::STOP;
-   satellite.MagnetizeOnto(target); m_attack+=m_increment; m_health+=m_increment;
+   satellite.MagnetizeOnto(target);
+   // Task-driven magnetization is still a successful friendly Magnetize
+   // event; notify player-owned passive listeners just like hand plays.
+   if (target.getPlayerCallback)
+       target.getPlayerCallback().ApplyAfterMagnetizeTrinkets(target);
+   m_attack+=m_increment; m_health+=m_increment;
  }
  return TaskStatus::COMPLETE;
 }

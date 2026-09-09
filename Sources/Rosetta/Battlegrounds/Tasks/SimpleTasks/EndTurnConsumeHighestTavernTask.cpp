@@ -21,6 +21,22 @@ TaskStatus EndTurnConsumeHighestTavernTask::Run(Player& p, Minion& s) {
      p.returnMinionCallback(consumed.GetPoolIndex());
  s.SetAttack(s.GetAttack()+consumed.GetAttack()*m_multiplier);
  s.SetHealth(s.GetHealth()+consumed.GetHealth()*m_multiplier);
+ // Flaming Portrait mirrors each successful consume to the live neighbors of
+ // the triggering Flaming Enforcer. Resolve this after removing the Tavern
+ // card so only the consumed stats are copied and each adjacent instance is
+ // updated once, including when the source is golden.
+ if (p.HasActivePortrait(PortraitEffect::FLAMING_ENFORCER_ADJACENT_STATS)) {
+   const int sourcePosition = s.GetZonePosition();
+   const int attack = consumed.GetAttack() * m_multiplier;
+   const int health = consumed.GetHealth() * m_multiplier;
+   p.GetField().ForEachAlive([sourcePosition, attack, health, &s](MinionData& d) {
+     auto& neighbor = d.value();
+     if (&neighbor == &s) return;
+     const int position = neighbor.GetZonePosition();
+     if (position == sourcePosition - 1 || position == sourcePosition + 1)
+       neighbor.ApplyPersistentMinionStats(attack, health);
+   });
+ }
  return TaskStatus::COMPLETE;
 }
 TaskStatus EndTurnConsumeHighestTavernTask::Run(Player& p, Minion& s, Minion&) { return Run(p,s); }

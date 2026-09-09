@@ -31,6 +31,14 @@ using CardData = std::variant<Minion, Spell>;
 class HandZone
 {
  public:
+    //! Installs the owner hook for minion instances entering this hand.  The
+    //! hook assigns the owning Player callback and, for newly-created cards,
+    //! a stable entity identity before acquisition listeners run.
+    void SetMinionAddCallback(std::function<void(Minion&)> callback)
+    {
+        m_minionAddCallback = std::move(callback);
+    }
+
     //! Operator overloading for operator[].
     //! \param zonePos The zone position of card.
     //! \return The card at \p zonePos.
@@ -104,6 +112,7 @@ class HandZone
     std::array<std::optional<CardData>, MAX_HAND_SIZE> m_cards;
     int m_count = 0;
     std::function<void(const CardData&)> m_addCallback;
+    std::function<void(Minion&)> m_minionAddCallback;
 };
 }  // namespace RosettaStone::Battlegrounds
 

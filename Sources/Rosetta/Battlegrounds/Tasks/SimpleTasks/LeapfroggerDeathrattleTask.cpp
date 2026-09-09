@@ -19,7 +19,10 @@ TaskStatus LeapfroggerDeathrattleTask::Run(Player& player, Minion& owner, Minion
   const auto index = Random::get<std::size_t>(0, candidates.size() - 1);
   Minion& target = *candidates[index];
   target.ApplyCombatPersistentStats(m_attack, m_health);
-  owner.CopyDeathrattleTo(target);
+  // Copy exactly this stack.  Copying the owner's complete deathrattle list
+  // would duplicate unrelated/other Leapfrogger stacks exponentially when a
+  // minion carries more than one child enchantment.
+  target.AddDarkGiftDeathrattleTask(TaskType{*this});
   return TaskStatus::COMPLETE;
 }
 }

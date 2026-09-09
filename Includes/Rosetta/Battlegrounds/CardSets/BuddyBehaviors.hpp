@@ -283,6 +283,20 @@ inline constexpr std::array BUDDY_HERO_POWER_DIVINE_SHIELD_BEHAVIORS = {
  BuddyHeroPowerDivineShieldDefinition{"TB_BaconShop_HERO_15_Buddy_G",77543,4},
 };
 
+//! Solemn Serenader observes a successful Hero Power that targeted a living
+//! friendly minion.  Its payload is derived from each owned Buddy instance's
+//! current Attack, so ordinary/golden copies and temporary stat changes are
+//! resolved independently at the event boundary.
+struct BuddyHeroPowerTargetDefinition {
+    std::string_view id;
+    std::int32_t dbfID;
+    int attackDivisor;
+};
+inline constexpr std::array BUDDY_HERO_POWER_TARGET_BEHAVIORS = {
+ BuddyHeroPowerTargetDefinition{"BG26_HERO_102_Buddy",113627,2},
+ BuddyHeroPowerTargetDefinition{"BG26_HERO_102_Buddy_G",113628,1},
+};
+
 struct BuddyEndTurnLeftHealthDefinition { std::string_view id; std::int32_t dbfID; int adjacentTargets; };
 inline constexpr std::array BUDDY_END_TURN_LEFT_HEALTH_BEHAVIORS = {
  BuddyEndTurnLeftHealthDefinition{"TB_BaconShop_HERO_34_Buddy",77817,1},
@@ -308,6 +322,18 @@ struct BuddyDiscoverTierDefinition { std::string_view id; std::int32_t dbfID; in
 inline constexpr std::array BUDDY_DISCOVER_TIER_BEHAVIORS = {
  BuddyDiscoverTierDefinition{"TB_BaconShop_HERO_28_Buddy",77507,1,1},
  BuddyDiscoverTierDefinition{"TB_BaconShop_HERO_28_Buddy_G",77603,1,2},
+};
+
+//! Burth is resolved at the Discover commit boundary.  The payload is
+//! instance-owned: every owned normal/golden copy buffs the selected minion
+//! once and advances only its own future payload.
+struct BuddyDiscoverBuffDefinition {
+ std::string_view id; std::int32_t dbfID; int attack; int health;
+ int attackImprovement; int healthImprovement;
+};
+inline constexpr std::array BUDDY_DISCOVER_BUFF_BEHAVIORS = {
+ BuddyDiscoverBuffDefinition{"TB_BaconShop_HERO_90_Buddy",77829,2,2,1,1},
+ BuddyDiscoverBuffDefinition{"TB_BaconShop_HERO_90_Buddy_G",77830,4,4,1,1},
 };
 
 struct BuddyTransformTavernDefinition { std::string_view id; std::int32_t dbfID; int tierDelta; };
@@ -364,6 +390,17 @@ struct BuddyZeroCostSpellCopyDefinition { std::string_view id; std::int32_t dbfI
 inline constexpr std::array BUDDY_ZERO_COST_SPELL_COPY_BEHAVIORS = {
  BuddyZeroCostSpellCopyDefinition{"BG31_HERO_006_Buddy",122342,1},
  BuddyZeroCostSpellCopyDefinition{"BG31_HERO_006_Buddy_G",122343,2},
+};
+
+// Coilfang Elite watches fresh Tavern offers.  Each Spellcraft minion that
+// appears grants one copy of its Spellcraft spell; the golden Buddy grants
+// two.  The offer-to-hand transfer is resolved at the Player refresh boundary
+// (where the Tavern is authoritative), while this typed table preserves the
+// exact normal/golden identity and fan-out for coverage and replay audits.
+struct BuddySpellcraftOfferDefinition { std::string_view id; std::int32_t dbfID; int copies; };
+inline constexpr std::array BUDDY_SPELLCRAFT_OFFER_BEHAVIORS = {
+ BuddySpellcraftOfferDefinition{"BG23_HERO_304_Buddy",101458,1},
+ BuddySpellcraftOfferDefinition{"BG23_HERO_304_Buddy_G",101463,2},
 };
 }
 #endif

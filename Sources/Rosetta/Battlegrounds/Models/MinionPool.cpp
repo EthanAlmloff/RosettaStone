@@ -281,12 +281,23 @@ void MinionPool::AddMinionsToTavern(Player& player, Tavern& tavern,
 
     const std::size_t numMinions = targetCount - currentCount;
 
-    // Temporal Tavern arms exactly one subsequent fill. Select the requested
-    // higher-tier offers first, then fill the remaining slots normally. The
-    // allowance is consumed here, after the refresh has been accepted, so a
-    // failed/unsupported action cannot leave a stale bonus for a later turn.
+    // Guiding Candle's Tier-6-only allowance takes precedence over ordinary
+    // next-tier additions. Frozen offers remain untouched; every newly
+    // generated slot must come from Tier 6 and there is no lower-tier
+    // fallback when the pool cannot supply one.
+    const auto tierSixOnly = player.season14.TakeTierSixOnlyRefresh();
     const auto requestedHigher = player.season14.TakeHigherTierRefresh();
-    if (requestedHigher > 0 && player.currentTier < TIER_UPPER_LIMIT)
+    if (tierSixOnly > 0)
+    {
+        auto tierSix = GetMinions(TIER_UPPER_LIMIT, TIER_UPPER_LIMIT, true);
+        Random::shuffle(tierSix.begin(), tierSix.end());
+        const auto tierSixCount = std::min<std::size_t>(
+            targetCount - currentCount, tierSix.size());
+        minions.clear();
+        minions.insert(minions.begin(), tierSix.begin(),
+                       tierSix.begin() + static_cast<std::ptrdiff_t>(tierSixCount));
+    }
+    else if (requestedHigher > 0 && player.currentTier < TIER_UPPER_LIMIT)
     {
         auto higherTier = GetMinions(player.currentTier + 1,
                                      player.currentTier + 1, true);

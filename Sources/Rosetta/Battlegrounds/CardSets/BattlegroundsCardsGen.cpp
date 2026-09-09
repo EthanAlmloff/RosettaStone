@@ -369,6 +369,15 @@ void BattlegroundsCardsGen::AddTokenMinions(
     // [TB_BaconUps_141t] Golden Sky Pirate (*) - TIER:1 [ATK:2/HP:2]
     power.ClearData();
     cards.emplace("TB_BaconUps_141t", CardDef{ power });
+
+    // [BG36_200t] Foraging Bat (*) - TIER:1 [ATK:1/HP:1]
+    // [BG36_200_Gt] Golden Foraging Bat (*) - TIER:1 [ATK:2/HP:2]
+    // These are plain Beast rally outputs; the parent owns the summon count
+    // and golden fan-out, while the token definitions preserve stable lookup.
+    power.ClearData();
+    cards.emplace("BG36_200t", CardDef{ power });
+    power.ClearData();
+    cards.emplace("BG36_200_Gt", CardDef{ power });
 }
 
 void BattlegroundsCardsGen::AddEnchantments(

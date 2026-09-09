@@ -20,6 +20,8 @@ TaskStatus RandomMagneticMechToTargetTask::Run(Player& player, Minion&, Minion& 
   if (candidates.empty()) return TaskStatus::STOP;
   Minion attachment{*candidates[Random::get<std::size_t>(0, candidates.size() - 1)]};
   attachment.MagnetizeOnto(target);
+  if (target.getPlayerCallback)
+    target.getPlayerCallback().ApplyAfterMagnetizeTrinkets(target);
   return TaskStatus::COMPLETE;
 }
 }

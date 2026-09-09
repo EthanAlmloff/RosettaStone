@@ -6,6 +6,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTauntBuffSelfTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomBountyToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MinionOfferingTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/CopyTargetBattlecryTask.hpp>
 #include <Rosetta/Battlegrounds/CardSets/BuddyBehaviors.hpp>
 #include <map>
 #include <algorithm>
@@ -27,8 +29,56 @@ TEST_CASE("[ModernTokenBehaviorsBatch70] generated rows are registered")
              "TB_BaconShop_HERO_25_Buddy_G", "TB_BaconShop_HERO_92_Buddy",
              "TB_BaconShop_HERO_92_Buddy_G", "TB_BaconShop_HERO_53_Buddy",
              "TB_BaconShop_HERO_53_Buddy_G", "TB_BaconShop_HERO_76_Buddy",
-             "TB_BaconShop_HERO_76_Buddy_G"})
+             "TB_BaconShop_HERO_76_Buddy_G", "TB_BaconUps_045",
+             "TB_BaconUps_089"})
         CHECK(cards.contains(id));
+}
+
+TEST_CASE("[ModernTokenBehaviorsBatch70] premium generated tokens preserve parent paths")
+{
+    std::map<std::string, CardDef> cards;
+    ModernTokenBehaviorsBatch70::AddAll(cards);
+    CHECK(cards.contains("TB_BaconUps_045"));
+    CHECK(cards.at("TB_BaconUps_045").power.GetBattlecryTask().empty());
+
+    const auto& tasks = cards.at("TB_BaconUps_089").power.GetBattlecryTask();
+    // The second Discover is reopened by Player after the first modal commits;
+    // keeping two tasks here would attempt to replace an already-open public
+    // decision and silently lose the premium repeat.
+    REQUIRE(tasks.size() == 1);
+    for (const auto& task : tasks)
+    {
+        const auto* offering = std::get_if<SimpleTasks::MinionOfferingTask>(&task);
+        REQUIRE(offering != nullptr);
+        CHECK(offering->GetRace() == Race::MURLOC);
+        CHECK(offering->GetMinTier() == 1);
+        CHECK(offering->GetMaxTier() == 7);
+        CHECK(offering->GetCount() == 3);
+        CHECK(offering->RequiresFriendlyRace());
+    }
+}
+
+TEST_CASE("[ModernTokenBehaviorsBatch70] Mini-Zerek targets Tavern and goldenizes copy")
+{
+    std::map<std::string, CardDef> cards;
+    ModernTokenBehaviorsBatch70::AddAll(cards);
+
+    for (const auto* id : {"BG31_HERO_005_Buddy", "BG31_HERO_005_Buddy_G"})
+    {
+        const auto& definition = cards.at(id);
+        CHECK(definition.playReqs.contains(PlayReq::REQ_TARGET_TO_PLAY));
+        CHECK(definition.playReqs.contains(PlayReq::REQ_TAVERN_MINION_TARGET));
+        REQUIRE(definition.power.GetBattlecryTask().size() == 1);
+        CHECK(std::holds_alternative<SimpleTasks::CopyTargetBattlecryTask>(
+            definition.power.GetBattlecryTask().front()));
+    }
+
+    const auto& normal = std::get<SimpleTasks::CopyTargetBattlecryTask>(
+        cards.at("BG31_HERO_005_Buddy").power.GetBattlecryTask().front());
+    const auto& golden = std::get<SimpleTasks::CopyTargetBattlecryTask>(
+        cards.at("BG31_HERO_005_Buddy_G").power.GetBattlecryTask().front());
+    CHECK_FALSE(normal.Golden());
+    CHECK(golden.Golden());
 }
 
 TEST_CASE("[ModernTokenBehaviorsBatch70] lifecycle Buddy families are registered")

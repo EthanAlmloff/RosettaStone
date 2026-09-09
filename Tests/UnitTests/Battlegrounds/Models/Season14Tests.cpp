@@ -3,10 +3,28 @@
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviors.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/MaxHealthDeathrattleTask.hpp>
 
 #include <doctest/doctest.h>
 
 using namespace RosettaStone::Battlegrounds;
+
+TEST_CASE("[Season14] - Bloodfury one-shot Fodders stack separately from refresh windows")
+{
+    Season14State state;
+    state.ArmFodderRefreshes(3, 1);
+    state.ArmFoddersNextRefresh(2);
+
+    CHECK(state.ConsumeFodderRefresh() == 1);
+    CHECK(state.ConsumeFoddersNextRefresh() == 2);
+    CHECK(state.ConsumeFoddersNextRefresh() == 0);
+    CHECK(state.ConsumeFodderRefresh() == 1);
+    CHECK(state.ConsumeFodderRefresh() == 1);
+    CHECK(state.ConsumeFodderRefresh() == 0);
+
+    state.ArmFoddersNextRefresh(99);
+    CHECK(state.ConsumeFoddersNextRefresh() == MAX_FIELD_SIZE);
+}
 
 TEST_CASE("[Season14] - Public decisions validate and clear")
 {
@@ -123,6 +141,90 @@ TEST_CASE("[Season14] - Double Time turns two copies into a golden and Tavern Co
     CHECK(!player.ResolveDoubleTimeCopies());
 }
 
+TEST_CASE("[Season14] - Designer Eyepatch pairs only Pirates, including a full hand")
+{
+    Player player;
+    player.season14.trinkets.push_back({Cards::FindCardByID("BG30_MagicItem_439").dbfID,
+                                        1, true});
+    const auto pirate = Cards::FindCardByID("BG21_017");
+    const auto nonPirate = Cards::FindCardByDbfID(49169);
+    REQUIRE(pirate.premiumDbfID != 0);
+    REQUIRE(nonPirate.premiumDbfID != 0);
+
+    // A full hand cannot prevent an in-place board conversion.  The normal
+    // Triple path leaves the unmatched third copy untouched.
+    for (int i = 0; i < MAX_HAND_SIZE; ++i)
+        player.hand.Add(CardData{Minion(nonPirate)});
+    player.recruitField.Add(Minion(pirate));
+    player.recruitField.Add(Minion(pirate));
+    player.recruitField.Add(Minion(nonPirate));
+
+    CHECK(player.ResolveDoubleTimeCopies());
+    CHECK(player.recruitField.GetCount() == 2);
+    CHECK(player.recruitField[0].IsGolden());
+    CHECK(player.recruitField[0].HasRace(Race::PIRATE));
+    CHECK(!player.recruitField[1].IsGolden());
+    CHECK(player.hand.GetCount() == MAX_HAND_SIZE);
+}
+
+TEST_CASE("[Season14] - Designer Eyepatch merges both copy states without a coin")
+{
+    const auto pirate = Cards::FindCardByID("BG21_017");
+    REQUIRE(pirate.premiumDbfID != 0);
+    const auto golden = Cards::FindCardByDbfID(pirate.premiumDbfID);
+    Minion survivor(pirate);
+    Minion duplicate(pirate);
+
+    survivor.ApplyPersistentMinionStats(2, 3);
+    duplicate.ApplyPersistentMinionStats(4, 5);
+    survivor.SetTaunt(true);
+    duplicate.SetGameTag(GameTag::POISONOUS, 1);
+    survivor.AddDarkGiftDeathrattleTask(
+        SimpleTasks::MaxHealthDeathrattleTask{1});
+    duplicate.AddDarkGiftDeathrattleTask(
+        SimpleTasks::MaxHealthDeathrattleTask{2});
+    survivor.RecordTemporaryEnchantment("EYEPATCH_FIRST");
+    duplicate.RecordTemporaryEnchantment("EYEPATCH_SECOND");
+
+    REQUIRE(survivor.MergeIntoGolden(duplicate));
+    CHECK(survivor.IsGolden());
+    CHECK(survivor.GetAttack() == golden.GetAttack() + 6);
+    CHECK(survivor.GetHealth() == golden.GetHealth() + 8);
+    CHECK(survivor.HasTaunt());
+    CHECK(survivor.HasVenomous());
+    CHECK(survivor.HasTemporaryEnchantment("EYEPATCH_FIRST"));
+    CHECK(survivor.HasTemporaryEnchantment("EYEPATCH_SECOND"));
+    CHECK(survivor.GetTasks(PowerType::DEATHRATTLE).size() == 2);
+}
+
+TEST_CASE("[Season14] - Eyepatch preserves the board copy in a hand-board pair")
+{
+    Player player;
+    player.season14.trinkets.push_back({Cards::FindCardByID("BG30_MagicItem_439").dbfID,
+                                        1, true});
+    const auto pirate = Cards::FindCardByID("BG21_017");
+    REQUIRE(pirate.premiumDbfID != 0);
+
+    Minion handCopy(pirate);
+    Minion boardCopy(pirate);
+    handCopy.ApplyPersistentMinionStats(1, 2);
+    boardCopy.ApplyPersistentMinionStats(4, 5);
+    boardCopy.AddDarkGiftDeathrattleTask(
+        SimpleTasks::MaxHealthDeathrattleTask{3});
+    player.hand.Add(CardData{std::move(handCopy)});
+    player.recruitField.Add(boardCopy);
+
+    REQUIRE(player.ResolveDoubleTimeCopies());
+    REQUIRE(player.hand.GetCount() == 1);
+    REQUIRE(std::holds_alternative<Minion>(player.hand[0]));
+    const auto& result = std::get<Minion>(player.hand[0]);
+    CHECK(result.IsGolden());
+    CHECK(result.GetAttack() == Cards::FindCardByDbfID(pirate.premiumDbfID).GetAttack() + 5);
+    CHECK(result.GetHealth() == Cards::FindCardByDbfID(pirate.premiumDbfID).GetHealth() + 7);
+    CHECK(result.GetTasks(PowerType::DEATHRATTLE).size() == 1);
+    CHECK(player.recruitField.GetCount() == 0);
+}
+
 TEST_CASE("[Season14] - Persistent effects and event hooks")
 {
     Season14State state;
@@ -207,6 +309,18 @@ TEST_CASE("[Season14] - acquisition grants recurring Trinkets exactly once")
     CHECK(player.hand.GetCount() == 3);
 }
 
+TEST_CASE("[Season14] - golden Egg portrait arms the pinned next-turn countdown")
+{
+    Player player;
+    // BG35_MagicItem_848t is Egg of the Endtimes Portrait (DBF 130900).
+    CHECK(player.AcquireTrinket({130900, 1, true}));
+    REQUIRE(player.hand.GetCount() == 1);
+    REQUIRE(std::holds_alternative<Minion>(player.hand[0]));
+    const auto& egg = std::get<Minion>(player.hand[0]);
+    CHECK(egg.GetCardID() == "BG34_639_G");
+    CHECK(egg.EggHatchTurnsRemaining() == 1);
+}
+
 TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")
 {
     Season14State state;
@@ -248,6 +362,23 @@ TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")
     CHECK(state.TavernOfferCount(3) == 7);
     CHECK(state.TavernOfferCount(6) == 7);
     CHECK(state.TavernOfferCount(7) == 7);
+}
+
+TEST_CASE("[Season14] - Felbat and absolute Tavern portraits target seven offers")
+{
+    Season14State state;
+    // Felbat Portrait (DBF 112054) grants Famished Felbat and sets a minimum
+    // Tavern size; the target must apply below tier 4 and remain seven above it.
+    state.AddTrinket({112054, 1, true});
+    CHECK(state.TavernOfferCount(3) == 7);
+    CHECK(state.TavernOfferCount(6) == 7);
+    CHECK(state.TavernOfferCount(7) == 7);
+
+    // A second absolute-seven portrait must not turn the target into a flat
+    // +1 modifier.  A genuine extra-slot modifier remains additive, however.
+    state.AddTrinket({111092, 1, true});
+    CHECK(state.TavernOfferCount(3) == 7);
+    CHECK(state.TavernOfferCount(6) == 7);
 }
 
 TEST_CASE("[Season14] - lifecycle hooks pay deterministic Batch-2 effects")
@@ -438,6 +569,53 @@ TEST_CASE("[Season14] - Reborn trinket is a friendly-board-only trigger")
     CHECK(player.battleField[0].GetAttack() == attack + 4);
     CHECK(player.battleField[0].GetHealth() == health + 4);
     CHECK(player.recruitField.GetCount() == 0);
+}
+
+TEST_CASE("[Season14] - Funeral Wreath copies each Reborn minion up to three times")
+{
+    const auto behavior = FindTrinketBehavior("BG36_MagicItem_217");
+    CHECK(behavior.effect == TrinketEffect::AFTER_REBORN_COPY);
+    CHECK(behavior.value == 3);
+
+    Player player;
+    player.season14.trinkets.push_back({
+        Cards::FindCardByID("BG36_MagicItem_217").dbfID, 1, true});
+    Minion minion(Cards::FindCardByDbfID(49169));
+    player.ApplyAfterRebornTrinkets(&minion);
+    player.ApplyAfterRebornTrinkets(&minion);
+    player.ApplyAfterRebornTrinkets(&minion);
+    player.ApplyAfterRebornTrinkets(&minion);
+    CHECK(player.hand.GetCount() == 3);
+    CHECK(player.season14.trinkets.front().triggerProgress == 3);
+}
+
+TEST_CASE("[Season14] - Funeral Wreath retries a full hand and resets per combat")
+{
+    const auto dbf = Cards::FindCardByID("BG36_MagicItem_217").dbfID;
+    Player player;
+    player.season14.trinkets.push_back({dbf, 1, true});
+    Minion source(Cards::FindCardByDbfID(49169));
+
+    // A failed add does not consume one of the three Reborn triggers.  Once
+    // space opens, the same combat event allowance remains available.
+    for (int i = 0; i < MAX_HAND_SIZE; ++i)
+        player.hand.Add(CardData{Minion(Cards::FindCardByDbfID(49169))});
+    player.ApplyAfterRebornTrinkets(&source);
+    CHECK(player.hand.GetCount() == MAX_HAND_SIZE);
+    CHECK(player.season14.trinkets.front().triggerProgress == 0);
+
+    CardData removed = player.hand[0];
+    player.hand.Remove(removed);
+    player.ApplyAfterRebornTrinkets(&source);
+    CHECK(player.hand.GetCount() == MAX_HAND_SIZE);
+    CHECK(player.season14.trinkets.front().triggerProgress == 1);
+
+    // The allowance is combat-local and must be restored for the next
+    // combat, while remaining attached to this Trinket instance.
+    player.season14.ResetTrinketAvengeProgress();
+    CHECK(player.season14.trinkets.front().triggerProgress == 0);
+    player.ApplyAfterRebornTrinkets(&source);
+    CHECK(player.season14.trinkets.front().triggerProgress == 1);
 }
 
 TEST_CASE("[Season14] - Dragon's Eye respects active and consumed state")

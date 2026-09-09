@@ -8,10 +8,10 @@ namespace SimpleTasks {
 class SpellCountRaceBuffTask {
  public:
   SpellCountRaceBuffTask(Race race, int attack, int health, int spellsPerImprovement,
-                         bool selfBuff = false)
-      : m_race(race), m_attack(attack), m_health(health), m_threshold(spellsPerImprovement), m_selfBuff(selfBuff) {}
+                         bool selfBuff = false, bool alsoLeft = false)
+      : m_race(race), m_attack(attack), m_health(health), m_threshold(spellsPerImprovement), m_selfBuff(selfBuff), m_alsoLeft(alsoLeft) {}
   TaskStatus Run(Player&, Minion&); TaskStatus Run(Player&, Minion&, Minion&);
- private: Race m_race; int m_attack; int m_health; int m_threshold; bool m_selfBuff = false;
+ private: Race m_race; int m_attack; int m_health; int m_threshold; bool m_selfBuff = false; bool m_alsoLeft = false;
 };
 }}
 #endif

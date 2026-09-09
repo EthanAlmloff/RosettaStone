@@ -85,6 +85,7 @@ TaskStatus SummonTask::Run(Player& player, Minion& source)
     {
         if (player.GetField().IsFull())
         {
+            player.ApplySummonOverflowTrinkets();
             return TaskStatus::STOP;
         }
 

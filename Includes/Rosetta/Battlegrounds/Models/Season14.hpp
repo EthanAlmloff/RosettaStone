@@ -16,6 +16,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch10.hpp>
 #include <Rosetta/Common/Enums/CardEnums.hpp>
 #include <Rosetta/Common/Enums/GameEnums.hpp>
+#include <Rosetta/Common/Constants.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 
 #include <array>
@@ -77,6 +78,26 @@ struct Season14PersistentEffect
     //! Trigger progress owned by this effect (for cadence-based Trinkets).
     //! It must not be shared between distinct Trinket instances.
     std::int32_t triggerProgress = 0;
+    //! Per-instance improvement level for progressive Trinket payloads.
+    std::int32_t statScale = 0;
+    //! Snapshot of the first friendly minion summoned this combat when a
+    //! first-summon copy Trinket found a full board.  The printed effect says
+    //! "the first minion" and must not silently switch to a later summon when
+    //! space opens.  This is transient combat state and is cleared at combat
+    //! start alongside triggerProgress.
+    std::optional<Minion> pendingFirstSummon;
+};
+
+//! Result of resolving one friendly combat death against Avenge Trinkets.
+//! The damage flag is kept separate from the stat delta because only
+//! Gilnean Thorned Rose deals damage; other AVENGE_MINION_STATS Trinkets
+//! (including Bird Feeder) must never inherit that side effect.
+struct TrinketAvengeResult
+{
+    std::int32_t attack = 0;
+    std::int32_t health = 0;
+    bool dealDamage = false;
+    std::int32_t summonBeetles = 0;
 };
 struct Season14ChooseOneState { bool pending = false; std::uint64_t sourceEntityID = 0; std::uint32_t targetMask = 0; std::int32_t sourceCardDbfID = 0; };
 
@@ -111,6 +132,10 @@ struct Season14SpellModalState {
     // player commits this modal.  Keeping this on the modal preserves the
     // selected stable target/branch across the asynchronous choice.
     std::uint8_t extraResolutionCount = 0;
+    // Lovely Locket is separate from Cathedral/Sushi repeats.  It survives
+    // an asynchronous Choose-One decision and resolves onto another live
+    // friendly minion when the branch is committed.
+    std::uint8_t friendlySpellRepeatCount = 0;
 };
 //! A generated Mycologist token may carry a Tavern spell.  Keep its source
 //! identity while the free cast is being resolved so a future target/modal
@@ -251,6 +276,11 @@ class Season14State
     std::int32_t pendingDemonDiscoverRemaining = 0;
     std::uint64_t pendingUndeadDiscoverSourceEntityID = 0;
     std::int32_t pendingUndeadDiscoverRemaining = 0;
+    //! Golden Primalfin Lookout reopens a second public Murloc Discover only
+    //! after the first choice commits.  Keep the source entity stable across
+    //! the asynchronous modal so hand-cap and replay validation remain exact.
+    std::int32_t pendingPrimalfinDiscoverRemaining = 0;
+    std::uint64_t pendingPrimalfinDiscoverSourceEntityID = 0;
     //! Ancient Wishbone replay state for hero powers that open sequential
     //! Discover modals.  The source DBF and pool discriminator are retained
     //! until every selected card has been materialized.
@@ -261,6 +291,12 @@ class Season14State
     std::uint64_t pendingMechMagnetizeSourceEntityID = 0;
     std::uint64_t pendingMechMagnetizeTargetEntityID = 0;
     std::int32_t pendingMechMagnetizeRemaining = 0;
+    //! Electromagnetic Device keeps one or more Discover-to-hand choices
+    //! alive across sequential modal resolutions.  This is separate from
+    //! Clunker Junker's attachment Discover because the selected card is
+    //! materialized in hand rather than magnetized immediately.
+    std::int32_t pendingElectromagneticDiscoverRemaining = 0;
+    std::int32_t pendingElectromagneticDiscoverSourceCardDbfID = 0;
     //! Identity of the effect that created the public offering. These fields
     //! make a pending modal replayable and prevent callers from treating an
     //! offering as an anonymous global random result.
@@ -280,6 +316,10 @@ class Season14State
     Season14PendingTaughtSpell pendingTaughtSpell;
     Season14TransformState transformModal;
     std::vector<Season14PersistentEffect> trinkets;
+    //! Safety Patch's Ice Block immunity lasts through the current damage
+    //! window/turn after it prevents a lethal hit. It is reset at the next
+    //! recruit/combat start and is deliberately separate from Trinket liveness.
+    bool iceBlockImmune = false;
     std::vector<Season14PersistentEffect> darkGifts;
     //! Generated quest-reward choices selected from a public modal. The
     //! reward DBF is retained until its effect family is resolved by the
@@ -292,7 +332,6 @@ class Season14State
     bool generatedRewardParasol = false;
     bool generatedRewardMirrorShield = false;
     std::int32_t generatedRewardGlobalAttack = 0;
-    std::uint64_t generatedRewardStealthEntityID = 0;
     bool generatedRewardEvilTwin = false;
     bool generatedRewardRitualDagger = false;
     bool generatedRewardRitualDaggerRepeat = false;
@@ -595,6 +634,10 @@ class Season14State
     //! Legacy Buddy lifecycle counters.  These are player-owned so combat
     //! copies cannot leak state across lobbies or recruit/combat boundaries.
     std::int32_t chromieRefreshesThisTurn = 0;
+    //! Imperial Defender's once-per-turn fan-out.  This is a count rather
+    //! than a boolean because multiple Buddy copies each have an independent
+    //! trigger, while a golden copy still consumes only one trigger slot.
+    std::int32_t imperialDefenderCopiesUsed = 0;
     void EnableBuddyExtraHeroPowerUses(std::int32_t n) noexcept { buddyExtraHeroPowerUses = std::max(buddyExtraHeroPowerUses, n); }
     void ResetBuddyExtraHeroPowerUses() noexcept { buddyExtraHeroPowerUses = 0; }
     bool powerOfStormActive = false;
@@ -646,11 +689,29 @@ class Season14State
     std::int32_t warpGateBuyCount = 0;
     std::int32_t warpGateSelectedDbfID = 0;
     std::int32_t warpGateRewardDbfID = 0;
+    //! Lifetime reduction applied only to the pinned Protoss pool after a
+    //! Sentry Deathrattle resolves.
+    std::int32_t protossCostReduction = 0;
+    std::int32_t carrierInterceptors = 0;
     //! Spawning Pool's turn-based cost reduction, capped at its printed cost.
     std::int32_t spawningPoolDiscount = 0;
     std::uint64_t spawningPoolLarvaEntityID = 0;
     bool spawningPoolUnlocked = false;
     std::uint64_t liftOffBattlecruiserEntityID = 0;
+    //! Lift Off upgrade lifecycle.  Upgrades are generated by completed
+    //! Tavern refreshes, bought from the Tavern spell row, and consumed by
+    //! the Battlecruiser entity.  These counters are player-owned so a
+    //! replayed spell/modal cannot manufacture a second upgrade.
+    std::int32_t liftOffUpgradeTier = 0;
+    std::int32_t liftOffUpgradesBoughtThisTurn = 0;
+    bool liftOffFreeUpgradeAvailable = false;
+    std::int32_t liftOffYamatoDamage = 0;
+    std::int32_t liftOffRallyAttack = 0;
+    std::int32_t liftOffDeathrattleAttack = 0;
+    std::int32_t liftOffDeathrattleHealth = 0;
+    bool liftOffFortifiedBunker = false;
+    bool liftOffMissilePod = false;
+    bool liftOffUltraCapacitor = false;
     //! Reserved fixed-capacity payload for delayed end-turn effects.  HP104
     //! deliberately leaves it empty: recipients are chosen at end turn.
     std::array<std::uint64_t, 32> cthunEndTurnTargets{};
@@ -752,6 +813,8 @@ class Season14State
     { temporaryRefreshShopAttack += attack; temporaryRefreshShopHealth += health; }
     std::int32_t refreshShopStatsDeltaAttack = 0;
     std::int32_t refreshShopStatsDeltaHealth = 0;
+    //! Permanent upgrade-cost reduction earned by successful refreshes.
+    std::int32_t refreshUpgradeCostDiscount = 0;
     std::int32_t temporaryTavernSpellAttack = 0;
     std::int32_t temporaryTavernSpellHealth = 0;
     //! Cumulative improvement applied to newly created Tasty Lobsters.  This
@@ -759,9 +822,17 @@ class Season14State
     //! refreshes, and recruit-phase transitions.
     std::int32_t futureLobsterAttack = 0;
     std::int32_t futureLobsterHealth = 0;
+    //! Cumulative per-cast improvement applied to future Deep Blues
+    //! Spellcraft cards.  This is player-owned state and survives refresh,
+    //! combat, and recruit-phase transitions.
+    std::int32_t futureDeepBluesAttack = 0;
+    std::int32_t futureDeepBluesHealth = 0;
     std::int32_t futureBallerAttack = 0;
     std::int32_t futureBallerHealth = 0;
     std::int32_t trinketExtraShopSlots = 0;
+    // Some Trinkets set a target Tavern size rather than adding a flat
+    // number of offers (Felbat Portrait keeps seven offers at every tier).
+    std::int32_t trinketMinimumShopSlots = 0;
     std::int32_t refreshExtraShopSlots = 0;
     // True only while a player-initiated Tavern refresh is filling offers;
     // refresh-triggered hero powers must not apply during turn-start setup.
@@ -773,6 +844,10 @@ class Season14State
     //! Player. Hand rewards remain pending when the hand is full.
     std::int32_t pendingSpellCountNagaRewards = 0;
     std::int32_t pendingSpellCountGold = 0;
+    //! Number of Blood Gems to play on each friendly minion after
+    //! thresholded spell-count Trinkets resolve. This is a pending board
+    //! effect rather than a hand reward, so it is independent of hand cap.
+    std::int32_t pendingSpellCountBloodGems = 0;
     std::vector<std::int32_t> distinctSpellsThisTurn;
     void RecordDistinctSpell(std::int32_t dbfID) {
         if (dbfID > 0 && std::find(distinctSpellsThisTurn.begin(), distinctSpellsThisTurn.end(), dbfID) == distinctSpellsThisTurn.end()) distinctSpellsThisTurn.push_back(dbfID);
@@ -786,8 +861,14 @@ class Season14State
     std::int32_t spellCastMinionAttackDelta = 0;
     std::int32_t spellCastMinionHealthDelta = 0;
     std::int32_t trinketHigherTierRefreshes = 0;
+    //! Number of pending refresh fills whose fresh offers must all be Tier 6.
+    std::int32_t trinketTierSixOnlyRefreshes = 0;
     std::int32_t trinketMaxGoldDelta = 0;
     std::int32_t trinketImmediateGold = 0;
+    //! Ornate Clock (BG32_MagicItem_271) moves the next Greater Trinket
+    //! offer to the following recruit start.  This is player-owned rather
+    //! than a global turn flag so duplicate/replayed players cannot leak it.
+    bool ornateClockGreaterNextTurn = false;
     //! Per-trigger counters for refresh/self-damage Trinket families.  These
     //! are intentionally player state rather than card-instance locals so a
     //! refresh cannot reset progress or make a replay depend on pointers.
@@ -798,6 +879,10 @@ class Season14State
     std::int32_t refreshRandomShopAttack = 0;
     std::int32_t refreshRandomShopHealth = 0;
     std::int32_t fodderRefreshes = 0;
+    //! One-shot Fodders armed by Bloodfury Shield and similar effects.  This
+    //! is deliberately separate from fodderRefreshes, whose semantics are a
+    //! contribution on each of several future refreshes (Defiler/Demonology).
+    std::int32_t foddersNextRefresh = 0;
     std::int32_t goldenMinionsPlayed = 0;
     std::int32_t piratesPlayedThisGame = 0;
     //! Lifetime Pirate acquisitions, including cards added to hand.  This is
@@ -986,8 +1071,17 @@ class Season14State
     //! The count is consumed by MinionPool when that fill occurs.
     void ArmHigherTierRefresh(std::int32_t count);
 
+    //! Arms upcoming refresh fills with Tier-6-only offers.
+    void ArmTierSixOnlyRefresh(std::int32_t count);
+
     //! Returns and clears the one-shot higher-tier refresh allowance.
     std::int32_t TakeHigherTierRefresh();
+
+    //! Returns and clears the pending Tier-6-only fill allowance.
+    std::int32_t TakeTierSixOnlyRefresh();
+
+    //! Resolve refresh-triggered allowances before the Tavern is filled.
+    void BeginRefreshTavern();
 
     //! Returns whether this hero automatically freezes the remaining Tavern.
     bool ShouldFreezeRemainingTavern() const;
@@ -1031,7 +1125,7 @@ class Season14State
     std::pair<std::int32_t, std::int32_t> TemporaryTavernSpellStats() const noexcept
     { return {temporaryTavernSpellAttack, temporaryTavernSpellHealth}; }
     //! Resolves Trinket Avenge progress after a friendly combat death.
-    std::pair<std::int32_t, std::int32_t> OnTrinketFriendlyMinionDied();
+    TrinketAvengeResult OnTrinketFriendlyMinionDied();
     void ResetTrinketAvengeProgress() noexcept;
     void OnFriendlyPirateAttack();
     void OnFriendlyMinionAttack();
@@ -1071,6 +1165,8 @@ class Season14State
     { if (pendingSpellCountNagaRewards <= 0) return false; --pendingSpellCountNagaRewards; return true; }
     std::int32_t TakeSpellCountGold() noexcept
     { const auto n = pendingSpellCountGold; pendingSpellCountGold = 0; return n; }
+    std::int32_t TakeSpellCountBloodGems() noexcept
+    { const auto n = pendingSpellCountBloodGems; pendingSpellCountBloodGems = 0; return n; }
     std::int32_t TakeSpellMinionAttackDelta() noexcept
     { const auto d = spellMinionAttackDelta; spellMinionAttackDelta = 0; return d; }
     std::int32_t LastTavernSpellDbfID() const noexcept { return lastTavernSpellDbfID; }
@@ -1179,6 +1275,10 @@ class Season14State
 
     //! Returns the cumulative future-Lobster bonus.
     std::pair<std::int32_t, std::int32_t> FutureLobsterStats() const noexcept;
+    //! Improves each subsequently resolved Deep Blues Spellcraft card.
+    void ImproveFutureDeepBlues(std::int32_t attack,
+                                std::int32_t health) noexcept;
+    std::pair<std::int32_t, std::int32_t> FutureDeepBluesStats() const noexcept;
     void ImproveFutureBallers(std::int32_t attack, std::int32_t health);
     std::pair<std::int32_t, std::int32_t> FutureBallerStats() const noexcept;
 
@@ -1197,6 +1297,22 @@ class Season14State
     std::pair<std::int32_t, std::int32_t>
     RefreshRandomShopStats() noexcept;
     void ArmFodderRefreshes(std::int32_t count, std::int32_t amount = 1) noexcept { if (count > 0) { fodderRefreshes += count; foddersPerRefresh = std::max(foddersPerRefresh, amount); } }
+    //! Arms one Fodder per count for the next successful refresh only.
+    //! Multiple copies stack, but there is no useful state beyond Tavern
+    //! capacity; cap the pending queue so repeated casts cannot leak into
+    //! later refreshes after the next refresh has resolved.
+    void ArmFoddersNextRefresh(std::int32_t count = 1) noexcept
+    {
+        if (count > 0)
+            foddersNextRefresh = std::min(
+                MAX_FIELD_SIZE, foddersNextRefresh + count);
+    }
+    std::int32_t ConsumeFoddersNextRefresh() noexcept
+    {
+        const auto result = foddersNextRefresh;
+        foddersNextRefresh = 0;
+        return result;
+    }
     //! Arms the shared next-three-refresh window used by Defiler triggers.
     //! Multiple Defilers resolve together, so their window is not extended.
     void ArmFodderDefilerRefreshes(std::int32_t count,

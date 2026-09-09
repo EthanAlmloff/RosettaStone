@@ -230,8 +230,8 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddRallyTask(SimpleTasks::PersistentRaceBuffTask{Race::UNDEAD, 2, 0, false, -1}); cards.emplace("BG33_323_G", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::PersistentRaceBuffTask{Race::ELEMENTAL, 0, 2, false, -1}); cards.emplace("BG32_842", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::PersistentRaceBuffTask{Race::ELEMENTAL, 0, 4, false, -1}); cards.emplace("BG32_842_G", CardDef{std::move(p)}); }
-  { Power p; p.AddBattlecryTask(SimpleTasks::ApplyMinionStatBuffTask{Race::INVALID, 2, 0, SimpleTasks::MinionBuffTarget::TAVERN_ALL_PERSISTENT}); cards.emplace("BG29_873", CardDef{std::move(p)}); }
-  { Power p; p.AddBattlecryTask(SimpleTasks::ApplyMinionStatBuffTask{Race::INVALID, 4, 0, SimpleTasks::MinionBuffTarget::TAVERN_ALL_PERSISTENT}); cards.emplace("BG29_873_G", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::ApplyMinionStatBuffTask{Race::INVALID, 0, 2, SimpleTasks::MinionBuffTarget::TAVERN_ALL_PERSISTENT}); cards.emplace("BG29_873", CardDef{std::move(p)}); }
+  { Power p; p.AddBattlecryTask(SimpleTasks::ApplyMinionStatBuffTask{Race::INVALID, 0, 4, SimpleTasks::MinionBuffTarget::TAVERN_ALL_PERSISTENT}); cards.emplace("BG29_873_G", CardDef{std::move(p)}); }
   { Power p; p.AddBattlecryTask(SimpleTasks::ApplyMinionStatBuffTask{Race::INVALID, 2, 1, SimpleTasks::MinionBuffTarget::TAVERN_ALL_PERSISTENT}); cards.emplace("BG25_041", CardDef{std::move(p)}); }
   { Power p; p.AddBattlecryTask(SimpleTasks::ApplyMinionStatBuffTask{Race::INVALID, 4, 2, SimpleTasks::MinionBuffTarget::TAVERN_ALL_PERSISTENT}); cards.emplace("BG25_041_G", CardDef{std::move(p)}); }
   { Power p; p.AddStartCombatTask(SimpleTasks::FriendlyRaceEnchantmentTask{"BG21_014e", Race::DRAGON}); cards.emplace("BG21_014", CardDef{std::move(p)}); }

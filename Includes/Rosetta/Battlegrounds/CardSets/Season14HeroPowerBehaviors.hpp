@@ -4,6 +4,7 @@
 #define ROSETTASTONE_BATTLEGROUNDS_SEASON14_HERO_POWER_BEHAVIORS_HPP
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 
@@ -75,6 +76,25 @@ struct Season14HeroPowerDefinition
     std::int32_t buddyDbfID = 0;
 };
 
+// Warp Gate is a passive lifecycle, not a repeatable hero-power activation.
+// Keep its public contract typed so selection, lifetime purchase progress,
+// and the pending two-choice reward cannot drift apart or silently become an
+// active action.
+struct WarpGateLifecycleDefinition
+{
+    std::int32_t heroPowerDbfID;
+    std::int32_t buyThreshold;
+    std::size_t choiceCount;
+};
+
+inline constexpr WarpGateLifecycleDefinition WARP_GATE_LIFECYCLE = {
+    119196, 14, 2};
+
+constexpr bool IsWarpGateHeroPowerDbfID(std::int32_t dbfID) noexcept
+{
+    return dbfID == WARP_GATE_LIFECYCLE.heroPowerDbfID;
+}
+
 // Protoss rewards are hero-generated and therefore are not required to be in
 // the ordinary Tavern pool. Keep the pinned DBF boundary explicit: a missing
 // generated behavior must fail closed instead of substituting another race.
@@ -87,6 +107,15 @@ constexpr bool IsWarpGateProtossDbfID(std::int32_t dbfID) noexcept
     for (const auto id : WARP_GATE_PROTOSS_DBF_IDS)
         if (id == dbfID) return true;
     return false;
+}
+
+// Empty CardDefs are enough to let the loader construct linked/generated
+// records, but they are not executable Protoss behavior. Keep this allowlist
+// closed so Warp Gate cannot offer a metadata-only record and strand a reward
+// that the simulator cannot resolve.
+constexpr bool IsExecutableWarpGateProtossDbfID(std::int32_t dbfID) noexcept
+{
+    return IsWarpGateProtossDbfID(dbfID) && dbfID != 113732;
 }
 
 // Whodunit's public start-game pool is the authoritative Season 14 quest

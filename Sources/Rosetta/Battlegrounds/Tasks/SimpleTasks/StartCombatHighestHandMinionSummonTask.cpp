@@ -3,7 +3,10 @@
 
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus StartCombatHighestHandMinionSummonTask::Run(Player& p, Minion&) {
-    if (p.GetField().IsFull()) return TaskStatus::STOP;
+    if (p.GetField().IsFull()) {
+        p.ApplySummonOverflowTrinkets();
+        return TaskStatus::STOP;
+    }
     const Minion* best = nullptr;
     p.hand.ForEach([&](const std::optional<CardData>& entry) {
         if (!entry || !std::holds_alternative<Minion>(*entry)) return;

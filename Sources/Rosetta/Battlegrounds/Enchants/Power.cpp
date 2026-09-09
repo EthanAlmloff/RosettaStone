@@ -57,6 +57,11 @@ std::vector<TaskType>& Power::GetRallyTask()
     return m_rallyTask;
 }
 
+const std::vector<TaskType>& Power::GetRallyTask() const
+{
+    return m_rallyTask;
+}
+
 std::optional<ActivateDefinition>& Power::GetActivate()
 {
     return m_activate;

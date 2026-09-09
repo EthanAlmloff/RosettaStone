@@ -41,7 +41,7 @@ enum class ActivateEffect : unsigned char
     ACTIVATE_FISHBAIT,
     ACTIVATE_RANDOM_TAVERN_SPELLS,
 };
-enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD, PROGRESSIVE_END_TURN, PLAY_BLOOD_GEMS_RACE };
+enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD, ADD_RANDOM_PROTOSS, PROGRESSIVE_END_TURN, PLAY_BLOOD_GEMS_RACE };
 struct AvengeDefinition
 {
     AvengeEffect effect = AvengeEffect::NONE;
@@ -95,6 +95,7 @@ class Power
     //! Returns Rally tasks, resolved when this minion's friendly attacker
     //! declares an attack.
     std::vector<TaskType>& GetRallyTask();
+    const std::vector<TaskType>& GetRallyTask() const;
 
     //! Returns the explicit manual Activate definition, when present.
     std::optional<ActivateDefinition>& GetActivate();

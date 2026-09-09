@@ -15,6 +15,7 @@ namespace RosettaStone::Battlegrounds
 void Card::Initialize()
 {
     bool needsTarget = false;
+    bool tavernMinionTarget = false;
     CharacterType characterType = CharacterType::CHARACTERS;
     FriendlyType friendlyType = FriendlyType::ALL;
 
@@ -27,6 +28,11 @@ void Card::Initialize()
                 break;
             case PlayReq::REQ_TARGET_TO_PLAY:
                 needsTarget = true;
+                mustHaveToTargetToPlay = true;
+                break;
+            case PlayReq::REQ_TAVERN_MINION_TARGET:
+                needsTarget = true;
+                tavernMinionTarget = true;
                 mustHaveToTargetToPlay = true;
                 break;
             case PlayReq::REQ_MINION_TARGET:
@@ -65,6 +71,12 @@ void Card::Initialize()
                 break;
         }
     }
+
+    // This is deliberately applied after the generic minion/character
+    // inference above: a Tavern target is neither a friendly board target nor
+    // an opponent character, and must be resolved against fieldZone.
+    if (tavernMinionTarget)
+        targetingType = TargetingType::TAVERN_MINIONS;
 }
 
 CardSet Card::GetCardSet() const
