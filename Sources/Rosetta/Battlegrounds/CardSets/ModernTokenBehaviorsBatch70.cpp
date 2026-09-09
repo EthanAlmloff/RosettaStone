@@ -93,6 +93,12 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
   cards.emplace("TB_BaconShop_HERO_41_Buddy", CardDef{});
   cards.emplace("TB_BaconShop_HERO_41_Buddy_G", CardDef{});
 
+  // Crimson Hand Centurion's Divine Shield is supplied by canonical card
+  // metadata; its Verdant Spheres stat copy is resolved by Player at the
+  // successful third-minion-play boundary.
+  cards.emplace("TB_BaconShop_HERO_60_Buddy", CardDef{});
+  cards.emplace("TB_BaconShop_HERO_60_Buddy_G", CardDef{});
+
   // Burth's trigger is owned by Player::ResolveDiscoverTriggers so the
   // selected hand entity can be identified by stable entity ID.  Keep both
   // canonical CardDefs registered: the normal/golden payload and its
@@ -164,6 +170,13 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
   festergutGolden.AddDeathrattleTask(
       SimpleTasks::RandomCardToHandTask{Race::UNDEAD, 0, 2});
   cards.emplace("BG25_HERO_100_Buddy_G", CardDef{std::move(festergutGolden)});
+
+  // The Nine Frogs is resolved at Player's successful purchase boundary so
+  // the purchased minion tier and each Buddy instance's remaining charges
+  // are authoritative.  Keep the canonical entities registered here even
+  // though their trigger graph is intentionally empty.
+  cards.emplace("BG28_HERO_801_Buddy", CardDef{});
+  cards.emplace("BG28_HERO_801_Buddy_G", CardDef{});
 
   // Baby N'Zoth is the N'Zoth buddy (HERO_93, not the Jailer buddy
   // HERO_702).  Its Battlecry goldenizes friendly Deathrattle minions; the
@@ -293,6 +306,13 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
   cards.emplace("TB_BaconShop_HERO_10_Buddy", CardDef{});
   cards.emplace("TB_BaconShop_HERO_10_Buddy_G", CardDef{});
 
+  // Evergreen Botani adds a fresh minion matching the owner's Tavern tier at
+  // recruit end.  Game::CompleteRecruitPhase owns the authoritative hand-cap
+  // and pool callback and counts normal/golden copies independently (one/two
+  // offers), so these entities intentionally carry no CardDef task graph.
+  cards.emplace("TB_BaconShop_HERO_74_Buddy", CardDef{});
+  cards.emplace("TB_BaconShop_HERO_74_Buddy_G", CardDef{});
+
   // Tuskarr Raider generates one/two random Bounties from each of its three
   // ordinary lifecycle hooks.  Keep the hooks in the CardDef so battlecry,
   // deathrattle, and rally all use the same canonical pool task.
@@ -329,5 +349,12 @@ void ModernTokenBehaviorsBatch70::AddAll(std::map<std::string, CardDef>& cards) 
       std::move(miniZerekGolden),
       {{PlayReq::REQ_TARGET_TO_PLAY, 0},
        {PlayReq::REQ_TAVERN_MINION_TARGET, 0}}});
+
+  // Jandice's Apprentice is resolved at the successful minion-play boundary:
+  // its trigger is identity-based and per recruit turn, so a fixed task graph
+  // cannot represent the prior-play state.  Player owns that state and the
+  // typed registry owns normal/golden identity and scaling.
+  cards.emplace("TB_BaconShop_HERO_71_Buddy", CardDef{});
+  cards.emplace("TB_BaconShop_HERO_71_Buddy_G", CardDef{});
 }
 }

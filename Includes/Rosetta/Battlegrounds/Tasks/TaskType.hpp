@@ -142,6 +142,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/QuilboarBloodGolemDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTauntBuffSelfTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ProtossBehaviorTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SkyGolemPortraitDeathrattleTask.hpp>
 
 #include <variant>
 
@@ -251,6 +252,7 @@ using TaskType =
                  SimpleTasks::StartCombatPirateScallywagTask,
                  SimpleTasks::TriggerAdjacentBattlecryTask,
                  SimpleTasks::CopyTargetBattlecryTask,
+                 SimpleTasks::SkyGolemPortraitDeathrattleTask,
                  SimpleTasks::ProtossBehaviorTask>;
 }  // namespace RosettaStone::Battlegrounds
 

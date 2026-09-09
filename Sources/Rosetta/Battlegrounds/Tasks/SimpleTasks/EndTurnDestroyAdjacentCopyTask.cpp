@@ -25,10 +25,15 @@ TaskStatus EndTurnDestroyAdjacentCopyTask::Run(Player& p, Minion& source) {
     if (targetPos < 0 || targetPos >= p.recruitField.GetCount()) continue;
     p.recruitField[targetPos].TakeDamage(p.recruitField[targetPos].GetHealth());
     p.recruitField.Remove(p.recruitField[targetPos]);
-    if (p.recruitField.IsFull()) continue;
-    copy.getPlayerCallback = [&p]() -> Player& { return p; };
-    if (p.getNextCardIndexCallback) copy.SetIndex(p.getNextCardIndexCallback());
-    p.recruitField.Add(copy, targetPos);
+    if (!p.recruitField.IsFull()) {
+      copy.getPlayerCallback = [&p]() -> Player& { return p; };
+      if (p.getNextCardIndexCallback) copy.SetIndex(p.getNextCardIndexCallback());
+      p.recruitField.Add(copy, targetPos);
+    }
+    // The replacement is part of Kel'Thuzad's destroy resolution. Fire the
+    // outside-combat observer only after the copy is back on the board so it
+    // receives the same buff as every other surviving friendly minion.
+    p.ApplyOutsideCombatDestroyTrinkets();
   }
   return TaskStatus::COMPLETE;
 }

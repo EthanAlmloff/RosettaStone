@@ -192,6 +192,12 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Patch 36.4 batch")
     const auto saloon = FindTavernSpellBehavior("BG28_849");
     CHECK(saloon.effect == TavernSpellEffect::REFRESH_TAVERN_SPELLS);
     CHECK(!TavernSpellRequiresTarget(saloon.effect));
+
+    const auto haunted = FindTavernSpellBehavior("BG33_112");
+    CHECK(haunted.effect == TavernSpellEffect::ALL_STATS_NEXT_TURN);
+    CHECK(haunted.attack == 3);
+    CHECK(haunted.health == 1);
+    CHECK(!TavernSpellRequiresTarget(haunted.effect));
 }
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - targeted stat batch")

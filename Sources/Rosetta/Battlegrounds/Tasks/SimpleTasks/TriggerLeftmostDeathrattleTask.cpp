@@ -1,5 +1,6 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerLeftmostDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus TriggerLeftmostDeathrattleTask::Run(Player& p, Minion& source) {
   // Macaw's text explicitly says "another" minion.  Exclude the observing
@@ -30,6 +31,30 @@ TaskStatus TriggerLeftmostDeathrattleTask::Run(Player& p, Minion& source) {
     if (target == nullptr) break;
     target->ActivateTask(PowerType::DEATHRATTLE, p);
     triggered = true;
+  }
+  // Macaw Portrait adds a second, independent Rally payload. Keep the
+  // ordinary Monstrous Macaw deathrattle trigger above intact, then resolve
+  // the left-most other Battlecry from the same combat snapshot.
+  if (p.HasActivePortrait(PortraitEffect::MACAW_LEFTMOST_BATTLECRY) &&
+      (source.GetCardID() == "BGS_078" ||
+       source.GetCardID() == "TB_BaconUps_135")) {
+    for (int repeat = 0; repeat < m_repeats; ++repeat) {
+      Minion* target = nullptr;
+      for (int i = 0; i < field.GetCount(); ++i) {
+        auto& candidate = field[i];
+        const bool isSource = &candidate == &source ||
+                              (source.GetIndex() >= 0 &&
+                               candidate.GetIndex() == source.GetIndex());
+        if (!candidate.IsDestroyed() && !isSource && candidate.HasBattlecry()) {
+          target = &candidate;
+          break;
+        }
+      }
+      if (target == nullptr) break;
+      target->ActivateTask(PowerType::POWER, p);
+      triggered = true;
+      if (p.season14.pendingDecision != Season14Decision::NONE) break;
+    }
   }
   return triggered ? TaskStatus::COMPLETE : TaskStatus::STOP;
 }

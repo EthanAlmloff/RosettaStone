@@ -39,6 +39,9 @@ TaskStatus AddEnchantmentTask::Run(Player& player, Minion& source)
 
     for (auto& minion : minions)
     {
+        if (ApplyReviewedTemporaryChildEnchantment(minion.get(), m_cardID,
+                                                   num, num))
+            continue;
         // reference_wrapper owns the same target as the historical
         // ApplyReviewedPersistentChildEnchantment(*minion, m_cardID, num)
         // call shape; .get() is the type-correct spelling here.
@@ -65,6 +68,8 @@ TaskStatus AddEnchantmentTask::Run(Player& player, Minion& source,
 
     for (auto& minion : minions)
     {
+        if (ApplyReviewedTemporaryChildEnchantment(minion.get(), m_cardID))
+            continue;
         // reference_wrapper owns the same target as the historical
         // ApplyReviewedPersistentChildEnchantment(*minion, m_cardID) call
         // shape; .get() is the type-correct spelling here.

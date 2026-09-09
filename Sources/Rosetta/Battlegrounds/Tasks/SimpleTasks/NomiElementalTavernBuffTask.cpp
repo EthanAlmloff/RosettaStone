@@ -19,6 +19,14 @@ TaskStatus NomiElementalTavernBuffTask::Run(Player& p, Minion&) {
       attack += behavior.attack;
       health += behavior.health;
     }
+    else if (behavior.effect ==
+             TrinketEffect::ESCALATING_ELEMENTAL_STAT_GIVER_BONUS) {
+      // statScale is the completed improvement level, not trigger progress.
+      // Keeping it on the owned Trinket preserves duplicate-instance and
+      // replay semantics without inferring state from the current shop.
+      attack += behavior.attack + trinket.statScale;
+      health += behavior.health + trinket.statScale;
+    }
   }
   p.ApplyTavernRaceBuff(Race::ELEMENTAL, attack, health);
   return TaskStatus::COMPLETE;

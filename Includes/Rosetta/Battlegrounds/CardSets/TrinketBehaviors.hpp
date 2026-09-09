@@ -22,7 +22,48 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // absolute minimum Tavern offer count.
                            SHOP_STATS_AND_TAVERN_SLOTS,
                            START_TURN_GOLD_PER_MINION_TYPE, IMMEDIATE_GOLD,
+                           // Mysterious Orb pays immediately and restricts
+                           // the next valid Trinket offer to the Lesser pool.
+                           // The restriction is stateful and is consumed only
+                           // when an offer modal is successfully opened.
+                           IMMEDIATE_GOLD_AND_LESSER_NEXT,
+                           // Lockbox Portrait repeats the Lockbox cadence at
+                           // recruit start; the payload itself is resolved by
+                           // Player's shared lockbox scheduler.
+                           LOCKBOX_PORTRAIT,
                            ACQUIRE_RANDOM_MINIONS,
+                           // Magician's Top Hat grants two independent
+                           // random minions from each of tiers 1, 2, and 3
+                           // on acquisition.  The executor owns hand-cap
+                           // handling and samples each tier independently.
+                           ACQUIRE_RANDOM_MINIONS_TIER_BATCH,
+                           // Lavish Cape casts one random legal Tavern spell
+                           // per distinct friendly minion type, immediately
+                           // and again at each recruit start.
+                           START_TURN_RANDOM_TAVERN_SPELLS_PER_TYPE,
+                           // Glass of Perspective grants one random
+                           // Battlegrounds Choose One minion on acquisition
+                           // and repeats that reward at each recruit start.
+                           ACQUIRE_RANDOM_CHOOSE_ONE,
+                           // Sacrificial Altar is an acquisition-time
+                           // conversion: remove every friendly warband
+                           // minion and award three Gold per removed entity.
+                           // Keep it typed so the destructive one-shot
+                           // payload cannot be mistaken for a passive aura.
+                           SACRIFICIAL_ALTAR,
+    //! Errgl Sticker's exact two-card Mrrglton reward pool.
+    ACQUIRE_RANDOM_MRGLTON,
+                           // Ominous Stone opens a Tier-4, most-common-type
+                           // minion Discover paired with an executable Dark
+                           // Gift.  The modal and gift are resolved at the
+                           // selection boundary, not during acquisition.
+                           OMINOUS_STONE_DISCOVER,
+                           // Wax Lance opens a Tier-7 minion Discover paired
+                           // with a legal Dark Gift at acquisition.
+                           WAX_LANCE_DISCOVER,
+                           // Discovers a plain warband copy with a Dark Gift
+                           // on acquisition and again at recruit start.
+                           MALDRAXXUS_DAGGER_DISCOVER,
                            // Baller Portrait grants one random canonical
                            // Fire/Snow Baller on acquisition and at each
                            // subsequent recruit start.
@@ -32,6 +73,10 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            AFTER_FRIENDLY_DEATH_RANDOM_MINION,
                            AFTER_SELL_RANDOM_MINION,
                            ACQUIRE_FIXED_CARD,
+                           // Primalfin Portrait grants the executable
+                           // Primalfin Lookout; each resulting minion
+                           // Discover also queues one random Tavern spell.
+                           ACQUIRE_PRIMALFIN_PORTRAIT,
                            // Fixed-card portrait whose first purchased
                            // Pirate each recruit turn is free.
                            ACQUIRE_FIXED_CARD_FIRST_PIRATE_FREE,
@@ -56,6 +101,11 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // Elemental stat-giver; it is not itself a play
                            // trigger.
                            ELEMENTAL_STAT_GIVER_BONUS,
+                           // Amplifying Essence adds a stat payload to every
+                           // Elemental stat-giver and improves that payload
+                           // after its owned lifetime play threshold. The
+                           // threshold/progress are per Trinket instance.
+                           ESCALATING_ELEMENTAL_STAT_GIVER_BONUS,
                            AFTER_TAVERN_SPELL_SHOP_BUFF,
                            // Felsteel Cleaver consumes the Tavern minion
                            // targeted by a successful spell after resolution.
@@ -65,6 +115,10 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            TAVERN_SPELL_GROWING_STATS,
                            TAVERN_SPELL_IMPROVE_AFTER_MINION_CAST,
                            AFTER_BUY_RANDOM_FRIENDLY_BUFF,
+                           // Reusable Batteries grants one Magnetic
+                           // Satellite copied from the first minion bought
+                           // each recruit turn.
+                           AFTER_BUY_MINION_MAGNETIC_SATELLITE,
                            // Trusty Crowbar buffs the left-most friendly
                            // minion whenever a Pirate is acquired.
                            AFTER_GET_PIRATE_LEFTMOST_STATS,
@@ -77,20 +131,36 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            END_TURN_DIVINE_SHIELD_ATTACK,
                            AFTER_PLAY_CARD_RANDOM_RACE_BUFF,
                            STATIC_RACE_STATS,
+                           AFTER_OUTSIDE_COMBAT_DESTROY_STATS,
+                           AFTER_OUTSIDE_COMBAT_DESTROY_GOLD,
                            AFTER_REBORN_STATS,
                            // Funeral Wreath adds a plain copy of each
                            // friendly Reborn minion, capped per combat.
                            AFTER_REBORN_COPY,
+                           // Deathtouch Apple restores Reborn to a friendly
+                           // Undead after its combat Reborn resolves.  The
+                           // value is the per-recruit-turn trigger cap.
+                           AFTER_REBORN_UNDEAD_REBORN,
                            DUPLICATE_DRAGON_BATTLECRY,
                            FIRST_MINION_DIVINE_SHIELD,
                            BATTLECRY_BUY_DISCOUNT,
                            REFRESH_SHOP_STATS,
+                           // Lightning in a Bottle copies the highest-Attack
+                           // Tavern minion's final stats to the lowest-Attack
+                           // offer after each successful refresh.
+                           REFRESH_HIGHEST_ATTACK_TO_LOWEST_STATS,
                            // Demonic Tapestry arms one highest-tier Tavern
                            // minion purchase to be paid with Health after
                            // `value` successful refreshes. `amount` is the
                            // health cost and `statScale` on the owned effect
                            // is the one-purchase armed marker.
                            REFRESH_HIGHEST_TIER_HEALTH_PURCHASE,
+                           // The Eye of Sargeras replaces every fourth
+                           // successful minion purchase's Gold cost with
+                           // Health.  Progress is kept on each owned
+                           // Trinket instance; the purchase executor owns
+                           // the payment boundary.
+                           BUY_MINION_HEALTH_CADENCE,
                            REFRESH_UPGRADE_COST_DISCOUNT,
                            HERO_DAMAGE_SHOP_STATS,
                            STATIC_MINION_STATS,
@@ -112,6 +182,12 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            START_TURN_GOLD_DAMAGE,
                            REFRESH_TEMP_SHOP_STATS,
                            AVENGE_MINION_STATS,
+                           // Cloud Serpent Horn gives (copies) the right-most
+                           // friendly minion's Attack to another friendly
+                           // Dragon after three friendly deaths.  The source
+                           // keeps its Attack; the combat result tracks one
+                           // trigger per owned Horn instance.
+                           AVENGE_RIGHTMOST_ATTACK_TO_DRAGON,
                            // Summon a 2/2 Beetle after the Avenge threshold.
                            // `amount` carries the number of Beetles (golden = 2).
                            AVENGE_SUMMON_BEETLES,
@@ -121,6 +197,7 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            START_COMBAT_HEALTH_FROM_ATTACK,
                            AVENGE_TAVERN_SPELL_ATTACK,
                            REFRESH_EXTRA_SHOP_SLOTS,
+                           MAGNETIC_MECH_COST_AND_REFRESH_SLOT,
                            SPELL_COUNT_MINION_ATTACK,
                            END_TURN_UNDEAD_ATTACK,
                            REACH_TIER_GOLD,
@@ -153,13 +230,27 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            START_COMBAT_EDGE_SHIELDS,
                            START_COMBAT_LEFT_COPY,
                            START_COMBAT_FIRST_SUMMON_COPY,
+                           // Boom Controller remembers the first friendly
+                           // Mech death and summons an exact combat copy when
+                           // a slot becomes available.
+                           BOOM_CONTROLLER_FIRST_MECH_COPY,
                            MECH_DIVINE_SHIELD_REPAIR,
                            ACQUIRE_FLAGBEARER_PORTRAIT,
                            START_COMBAT_AUTOMATON_SUMMON,
+                           // Assembler Portrait magnetizes one canonical Auto
+                           // Assembler onto every friendly Mech at combat
+                           // start.  Keep this distinct from summoning an
+                           // Automaton: the attachment carries Magnetic and
+                           // Deathrattle semantics through Minion.
+                           START_COMBAT_AUTO_ASSEMBLER,
                            START_COMBAT_UNDEAD_EDGE_REBORN,
                            START_COMBAT_TRIGGER_DEATHRATTLES,
                            START_COMBAT_HIGHEST_HAND_MINION,
                            AFTER_DEATHRATTLE_RIGHTMOST_STATS,
+                           // Blood Amulet plays one permanent Blood Gem on
+                           // three distinct random friendly minions after a
+                           // friendly Deathrattle resolves.
+                           AFTER_DEATHRATTLE_BLOOD_GEMS,
                            START_COMBAT_NEUTRAL_TRIPLE,
                            START_COMBAT_DRAGON_MAX_ATTACK,
                            START_COMBAT_LEFTMOST_HAND_STATS,
@@ -181,6 +272,13 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            AFTER_TWO_ATTACKS_QUILBOAR_GEM,
                            SPELL_COUNT_RANDOM_NAGA,
                            SPELL_COUNT_GOLD_ON_MINION,
+                           // Bubble Crown improves future Tavern-spell stat
+                           // payloads once after twelve successful spells.
+                           SPELL_COUNT_TAVERN_SPELL_STATS,
+                           // Rune of Transmutation replaces its owned
+                           // instance after fifteen successful Tavern spells
+                           // with a random executable Greater Naga Trinket.
+                           SPELL_COUNT_REPLACE_GREATER_NAGA,
                            // Bloodbound Earrings: `value` is the recurring
                            // successful-spell threshold and `amount` is the
                            // number of Blood Gems played on each minion per
@@ -226,7 +324,15 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // marker distinct from token effects so coverage
                            // and acquisition cannot credit the wrong target.
                            SPELLCRAFT_MURLOC_KEYWORD,
+                           // Ophidian Staff supplies a temporary Spellcraft
+                           // token whose TavernSpellBehavior owns the exact
+                           // Beast +2/+2 and Reborn target contract.
+                           SPELLCRAFT_OPHIDIAN_STAFF,
                            SPELLCRAFT_TRIGGER_DEATHRATTLE,
+                           // Chillmere Mosaic supplies a Spellcraft token
+                           // that refreshes the Tavern with Battlecry
+                           // minions costing one Gold.
+                           SPELLCRAFT_CHILLMERE_MOSAIC,
                            PRECIOUS_PEARL_SPELLCRAFT,
                            BOOK_OF_MEDIVH_DISCOVER,
                            AZEROTH_MODEL_GLOBE,
@@ -239,6 +345,9 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // once-per-turn first-spell replay.
                            AFTER_FRIENDLY_SPELL_REPEAT,
                            SPELLCRAFT_REPEAT,
+                           // Trailblazer Sticker makes every supported
+                           // Choose One source resolve both branches.
+                           TRAILBLAZER_CHOOSE_ONE,
                            AFTER_FRIENDLY_NO_TYPE_DEATH_RANDOM_SPELL,
                            AFTER_DIVINE_SHIELD_LOST_RANDOM_SPELL,
                            AFTER_BLOOD_GEM_DIVINE_SHIELD,
@@ -246,6 +355,12 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // Re-fire the left- and right-most friendly
                            // minions' Battlecries at recruit end.
                            END_TURN_BATTLECRY_TRIGGER,
+                           // War Drum repeats one successful friendly
+                           // Battlecry twice per recruit turn.  The
+                           // per-instance triggerProgress marker is reset at
+                           // recruit start, so the effect is not a lifetime
+                           // one-shot and cannot be consumed by failed plays.
+                           BATTLECRY_EXTRA_TRIGGERS,
                            // Add a random Tavern spell after playing an
                            // Elemental, with `value` as the per-turn cap.
                            AFTER_PLAY_ELEMENTAL_RANDOM_SPELL,
@@ -253,8 +368,20 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // Tavern-spell reward. `value` is the threshold
                            // and `amount` is the reward count.
                            AFTER_PLAY_MURLOC_RANDOM_SPELL,
+                           // Magicfin Sticker rewards a taught 1/1 Murloc
+                           // after a successful Tavern-spell purchase;
+                           // `value` is its per-recruit-turn cap.
+                           AFTER_BUY_TAVERN_SPELL_MURLOC,
                            AFTER_PLAY_ELEMENTAL_FREE_REFRESH,
                            AFTER_PLAY_DEMON_DAMAGE,
+                           // Ur'zul Sticker makes another friendly Demon
+                           // consume one Tavern minion after a Demon is
+                           // played.
+                           AFTER_PLAY_DEMON_CONSUME,
+                           // Consuming Claw copies every Bonus Keyword from
+                           // a Tavern minion consumed by a friendly Demon and
+                           // adds its fixed stat payload at that boundary.
+                           DEMON_CONSUME_BONUS_KEYWORDS,
                            END_TURN_LEFTMOST_STATS_PER_BATTLECRY,
                            END_TURN_FIXED_CARD,
                            // Inductive Gyroblade creates a Magnetic
@@ -327,7 +454,11 @@ enum class PortraitEffect {
     // Hackerfin Portrait makes every owned Hackerfin repeat its Battlecry at
     // recruit end.  The marker is stored on each Minion instance so copies
     // retain the lifecycle through hand/board movement.
-    HACKERFIN_END_TURN_BATTLECRY
+    HACKERFIN_END_TURN_BATTLECRY,
+    RYLAK_START_COMBAT_DEATHRATTLES,
+    MACAW_LEFTMOST_BATTLECRY,
+    SKY_GOLEM_DEATHRATTLE_STATS,
+    SCRAPSMITH_TAUNT_DEATH_GEMS
 };
 // End-of-recruit persistent race aura.
 // Effects whose trigger is a successful recruit-phase refresh or self-damage

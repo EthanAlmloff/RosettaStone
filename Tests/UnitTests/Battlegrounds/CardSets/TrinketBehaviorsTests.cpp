@@ -16,6 +16,29 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Spellcraft executor markers")
           TrinketEffect::SPELLCRAFT_CONSUME_SHOP_STATS);
     CHECK(FindTrinketBehavior("BG36_MagicItem_208").effect ==
           TrinketEffect::SPELLCRAFT_TRIGGER_DEATHRATTLE);
+    CHECK(FindTrinketBehavior("BG35_MagicItem_872").effect ==
+          TrinketEffect::SPELLCRAFT_OPHIDIAN_STAFF);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Assembler Portrait is a start combat attachment")
+{
+    CHECK(FindTrinketBehavior("BG36_MagicItem_841").effect ==
+          TrinketEffect::START_COMBAT_AUTO_ASSEMBLER);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Deathtouch Apple re-arms Undead Reborn")
+{
+    const auto behavior = FindTrinketBehavior("BG35_MagicItem_731");
+    CHECK(behavior.effect == TrinketEffect::AFTER_REBORN_UNDEAD_REBORN);
+    CHECK(behavior.value == 3);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Consuming Claw is a typed demon consume observer")
+{
+    const auto behavior = FindTrinketBehavior("BG36_MagicItem_801");
+    CHECK(behavior.effect == TrinketEffect::DEMON_CONSUME_BONUS_KEYWORDS);
+    CHECK(behavior.attack == 5);
+    CHECK(behavior.health == 5);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - complete immediate gold batch")
@@ -47,6 +70,16 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - complete immediate gold batch")
     CHECK(music.repeatAtStartTurn);
     CHECK(music.battlecryOnly);
     CHECK(!music.magneticOnly);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Ominous Stone is typed Dark Gift discover")
+{
+    const auto behavior = FindTrinketBehavior("BG36_MagicItem_206");
+    CHECK(behavior.effect == TrinketEffect::OMINOUS_STONE_DISCOVER);
+    CHECK(behavior.attack == 0);
+    CHECK(behavior.health == 0);
+    CHECK(behavior.value == 0);
+    CHECK(behavior.amount == 0);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - distinct minion acquisition trinkets")
@@ -86,6 +119,35 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - recurring fixed acquisition")
     CHECK(behavior.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
     CHECK(behavior.cardID == "BG28_604");
     CHECK(behavior.repeatAtStartTurn);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Magicfin Sticker observes spell purchases")
+{
+    const auto behavior = FindTrinketBehavior("BG35_MagicItem_750");
+    CHECK(behavior.effect == TrinketEffect::AFTER_BUY_TAVERN_SPELL_MURLOC);
+    CHECK(behavior.value == 2); // printed per-recruit-turn cap
+    CHECK(behavior.amount == 1); // one taught 1/1 Murloc per purchase
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Glass of Perspective is a recurring Choose One reward")
+{
+    const auto behavior = FindTrinketBehavior("BG36_MagicItem_303");
+    CHECK(behavior.effect == TrinketEffect::ACQUIRE_RANDOM_CHOOSE_ONE);
+    CHECK(behavior.amount == 1);
+    CHECK(behavior.repeatAtStartTurn);
+    CHECK_FALSE(behavior.battlecryOnly);
+    CHECK_FALSE(behavior.magneticOnly);
+
+    const auto greater = FindTrinketBehavior("BG36_MagicItem_303t");
+    CHECK(greater.effect == TrinketEffect::ACQUIRE_RANDOM_CHOOSE_ONE);
+    CHECK(greater.amount == 2);
+    CHECK(greater.repeatAtStartTurn);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Sacrificial Altar is a typed acquisition conversion")
+{
+    const auto behavior = FindTrinketBehavior("BG32_MagicItem_844");
+    CHECK(behavior.effect == TrinketEffect::SACRIFICIAL_ALTAR);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Grifter Portrait first Pirate purchase")
@@ -140,6 +202,12 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - fixed supported portrait batch")
     CHECK(sellemental.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
     CHECK(sellemental.cardID == "BGS_115");
     CHECK(sellemental.repeatAtStartTurn);
+
+    const auto electrode = FindTrinketBehavior("BG35_MagicItem_743");
+    CHECK(electrode.effect ==
+          TrinketEffect::MAGNETIC_MECH_COST_AND_REFRESH_SLOT);
+    CHECK(electrode.value == 1);
+    CHECK(electrode.amount == 2);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - portrait extras are explicit")
@@ -465,6 +533,24 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - beast summon cadence and element
           TrinketEffect::NONE);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Bubble Crown spell cadence")
+{
+    const auto crown = FindTrinketBehavior("BG35_MagicItem_920");
+    CHECK(crown.effect == TrinketEffect::SPELL_COUNT_TAVERN_SPELL_STATS);
+    CHECK(crown.value == 12);
+    CHECK(crown.attack == 4);
+    CHECK(crown.health == 4);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Eye of Sargeras purchase cadence")
+{
+    const auto eye = FindTrinketBehavior("BG30_MagicItem_701");
+    CHECK(eye.effect == TrinketEffect::BUY_MINION_HEALTH_CADENCE);
+    CHECK(eye.value == 4);
+    CHECK(FindTrinketBehavior("BG30_MagicItem_701e").effect ==
+          TrinketEffect::NONE);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Hackerfin Portrait lifecycle")
 {
     const auto behavior = FindTrinketBehavior("BG32_MagicItem_925");
@@ -546,6 +632,13 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Stegodon Portrait")
 {
     CHECK(FindTrinketBehavior("BG35_MagicItem_702").effect ==
           TrinketEffect::START_COMBAT_LEFT_BEAST_SHIELDS);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Cloud Serpent Horn")
+{
+    const auto horn = FindTrinketBehavior("BG35_MagicItem_849");
+    CHECK(horn.effect == TrinketEffect::AVENGE_RIGHTMOST_ATTACK_TO_DRAGON);
+    CHECK(horn.value == 3);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Yu'lon Sticker")
@@ -759,6 +852,16 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Tavern spell economy and turn ec
     CHECK(wax.value == 2);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Amplifying Essence is escalating")
+{
+    const auto essence = FindTrinketBehavior("BG36_MagicItem_380");
+    CHECK(essence.effect ==
+          TrinketEffect::ESCALATING_ELEMENTAL_STAT_GIVER_BONUS);
+    CHECK(essence.attack == 1);
+    CHECK(essence.health == 1);
+    CHECK(essence.value == 5);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - end of recruit family")
 {
     const auto wallet = FindTrinketBehavior("BG30_MagicItem_847");
@@ -877,14 +980,36 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Copper Coil magnetize scaling")
     CHECK(golden.value == 1);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Magician's Top Hat tier batch")
+{
+    // Pinned card contract: BG35_MagicItem_815, "Get two minions each from
+    // Tiers 1, 2, and 3."  This is an acquisition payload, not a recurring
+    // start-of-turn effect.
+    const auto behavior = FindTrinketBehavior("BG35_MagicItem_815");
+    CHECK(behavior.effect == TrinketEffect::ACQUIRE_RANDOM_MINIONS_TIER_BATCH);
+    // The executor intentionally owns the fixed 2-per-tier payload; no
+    // generic amount/tier field may widen this into one mixed pool.
+    CHECK(behavior.tier == 0);
+    CHECK(behavior.amount == 0);
+    CHECK_FALSE(behavior.repeatAtStartTurn);
+    // The printed text does not promise different minions.  The executor
+    // therefore samples each tier with replacement (distinct=false), while
+    // still applying hand-cap and fresh-instance modifiers per draw.
+    CHECK_FALSE(behavior.distinct);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - registrations")
 {
     std::map<std::string, CardDef> cards;
     TrinketBehaviors::AddAll(cards);
-    CHECK(cards.size() == 126);
+    CHECK(cards.size() == 128);
+    CHECK(cards.contains("BG35_MagicItem_815"));
     CHECK(cards.contains("BG30_MagicItem_996"));
     CHECK(cards.contains("BG30_MagicItem_841"));
+    CHECK(cards.contains("BG36_MagicItem_303"));
+    CHECK(cards.contains("BG36_MagicItem_303t"));
     CHECK(cards.contains("BG36_MagicItem_220"));
+    CHECK(cards.contains("BG36_MagicItem_206"));
     CHECK(cards.contains("BG30_MagicItem_425"));
     CHECK(cards.contains("BG30_MagicItem_419"));
     CHECK(cards.contains("BG30_MagicItem_426"));

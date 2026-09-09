@@ -98,6 +98,9 @@ struct TrinketAvengeResult
     std::int32_t health = 0;
     bool dealDamage = false;
     std::int32_t summonBeetles = 0;
+    // Count triggered Horn instances rather than using a flag: multiple
+    // copies can independently satisfy Avenge on the same death boundary.
+    std::int32_t transferRightmostAttackToDragon = 0;
 };
 struct Season14ChooseOneState { bool pending = false; std::uint64_t sourceEntityID = 0; std::uint32_t targetMask = 0; std::int32_t sourceCardDbfID = 0; };
 
@@ -297,6 +300,9 @@ class Season14State
     //! materialized in hand rather than magnetized immediately.
     std::int32_t pendingElectromagneticDiscoverRemaining = 0;
     std::int32_t pendingElectromagneticDiscoverSourceCardDbfID = 0;
+    //! Phyresz's sale Discover is replayed once more for its golden copy.
+    std::int32_t pendingUniqueDiscoverRemaining = 0;
+    std::int32_t pendingUniqueDiscoverSourceCardDbfID = 0;
     //! Identity of the effect that created the public offering. These fields
     //! make a pending modal replayable and prevent callers from treating an
     //! offering as an anonymous global random result.
@@ -312,6 +318,8 @@ class Season14State
     std::int32_t pendingTavernReplacementSlot = -1;
     std::int32_t pendingTavernReplacementTier = 0;
     Season14ChooseOneState chooseOne;
+    //! Persistent global modifier installed by Trailblazer Sticker.
+    bool trailblazerCombinedChooseOne = false;
     Season14SpellModalState spellModal;
     Season14PendingTaughtSpell pendingTaughtSpell;
     Season14TransformState transformModal;
@@ -452,6 +460,10 @@ class Season14State
     // of unresolved casts so selecting a target resumes the same five-cast
     // sequence instead of silently ending the reward early.
     std::int32_t generatedRewardRandomSpellsRemaining = 0;
+    //! Lavish Cape may pause after selecting a targeted random Tavern spell.
+    //! Keep the remaining casts separate from generated quest rewards so a
+    //! target modal can resume the Cape sequence without conflating sources.
+    std::int32_t lavishCapeRandomSpellsRemaining = 0;
 
     //! Install one supported generated quest reward effect. Returns false
     //! for metadata-only choices so callers cannot award executable credit.
@@ -602,6 +614,26 @@ class Season14State
     {
         generatedRewardRandomSpellsRemaining = 0;
     }
+    void BeginLavishCapeRandomSpells(std::int32_t amount) noexcept
+    {
+        lavishCapeRandomSpellsRemaining = std::max<std::int32_t>(0, amount);
+    }
+    std::int32_t LavishCapeRandomSpellsRemaining() const noexcept
+    {
+        return lavishCapeRandomSpellsRemaining;
+    }
+    void SetLavishCapeRandomSpellsRemaining(std::int32_t amount) noexcept
+    {
+        lavishCapeRandomSpellsRemaining = std::max<std::int32_t>(0, amount);
+    }
+    bool HasPendingLavishCapeRandomSpells() const noexcept
+    {
+        return lavishCapeRandomSpellsRemaining > 0;
+    }
+    void FinishLavishCapeRandomSpells() noexcept
+    {
+        lavishCapeRandomSpellsRemaining = 0;
+    }
     bool AdvanceGeneratedRewardAvengeRefresh() noexcept
     {
         return generatedRewardAvengeRefresh &&
@@ -631,6 +663,10 @@ class Season14State
     //! Three Wishes is a persistent three-charge hero power.
     std::int32_t threeWishesRemaining = 3;
     std::int32_t buddyExtraHeroPowerUses = 0;
+    //! Shadow Warden arms the next one/two successful targeted hero powers
+    //! to make their selected minion golden.  This is player-owned state,
+    //! independent of the ordinary extra-use counter.
+    std::int32_t buddyGoldenHeroPowerUses = 0;
     //! Legacy Buddy lifecycle counters.  These are player-owned so combat
     //! copies cannot leak state across lobbies or recruit/combat boundaries.
     std::int32_t chromieRefreshesThisTurn = 0;
@@ -640,6 +676,16 @@ class Season14State
     std::int32_t imperialDefenderCopiesUsed = 0;
     void EnableBuddyExtraHeroPowerUses(std::int32_t n) noexcept { buddyExtraHeroPowerUses = std::max(buddyExtraHeroPowerUses, n); }
     void ResetBuddyExtraHeroPowerUses() noexcept { buddyExtraHeroPowerUses = 0; }
+    void ArmBuddyGoldenHeroPowerUses(std::int32_t n) noexcept
+    {
+        if (n > 0) buddyGoldenHeroPowerUses += n;
+    }
+    bool ConsumeBuddyGoldenHeroPowerUse() noexcept
+    {
+        if (buddyGoldenHeroPowerUses <= 0) return false;
+        --buddyGoldenHeroPowerUses;
+        return true;
+    }
     bool powerOfStormActive = false;
     std::int32_t luckyRollCooldown = 0;
 
@@ -666,6 +712,44 @@ class Season14State
     //! Persistent +1/+1 earned by Tentacular's combat-start Tentacle per sale.
     std::int32_t tentacularBonus = 0;
     std::int32_t embraceElementDbfID = 0;
+    //! Spirit Raptor payloads keyed by stable minion entity identity.
+    std::vector<std::pair<std::uint64_t, std::vector<std::int32_t>>> spiritRaptorElements;
+    //! Nine Frogs purchase charges keyed by the concrete Buddy entity.  The
+    //! key prevents duplicate copies from sharing the printed (9 left)
+    //! counter and keeps combat/sale lifecycles isolated.
+    std::vector<std::pair<std::uint64_t, std::int32_t>> nineFrogsPurchasesRemaining;
+    void ForgetNineFrogs(std::uint64_t entityID) noexcept
+    {
+        nineFrogsPurchasesRemaining.erase(
+            std::remove_if(nineFrogsPurchasesRemaining.begin(),
+                           nineFrogsPurchasesRemaining.end(),
+                           [entityID](const auto& entry) {
+                               return entry.first == entityID;
+                           }),
+            nineFrogsPurchasesRemaining.end());
+    }
+    //! Triple formation creates a fresh golden Buddy identity. Its printed
+    //! counter is nine even when a normal source copy had already fired, so
+    //! discard source records before arming the surviving entity.
+    void ResetNineFrogs(std::uint64_t entityID, std::int32_t charges = 9)
+    {
+        ForgetNineFrogs(entityID);
+        nineFrogsPurchasesRemaining.emplace_back(entityID, charges);
+    }
+    //! A Raptor's memory belongs to that concrete minion instance.  Remove
+    //! it when the instance leaves the recruit board without a combat
+    //! death (for example, a sale), so entity state cannot leak to a later
+    //! card lifecycle.
+    void ForgetSpiritRaptor(std::uint64_t entityID) noexcept
+    {
+        spiritRaptorElements.erase(
+            std::remove_if(spiritRaptorElements.begin(),
+                           spiritRaptorElements.end(),
+                           [entityID](const auto& entry) {
+                               return entry.first == entityID;
+                           }),
+            spiritRaptorElements.end());
+    }
     std::int32_t murlocRewardSells = 0;
     std::int32_t murlocRewardsRemaining = 5;
     std::int32_t battlecryRewardBuys = 0;
@@ -727,6 +811,10 @@ class Season14State
     //! Hooks for effects whose entity behavior is implemented elsewhere.
     bool lockboxActive = false;
     std::int32_t lockboxAdvance = 0;
+    // Remaining recruit starts before the active Lockbox opens.  Keeping the
+    // countdown in Season14State makes portrait and minion sources replayable
+    // and prevents a duplicate source from creating a second box.
+    std::int32_t lockboxTurnsRemaining = 0;
     bool fishbaitActive = false;
     //! DBF ID of Fishbait generated by the latest Snarky Shark sale.
     std::int32_t fishbaitDbfID = 0;
@@ -754,6 +842,9 @@ class Season14State
     //! card-power task graph inside itself.
     std::vector<std::optional<Minion>> pendingExactCopySnapshots;
     std::vector<Minion> combatDeadMinions;
+    //! Boom Controller's first friendly Mech death is retained until the
+    //! post-death boundary has room to summon its exact combat copy.
+    std::optional<Minion> boomControllerFirstMech;
     void RecordCombatDeadMinion(const Minion& minion) { combatDeadMinions.push_back(minion); }
     //! Returns plain copies of the first matching combat deaths.  History is
     //! intentionally non-consuming: multiple Kangor deathrattles each refer
@@ -761,6 +852,15 @@ class Season14State
     std::vector<Minion> TakeCombatDeadMinions(Race race, std::size_t count);
     std::optional<Minion> CopyLastCombatDeadMinion() const;
     void ClearCombatDeadMinions() noexcept { combatDeadMinions.clear(); }
+    void RecordBoomControllerMech(const Minion& minion)
+    {
+        if (!boomControllerFirstMech.has_value()) boomControllerFirstMech = minion;
+    }
+    const std::optional<Minion>& BoomControllerFirstMech() const noexcept
+    {
+        return boomControllerFirstMech;
+    }
+    void ClearBoomControllerMech() noexcept { boomControllerFirstMech.reset(); }
     std::size_t CountCombatDeadMinions(Race race) const noexcept
     {
         return static_cast<std::size_t>(std::count_if(
@@ -788,6 +888,10 @@ class Season14State
     //! turn; -1 means normal tier-independent cost handling.
     std::int32_t temporaryMinionPurchaseCost = -1;
     std::int32_t minionsPlayedThisTurn = 0;
+    //! Card identities played this recruit turn, used by Jandice's
+    //! Apprentice.  This is deliberately reset at the recruit boundary and
+    //! is not a lifetime/stat counter.
+    std::vector<std::string> repeatedPlayCardIDs;
     std::int32_t progressiveAvengeAttack = 1;
     std::int32_t progressiveAvengeHealth = 1;
     std::int32_t battlecriesTriggered = 0;
@@ -830,6 +934,7 @@ class Season14State
     std::int32_t futureBallerAttack = 0;
     std::int32_t futureBallerHealth = 0;
     std::int32_t trinketExtraShopSlots = 0;
+    std::int32_t magneticMechPurchaseCostDiscount = 0;
     // Some Trinkets set a target Tavern size rather than adding a flat
     // number of offers (Felbat Portrait keeps seven offers at every tier).
     std::int32_t trinketMinimumShopSlots = 0;
@@ -872,6 +977,10 @@ class Season14State
     //! offer to the following recruit start.  This is player-owned rather
     //! than a global turn flag so duplicate/replayed players cannot leak it.
     bool ornateClockGreaterNextTurn = false;
+    //! Mysterious Orb forces the next valid Trinket offer to be Lesser.
+    //! This remains armed across a blocked/full modal boundary and is
+    //! cleared only after the offer has been committed to pending state.
+    bool mysteriousOrbLesserNext = false;
     //! Per-trigger counters for refresh/self-damage Trinket families.  These
     //! are intentionally player state rather than card-instance locals so a
     //! refresh cannot reset progress or make a replay depend on pointers.
@@ -1026,7 +1135,7 @@ class Season14State
     void ExpireFirstKillCopy() noexcept;
 
     //! Returns the one-time attack bonus for the next minion purchase.
-    std::int32_t OnBuyMinionBatch4();
+    Season14HeroPowerBatch4Result OnBuyMinionBatch4();
 
     //! Applies a successfully played Elemental to hero-power state.
     Season14HeroPowerBatch2Result OnPlayElemental();
@@ -1042,6 +1151,12 @@ class Season14State
 
     //! Returns the effective cost of buying a minion under passive auras.
     std::int32_t MinionPurchaseCost(std::int32_t baseCost) const;
+    //! Electrode Attractor sets Magnetic Mech purchases to exactly 2 Gold.
+    //! This is an absolute cost aura, so multiple copies do not stack down.
+    bool HasMagneticMechFixedCost() const noexcept
+    { return magneticMechPurchaseCostDiscount > 0; }
+    std::int32_t MagneticMechPurchaseCostDiscount() const noexcept
+    { return magneticMechPurchaseCostDiscount; }
     void SetTemporaryMinionPurchaseCost(std::int32_t cost) noexcept
     {
         temporaryMinionPurchaseCost = cost < 0 ? -1 : cost;
@@ -1248,6 +1363,16 @@ class Season14State
     {
         ++minionsPlayedThisTurn;
         if (battlecry) ++battlecriesTriggered;
+    }
+    bool WasMinionPlayedThisTurn(std::string_view cardID) const noexcept
+    {
+        return std::find(repeatedPlayCardIDs.begin(), repeatedPlayCardIDs.end(),
+                         cardID) != repeatedPlayCardIDs.end();
+    }
+    void RecordRepeatedPlayCard(std::string_view cardID)
+    {
+        if (!WasMinionPlayedThisTurn(cardID))
+            repeatedPlayCardIDs.emplace_back(cardID);
     }
     void RecordBattlecry() noexcept { ++battlecriesTriggered; }
     int RecordGoldSpent(std::int32_t amount) noexcept;

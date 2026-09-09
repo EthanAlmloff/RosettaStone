@@ -10,6 +10,7 @@
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch8.hpp>
+#include <Rosetta/Battlegrounds/CardSets/BuddyBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/QuilboarBloodGolemDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomTavernSpellToHandTask.hpp>
@@ -31,6 +32,32 @@ namespace RosettaStone::Battlegrounds
 {
 namespace
 {
+void ApplyEmbraceElement(Player& owner, FieldZone& friendly, FieldZone& enemy,
+                         std::int32_t element)
+{
+    if (element == 79721) {
+        std::vector<Minion*> candidates;
+        friendly.ForEachAlive([&](MinionData& data) { candidates.push_back(&data.value()); });
+        Random::shuffle(candidates.begin(), candidates.end());
+        for (std::size_t i = 0; i < std::min<std::size_t>(4, candidates.size()); ++i)
+            candidates[i]->SetEarthElementalDeathrattle(true);
+    } else if (element == 79722) {
+        Minion* left = nullptr;
+        friendly.ForEachAlive([&](MinionData& data) { if (left == nullptr) left = &data.value(); });
+        if (left != nullptr) left->SetAttack(left->GetAttack() * 2);
+    } else if (element == 79723) {
+        Minion* right = nullptr;
+        friendly.ForEachAlive([&](MinionData& data) { right = &data.value(); });
+        if (right != nullptr) { right->SetHealth(right->GetHealth() + 3); right->SetTaunt(true); }
+    } else if (element == 79724) {
+        std::vector<Minion*> candidates;
+        enemy.ForEachAlive([&](MinionData& data) { candidates.push_back(&data.value()); });
+        Random::shuffle(candidates.begin(), candidates.end());
+        for (std::size_t i = 0; i < std::min<std::size_t>(5, candidates.size()); ++i)
+            candidates[i]->SetHealth(candidates[i]->GetHealth() - 1);
+    }
+}
+
 struct AttackingStateGuard
 {
     Minion& minion;
@@ -130,6 +157,8 @@ Battle::Battle(Player& player1, Player& player2)
     m_player2.season14.ClearCombatExactCopySnapshots();
     m_player1.season14.ClearCombatDeadMinions();
     m_player2.season14.ClearCombatDeadMinions();
+    m_player1.season14.ClearBoomControllerMech();
+    m_player2.season14.ClearBoomControllerMech();
     m_player1.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
     m_player2.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
     m_player1.battleField = m_player1.recruitField;
@@ -382,7 +411,34 @@ void Battle::CommitPersistentState()
             });
             if (combat != nullptr)
             {
+                // Sr. Tomb Diver (and other permanent goldenization effects)
+                // changes the combat copy's card identity. Reconcile that
+                // identity back to the recruit entity; otherwise the effect
+                // appears to work during combat but silently reverts at the
+                // next recruit phase. Temporary golden conversions are
+                // deliberately excluded and expire through their normal
+                // lifecycle.
+                if (combat->IsGolden() && !combat->IsTemporarilyGolden() &&
+                    !recruit.IsGolden() && recruit.CanMakeGolden())
+                    (void)recruit.MakeGolden();
                 recruit.ReconcileCombatPersistentState(*combat);
+                // Goldrinn's Soul of the Beast lasts through combat and
+                // expires at the next recruit start. Temporary combat deltas
+                // normally do not reconcile; transfer only marked Goldrinn
+                // occurrences to the recruit copy.
+                const auto& temporary = combat->GetTemporaryEnchantments();
+                const auto goldrinn = std::count_if(
+                    temporary.begin(), temporary.end(),
+                    [](const std::string& id) { return id == "BGS_018e"; });
+                if (goldrinn > 0)
+                {
+                    recruit.ApplyTemporaryEnchantment(
+                        Minion::TemporaryEnchantment::Stats,
+                        static_cast<int>(goldrinn) * 8,
+                        static_cast<int>(goldrinn) * 8);
+                    for (int i = 0; i < goldrinn; ++i)
+                        recruit.RecordTemporaryEnchantmentOccurrence("BGS_018e");
+                }
                 if (combat->IsPoetCombatEligible()) {
                     const int attackGain = std::max(0, combat->GetAttack() - combat->PoetCombatAttack()) * combat->PoetCombatMultiplier();
                     const int healthGain = std::max(0, combat->GetHealth() - combat->PoetCombatHealth()) * combat->PoetCombatMultiplier();
@@ -591,28 +647,8 @@ void Battle::Initialize()
 
     const auto resolveEmbrace = [](Player& owner, FieldZone& friendly,
                                    FieldZone& enemy) {
-        const auto element = owner.season14.embraceElementDbfID;
-        if (element == 79721) {
-            std::vector<Minion*> candidates;
-            friendly.ForEachAlive([&](MinionData& data) { candidates.push_back(&data.value()); });
-            Random::shuffle(candidates.begin(), candidates.end());
-            for (std::size_t i = 0; i < std::min<std::size_t>(4, candidates.size()); ++i)
-                candidates[i]->SetEarthElementalDeathrattle(true);
-        } else if (element == 79722) {
-            Minion* left = nullptr;
-            friendly.ForEachAlive([&](MinionData& data) { if (left == nullptr) left = &data.value(); });
-            if (left != nullptr) left->SetAttack(left->GetAttack() * 2);
-        } else if (element == 79723) {
-            Minion* right = nullptr;
-            friendly.ForEachAlive([&](MinionData& data) { right = &data.value(); });
-            if (right != nullptr) { right->SetHealth(right->GetHealth() + 3); right->SetTaunt(true); }
-        } else if (element == 79724) {
-            std::vector<Minion*> candidates;
-            enemy.ForEachAlive([&](MinionData& data) { candidates.push_back(&data.value()); });
-            Random::shuffle(candidates.begin(), candidates.end());
-            for (std::size_t i = 0; i < std::min<std::size_t>(5, candidates.size()); ++i)
-                candidates[i]->SetHealth(candidates[i]->GetHealth() - 1);
-        }
+        ApplyEmbraceElement(owner, friendly, enemy,
+                            owner.season14.embraceElementDbfID);
     };
     resolveEmbrace(m_player1, m_p1Field, m_p2Field);
     resolveEmbrace(m_player2, m_p2Field, m_p1Field);
@@ -1702,6 +1738,10 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 aliveMinion.value().ActivateTrigger(TriggerType::DEATH, minion);
             });
 
+            // Scrapsmith Portrait is owner-scoped: only the owner of the
+            // friendly Taunt death receives a permanent Gem on Scrapsmiths.
+            if (minion.HasTaunt()) owner.ResolveScrapsmithPortraitDeath(minion);
+
             minion.SetLastFieldPos(minion.GetZonePosition());
             removedMinion = m_p1Field.Remove(minion);
         }
@@ -1733,8 +1773,28 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 aliveMinion.value().ActivateTrigger(TriggerType::DEATH, minion);
             });
 
+            if (minion.HasTaunt()) owner.ResolveScrapsmithPortraitDeath(minion);
+
             minion.SetLastFieldPos(minion.GetZonePosition());
             removedMinion = m_p2Field.Remove(minion);
+        }
+
+        // Boom Controller snapshots the first friendly Mech only after the
+        // authoritative removal, but before any later deathrattle mutates the
+        // instance.  Its copy is resolved at the completed death boundary.
+        if (removedMinion.HasRace(Race::MECHANICAL)) {
+            Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+            const bool hasBoomController = std::any_of(
+                owner.season14.trinkets.begin(), owner.season14.trinkets.end(),
+                [](const Season14PersistentEffect& trinket) {
+                    return trinket.active && trinket.remainingUses != 0 &&
+                           trinket.triggerProgress == 0 &&
+                           FindTrinketBehavior(
+                               Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
+                               TrinketEffect::BOOM_CONTROLLER_FIRST_MECH_COPY;
+                });
+            if (hasBoomController)
+                owner.season14.RecordBoomControllerMech(removedMinion);
         }
 
         // Elementium Squirrel Bomb resolves after its source is removed. The
@@ -1925,6 +1985,30 @@ void Battle::ProcessDestroy(bool beforeAttack)
             }
             owner.ResolveGeneratedQuestRewardDeath(removedMinion);
             ++owner.season14.deathrattlesTriggered;
+            // Blood Amulet plays three permanent Blood Gems on distinct
+            // random friendly minions after the Deathrattle boundary.  Build
+            // the candidate list after the Deathrattle so summons/removals
+            // are reflected, and consume one owned instance independently.
+            for (auto& trinket : owner.season14.trinkets)
+            {
+                if (!trinket.active || trinket.remainingUses == 0) continue;
+                const auto behavior = FindTrinketBehavior(
+                    Cards::FindCardByDbfID(trinket.dbfID).id);
+                if (behavior.effect != TrinketEffect::AFTER_DEATHRATTLE_BLOOD_GEMS)
+                    continue;
+                std::vector<Minion*> candidates;
+                owner.battleField.ForEachAlive([&candidates](MinionData& data) {
+                    candidates.push_back(&data.value());
+                });
+                const auto count = std::min<int>(behavior.amount,
+                                                 static_cast<int>(candidates.size()));
+                for (int i = 0; i < count; ++i)
+                {
+                    const auto index = Random::get(0, static_cast<int>(candidates.size()) - 1);
+                    owner.ApplyBloodGemTo(*candidates[static_cast<std::size_t>(index)]);
+                    candidates.erase(candidates.begin() + index);
+                }
+            }
             for (auto& trinket : owner.season14.trinkets)
             {
                 if (!trinket.active || trinket.remainingUses == 0) continue;
@@ -1992,18 +2076,24 @@ void Battle::ProcessDestroy(bool beforeAttack)
         // Sr. Tomb Diver resolves after the deathrattle event has selected
         // and removed its source, so the live board order is authoritative.
         // The golden form upgrades the two right-most survivors.
-        if (removedMinion.GetCardID() == "TB_BaconShop_HERO_41_Buddy" ||
-            removedMinion.GetCardID() == "TB_BaconShop_HERO_41_Buddy_G") {
+        for (const auto& definition : BUDDY_RIGHTMOST_GOLDENIZE_BEHAVIORS) {
+            if (removedMinion.GetCardID() != definition.id) continue;
             std::vector<Minion*> survivors;
             owner.battleField.ForEachAlive([&survivors](MinionData& data) {
-                survivors.push_back(&data.value());
+                // "Right-most" is restricted to minions the effect can
+                // actually convert. A pre-existing Golden minion must not
+                // consume one of the normal/golden Buddy's target slots and
+                // thereby prevent an eligible minion further left from being
+                // selected.
+                if (data.value().CanMakeGolden())
+                    survivors.push_back(&data.value());
             });
-            const int count = removedMinion.GetCardID().ends_with("_G") ? 2 : 1;
-            for (int i = 0; i < count && !survivors.empty(); ++i) {
+            for (int i = 0; i < definition.targets && !survivors.empty(); ++i) {
                 Minion* target = survivors.back();
                 survivors.pop_back();
                 target->MakeGolden();
             }
+            break;
         }
 
         // Fish of N'Zoth gains the just-resolved friendly deathrattle twice.
@@ -2144,6 +2234,31 @@ void Battle::ProcessDestroy(bool beforeAttack)
             removedMinion.SetEarthElementalDeathrattle(false);
         }
 
+        if (removedMinion.GetCardID() == "BG22_HERO_001_Buddy" ||
+            removedMinion.GetCardID() == "BG22_HERO_001_Buddy_G") {
+            Player& owner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+            FieldZone& ownerField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
+            FieldZone& enemyField = std::get<0>(deadMinion) == 1 ? m_p2Field : m_p1Field;
+            const auto key = static_cast<std::uint64_t>(removedMinion.GetIndex());
+            const auto it = std::find_if(owner.season14.spiritRaptorElements.begin(),
+                                         owner.season14.spiritRaptorElements.end(),
+                                         [key](const auto& entry) { return entry.first == key; });
+            const auto definition = std::find_if(
+                BUDDY_ELEMENT_MEMORY_BEHAVIORS.begin(),
+                BUDDY_ELEMENT_MEMORY_BEHAVIORS.end(),
+                [&](const auto& candidate) {
+                    return candidate.id == removedMinion.GetCardID();
+                });
+            const int replay = definition == BUDDY_ELEMENT_MEMORY_BEHAVIORS.end()
+                                   ? 0 : definition->replayCount;
+            if (it != owner.season14.spiritRaptorElements.end()) {
+                for (const auto element : it->second)
+                    for (int n = 0; n < replay; ++n)
+                        ApplyEmbraceElement(owner, ownerField, enemyField, element);
+                owner.season14.spiritRaptorElements.erase(it);
+            }
+        }
+
         if (removedMinion.HasReborn())
         {
             FieldZone& ownerField =
@@ -2262,7 +2377,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
         }
         const auto trinketAvenger = owner.season14.OnTrinketFriendlyMinionDied();
         if (trinketAvenger.attack != 0 || trinketAvenger.health != 0 ||
-            trinketAvenger.summonBeetles > 0)
+            trinketAvenger.summonBeetles > 0 ||
+            trinketAvenger.transferRightmostAttackToDragon)
         {
             ApplyPermanentAvengeBonus(
                 owner, combatField, trinketAvenger.attack,
@@ -2296,6 +2412,44 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     alive.value().ActivateTrigger(TriggerType::SUMMON, summoned);
                 });
                 owner.ApplySummonTrinkets(summoned);
+            }
+        }
+        owner.ResolveBoomController(combatField);
+        // Cloud Serpent Horn resolves after the complete death boundary:
+        // choose the current right-most surviving friendly minion as the
+        // source, then a different friendly Dragon as the recipient.  The
+        // printed "Give the Attack" copies the source's current Attack; it
+        // does not drain the source.  Resolve once per triggered Horn copy.
+        // Both entities are combat copies, so commit only the granted Attack
+        // to the matching recruit entity; no hidden target or future board
+        // state is consulted.
+        for (std::int32_t transfer = 0;
+             transfer < trinketAvenger.transferRightmostAttackToDragon;
+             ++transfer) {
+            Minion* source = nullptr;
+            std::vector<Minion*> dragons;
+            combatField.ForEachAlive([&](MinionData& data) {
+                auto& minion = data.value();
+                source = &minion;
+                if (minion.HasRace(Race::DRAGON)) dragons.push_back(&minion);
+            });
+            if (source != nullptr && source->GetAttack() > 0) {
+                dragons.erase(
+                    std::remove(dragons.begin(), dragons.end(), source),
+                    dragons.end());
+                if (!dragons.empty()) {
+                    Minion* target =
+                        dragons[Random::get<std::size_t>(0, dragons.size() - 1)];
+                    const int attack = source->GetAttack();
+                    target->SetAttack(target->GetAttack() + attack);
+                    const auto targetIndex = target->GetIndex();
+                    owner.recruitField.ForEachAlive(
+                        [targetIndex, attack](MinionData& data) {
+                            auto& recruit = data.value();
+                            if (recruit.GetIndex() == targetIndex)
+                                recruit.SetAttack(recruit.GetAttack() + attack);
+                        });
+                }
             }
         }
         }

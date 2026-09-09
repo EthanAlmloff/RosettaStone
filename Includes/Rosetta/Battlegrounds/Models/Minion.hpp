@@ -253,6 +253,10 @@ class Minion
     //! Replaces card identity while preserving this instance's zone, stats,
     //! callbacks, and mutable keyword state.
     bool TransformTo(Card replacement);
+    //! Replaces card identity while retaining all instance enchantments and
+    //! provenance.  This is used by effects whose text explicitly says that
+    //! copied minions keep enchantments.
+    bool TransformToKeepingInstanceState(Card replacement);
 
     //! Returns the value of attack.
     //! \return The value of attack.
@@ -346,6 +350,8 @@ class Minion
     //! The payload is still owned by the typed temporary-state fields above;
     //! this identity is retained for replay/observation and auditability.
     void RecordTemporaryEnchantment(std::string_view enchantmentID);
+    //! Records one additional application of a stackable child lifecycle.
+    void RecordTemporaryEnchantmentOccurrence(std::string_view enchantmentID);
     bool HasTemporaryEnchantment(std::string_view enchantmentID) const;
     const std::vector<std::string>& GetTemporaryEnchantments() const noexcept
     {

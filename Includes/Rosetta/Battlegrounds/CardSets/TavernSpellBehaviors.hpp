@@ -49,6 +49,7 @@ enum class TavernSpellEffect
     NEXT_COMBAT_REWARD,
     TARGET_NEXT_COMBAT_BUFF,
     TARGET_STATS_NEXT_TURN,
+    ALL_STATS_NEXT_TURN,
     TAVERN_SPELL_STATS_PERMANENT,
     RANDOM_STAT_TAVERN_SPELL,
     TARGET_RANDOM_RACE_KEYWORD,
@@ -179,6 +180,11 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     if (id == "BG33_Reward_006t") return { 0, 0, 0, TavernSpellEffect::TARGET_DIVINE_SHIELD_AND_WINDFURY };
     if (id == "BG33_Reward_012t") return { 0, 0, 0, TavernSpellEffect::GAIN_GOLD,
                                                Race::INVALID, 0, 5 };
+    // Maw Caster Portrait's exact generated Coin Pouch from the pinned
+    // snapshot. Keep the token identity/payload explicit so the portrait
+    // cannot silently substitute an arbitrary gold delta.
+    if (id == "BG32_MagicItem_205t") return { 0, 0, 0, TavernSpellEffect::GAIN_GOLD,
+                                               Race::INVALID, 0, 3 };
     if (id == "BG31_924t") return { 0, 1, 1, TavernSpellEffect::TARGET_STATS };
     if (id == "BG31_924_Gt") return { 0, 2, 2, TavernSpellEffect::TARGET_STATS };
     if (id == "BG26_501t") return { 0, 0, 0, TavernSpellEffect::TARGET_STATS };
@@ -247,6 +253,8 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     {
         return { 0, 1, 2, TavernSpellEffect::RANDOM_STATS, Race::INVALID, 4 };
     }
+    if (id == "BG33_112") // Haunted Carapace: your minions +3/+1 until next turn.
+        return { 0, 3, 1, TavernSpellEffect::ALL_STATS_NEXT_TURN };
 
     // Patch 36.4 bounded target/stat batch. These effects use the existing
     // minion stat and race primitives; target selection is supplied by the

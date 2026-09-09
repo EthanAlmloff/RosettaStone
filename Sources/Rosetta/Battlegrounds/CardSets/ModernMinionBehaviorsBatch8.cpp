@@ -144,15 +144,15 @@ void AddMoltenRock(std::map<std::string, CardDef>& cards, const char* id,
 void ModernMinionBehaviorsBatch8::AddAll(
     std::map<std::string, CardDef>& cards)
 {
-    // Goldrinn, the Great Wolf: Deathrattle: Give your Beasts +5/+5;
-    // TB_BaconUps_085 is the linked golden entity and gives +10/+10.  The
+    // Goldrinn, the Great Wolf: Deathrattle: Give your Beasts +8/+8;
+    // TB_BaconUps_085 is the linked golden entity and gives +16/+16.  The
     // pinned HearthstoneJSON snapshot omits the generated golden enchantment
     // record, so apply the pinned normal enchantment twice for the golden
     // form instead of referring to an unresolvable ID.
     AddRaceDeathrattleBuff(cards, "BGS_018", "BGS_018e", Race::BEAST);
     AddRaceDeathrattleBuff(cards, "TB_BaconUps_085", "BGS_018e", Race::BEAST,
                            2);
-    AddStatEnchantment(cards, "BGS_018e", 5, 5);
+    AddStatEnchantment(cards, "BGS_018e", 8, 8);
 
     // Ichoron grants the played Elemental the exact pinned child identity.
     // The normal child expires at the next recruit turn; the golden child is

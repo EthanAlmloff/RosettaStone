@@ -49,6 +49,8 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BG25_HERO_103_Buddy_G");
     AddStatic(cards, "BG26_HERO_104_Buddy");
     AddStatic(cards, "BG26_HERO_104_Buddy_G");
+    AddStatic(cards, "TB_BaconShop_HERO_62_Buddy");
+    AddStatic(cards, "TB_BaconShop_HERO_62_Buddy_G");
     // Eternal Knight's stats are maintained by authoritative death
     // processing in Battle.cpp; register both pool entities so its dynamic
     // wherever-this-is aura is not mistaken for unsupported content.
@@ -110,14 +112,10 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     // from entering the pool while that modal is pending.
     AddStatic(cards, "BG34_639");
     AddStatic(cards, "BG34_639_G");
-    AddStatic(cards, "BG31_320");
-    AddStatic(cards, "BG31_320_G");
     AddStatic(cards, "BG31_323");
     AddStatic(cards, "BG31_323_G");
     AddStatic(cards, "BG31_327");
     AddStatic(cards, "BG31_327_G");
-    AddStatic(cards, "BG32_237");
-    AddStatic(cards, "BG32_237_G");
     AddStatic(cards, "BG32_873"); AddStatic(cards, "BG32_873_G");
     AddStatic(cards, "BG34_322"); AddStatic(cards, "BG34_322_G");
     // Karl the Lost buffs friendly Divine Shield minions after a successful
@@ -296,5 +294,7 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BGS_119");    // Crackling Cyclone, DS/Windfury
     AddStatic(cards, "BGS_131");    // Deadly Spore, Venomous
     AddStatic(cards, "BG_BOT_911"); // Annoy-o-Module, DS/Taunt
+    AddStatic(cards, "BG22_HERO_001_Buddy");
+    AddStatic(cards, "BG22_HERO_001_Buddy_G");
 }
 }  // namespace RosettaStone::Battlegrounds

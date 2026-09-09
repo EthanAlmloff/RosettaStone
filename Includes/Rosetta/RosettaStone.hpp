@@ -250,6 +250,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberEndTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RepeatNumberStartTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SetGameTagTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SkyGolemPortraitDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastAdjacentBloodGemTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastOnSelfHealthTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SpellCastSelfScalingTask.hpp>

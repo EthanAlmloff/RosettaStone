@@ -18,6 +18,11 @@ bool IsLeapfroggerChild(std::string_view cardID)
 {
     return cardID == "BG21_000e" || cardID == "BG21_000_Ge";
 }
+
+bool IsGoldrinnChild(std::string_view cardID)
+{
+    return cardID == "BGS_018e";
+}
 }
 
 FriendlyRaceEnchantmentTask::FriendlyRaceEnchantmentTask(
@@ -50,6 +55,36 @@ TaskStatus FriendlyRaceEnchantmentTask::Run(
                    *candidates[index], m_cardID)
                    ? TaskStatus::COMPLETE
                    : TaskStatus::STOP;
+    }
+
+    // Goldrinn's normal and golden parents both use the canonical Soul of
+    // the Beast child.  The golden parent invokes this task twice; route
+    // each application through the typed lifecycle gate so the +8/+8 payload
+    // and next-turn expiry are retained without losing child provenance.
+    if (IsGoldrinnChild(m_cardID))
+    {
+        bool applied = false;
+        player.GetField().ForEachAlive(
+            [this, &source, &applied](MinionData& data) {
+                Minion& minion = data.value();
+                const bool isSource = &minion == &source ||
+                                      (source.GetPoolIndex() >= 0 &&
+                                       minion.GetPoolIndex() == source.GetPoolIndex()) ||
+                                      (source.GetIndex() >= 0 &&
+                                       minion.GetIndex() == source.GetIndex());
+                if (minion.HasRace(m_race) &&
+                    (!m_excludeSource || !isSource))
+                {
+                    const bool resolved = ApplyReviewedLifecycleEnchantment(
+                        minion, "BGS_018", m_cardID,
+                        Minion::TemporaryEnchantment::Stats, 8, 8);
+                    if (resolved) {
+                        minion.RecordTemporaryEnchantmentOccurrence(m_cardID);
+                        applied = true;
+                    }
+                }
+            });
+        return applied ? TaskStatus::COMPLETE : TaskStatus::STOP;
     }
 
     Card enchantmentCard = Cards::FindCardByID(m_cardID);

@@ -34,5 +34,27 @@ void ModernMinionBehaviorsBatch36::AddAll(
     cards.emplace("BG36_341_Gt", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
     cards.emplace("BG36_341t2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
     cards.emplace("BG36_341_Gt2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+
+    // These older Choose One minions use the same public modal state machine
+    // as the Season 14 sources above.  Register both normal and golden
+    // generated options so replay validation cannot reject a valid choice.
+    cards.emplace("BG31_320", CardDef{CardLifecycle::CHOOSE_ONE_SOURCE});
+    cards.emplace("BG31_320_G", CardDef{CardLifecycle::CHOOSE_ONE_SOURCE});
+    cards.emplace("BG31_320t", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG31_320_Gt", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG31_320t2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG31_320_Gt2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG32_237", CardDef{CardLifecycle::CHOOSE_ONE_SOURCE});
+    cards.emplace("BG32_237_G", CardDef{CardLifecycle::CHOOSE_ONE_SOURCE});
+    cards.emplace("BG32_237t", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG32_237_Gt", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG32_237t2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG32_237_Gt2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG36_332", CardDef{CardLifecycle::CHOOSE_ONE_SOURCE});
+    cards.emplace("BG36_332_G", CardDef{CardLifecycle::CHOOSE_ONE_SOURCE});
+    cards.emplace("BG36_332t", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG36_332_Gt", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG36_332t2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
+    cards.emplace("BG36_332_Gt2", CardDef{CardLifecycle::CHOOSE_ONE_OPTION});
 }
 }  // namespace RosettaStone::Battlegrounds

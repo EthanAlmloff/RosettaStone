@@ -6,6 +6,8 @@
 
 #include <Rosetta/Battlegrounds/Models/Hero.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
+#include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 
 #include <algorithm>
 

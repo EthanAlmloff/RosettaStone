@@ -36,6 +36,13 @@ bool ApplyReviewedLifecycleEnchantment(Minion& target,
                                        Minion::TemporaryEnchantment payload,
                                        int attack = 0, int health = 0);
 
+//! Apply a reviewed child whose card-data identity is itself the lifecycle
+//! record.  The registry owns the child identity and typed payload together;
+//! callers must not recreate the temporary keyword/stat semantics locally.
+bool ApplyReviewedTemporaryChildEnchantment(Minion& target,
+                                            std::string_view childID,
+                                            int attack = 0, int health = 0);
+
 //! Record a reviewed child when its payload is owned by another state
 //! machine (for example a next-combat reward), so applying it here would
 //! double-count stats.

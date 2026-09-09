@@ -30,8 +30,38 @@ TEST_CASE("[ModernTokenBehaviorsBatch70] generated rows are registered")
              "TB_BaconShop_HERO_92_Buddy_G", "TB_BaconShop_HERO_53_Buddy",
              "TB_BaconShop_HERO_53_Buddy_G", "TB_BaconShop_HERO_76_Buddy",
              "TB_BaconShop_HERO_76_Buddy_G", "TB_BaconUps_045",
-             "TB_BaconUps_089"})
+             "TB_BaconUps_089", "TB_BaconShop_HERO_74_Buddy",
+             "TB_BaconShop_HERO_74_Buddy_G"})
         CHECK(cards.contains(id));
+}
+
+TEST_CASE("[ModernTokenBehaviorsBatch70] Evergreen Botani tier-hand Buddy is lifecycle-owned")
+{
+    std::map<std::string, CardDef> cards;
+    ModernTokenBehaviorsBatch70::AddAll(cards);
+    REQUIRE(cards.contains("TB_BaconShop_HERO_74_Buddy"));
+    REQUIRE(cards.contains("TB_BaconShop_HERO_74_Buddy_G"));
+    CHECK(cards.at("TB_BaconShop_HERO_74_Buddy").power.GetBattlecryTask().empty());
+    CHECK(cards.at("TB_BaconShop_HERO_74_Buddy_G").power.GetBattlecryTask().empty());
+
+    const auto normal = std::find_if(
+        BUDDY_TAVERN_TIER_HAND_BEHAVIORS.begin(),
+        BUDDY_TAVERN_TIER_HAND_BEHAVIORS.end(),
+        [](const BuddyTavernTierHandDefinition& definition) {
+            return definition.id == "TB_BaconShop_HERO_74_Buddy";
+        });
+    const auto golden = std::find_if(
+        BUDDY_TAVERN_TIER_HAND_BEHAVIORS.begin(),
+        BUDDY_TAVERN_TIER_HAND_BEHAVIORS.end(),
+        [](const BuddyTavernTierHandDefinition& definition) {
+            return definition.id == "TB_BaconShop_HERO_74_Buddy_G";
+        });
+    REQUIRE(normal != BUDDY_TAVERN_TIER_HAND_BEHAVIORS.end());
+    REQUIRE(golden != BUDDY_TAVERN_TIER_HAND_BEHAVIORS.end());
+    CHECK(normal->dbfID == 77493);
+    CHECK(golden->dbfID == 77541);
+    CHECK(normal->copies == 1);
+    CHECK(golden->copies == 2);
 }
 
 TEST_CASE("[ModernTokenBehaviorsBatch70] premium generated tokens preserve parent paths")

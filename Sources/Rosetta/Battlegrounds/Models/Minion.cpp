@@ -260,7 +260,15 @@ void Minion::MagnetizeOnto(Minion& target) const
     if (target.getPlayerCallback && !target.getPlayerCallback().magnetizationMirrorInProgress) {
         auto& owner = target.getPlayerCallback();
         std::vector<Minion*> mirrors;
-        owner.recruitField.ForEachAlive([&](MinionData& data) {
+        // Combat starts from a copy of recruitField.  A start-of-combat
+        // Magnetize (for example Assembler Portrait) must mirror onto that
+        // combat copy, never onto the persistent recruit board.  Normal
+        // recruit-phase Magnetize still resolves against recruitField.
+        FieldZone* targetField = &owner.recruitField;
+        owner.battleField.ForEachAlive([&](MinionData& data) {
+            if (&data.value() == &target) targetField = &owner.battleField;
+        });
+        targetField->ForEachAlive([&](MinionData& data) {
             auto& candidate = data.value();
             if (&candidate != &target &&
                 (candidate.GetCardID() == "BG26_149" ||
@@ -771,8 +779,16 @@ bool Minion::MergeIntoGolden(const Minion& other)
         m_lastDamageSourceCardID = other.m_lastDamageSourceCardID;
     }
     for (const auto& id : other.m_temporaryEnchantmentIDs)
-        if (std::find(m_temporaryEnchantmentIDs.begin(), m_temporaryEnchantmentIDs.end(), id) == m_temporaryEnchantmentIDs.end())
+    {
+        // Goldrinn occurrences are transferred by Battle::CommitPersistentState
+        // with their stack count; merging one deduplicated marker here would
+        // lose the golden two-trigger amount.
+        if (id == "BGS_018e") continue;
+        if (std::find(m_temporaryEnchantmentIDs.begin(),
+                      m_temporaryEnchantmentIDs.end(), id) ==
+            m_temporaryEnchantmentIDs.end())
             m_temporaryEnchantmentIDs.push_back(id);
+    }
 
     appendDynamic(m_card.power.GetBattlecryTask(), thisBattlecry, baseBattlecry);
     appendDynamic(m_card.power.GetBattlecryTask(), otherBattlecry, baseBattlecry);
@@ -895,6 +911,24 @@ bool Minion::TransformTo(Card replacement)
             default: break;
         }
     }
+    return true;
+}
+
+bool Minion::TransformToKeepingInstanceState(Card replacement)
+{
+    if (replacement.dbfID == 0 || replacement.GetCardType() != CardType::MINION)
+        return false;
+
+    // TransformTo intentionally creates a fresh instance for ordinary
+    // transforms.  Keep a complete snapshot here, then install only the new
+    // card identity/powers so all instance-owned enchantments and counters
+    // survive this special copy operation.
+    Minion preserved = *this;
+    if (!TransformTo(std::move(replacement))) return false;
+    Card transformedCard = std::move(m_card);
+    *this = std::move(preserved);
+    m_card = std::move(transformedCard);
+    m_card.Initialize();
     return true;
 }
 
@@ -1242,6 +1276,12 @@ void Minion::RecordTemporaryEnchantment(std::string_view enchantmentID)
         m_temporaryEnchantmentIDs.emplace_back(enchantmentID);
 }
 
+void Minion::RecordTemporaryEnchantmentOccurrence(std::string_view enchantmentID)
+{
+    if (!enchantmentID.empty())
+        m_temporaryEnchantmentIDs.emplace_back(enchantmentID);
+}
+
 bool Minion::HasTemporaryEnchantment(std::string_view enchantmentID) const
 {
     return std::find(m_temporaryEnchantmentIDs.begin(),
@@ -1580,8 +1620,8 @@ bool Minion::HasAnyValidPlayTargets(Player& player) const
     {
         for (auto& minion : player.tavern.fieldZone.GetAll())
         {
-            if (!minion.IsDestroyed() && !minion.GetCardID().empty() &&
-                m_card.TargetingRequirements(minion))
+            if (!minion.get().IsDestroyed() && !minion.get().GetCardID().empty() &&
+                m_card.TargetingRequirements(minion.get()))
                 return true;
         }
         return false;
@@ -1845,7 +1885,7 @@ void Minion::ActivateTask(PowerType type, Player& player)
 
 void Minion::ActivateTask(PowerType type, Player& player, Minion& target)
 {
-    const auto tasks = GetTasks(type);
+    auto tasks = GetTasks(type);
     ActivateTask(type, player, target, tasks);
 }
 
@@ -1872,6 +1912,10 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target,
     {
         return;
     }
+    // Task::Run is intentionally non-const, while this overload accepts a
+    // shared task list.  Execute mutable copies so dispatch remains valid for
+    // stateful task variants without mutating the source definition.
+    auto taskCopies = tasks;
     if (type == PowerType::POWER)
     {
         player.season14.RecordBattlecry();
@@ -1887,7 +1931,7 @@ void Minion::ActivateTask(PowerType type, Player& player, Minion& target,
             else if (id == "BG25_354_G") repeats += 2;
         });
     }
-    for (auto& task : tasks)
+    for (auto& task : taskCopies)
     {
         if (player.taskStack.isStackingTasks &&
             !std::holds_alternative<SimpleTasks::RepeatNumberEndTask>(task))

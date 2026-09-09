@@ -331097,5 +331097,28 @@
     "set": "SPACE",
     "text": "[x]At the end of your turn,\ndeal 8 damage to the\nenemy hero and 2 damage\nto their minions.",
     "type": "MINION"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 121944,
+    "id": "BG32_MagicItem_205t",
+    "name": "Coin Pouch",
+    "set": "BATTLEGROUNDS",
+    "text": "Gain 3 Gold.",
+    "type": "SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 104436,
+    "id": "BG28_810",
+    "isBattlegroundsPoolSpell": true,
+    "name": "Tavern Coin",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "TAVERN",
+    "techLevel": 1,
+    "text": "Gain 1 Gold.",
+    "type": "BATTLEGROUND_SPELL"
 }
 ]

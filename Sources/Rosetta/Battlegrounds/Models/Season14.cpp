@@ -474,6 +474,8 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     pendingHeroPowerReplayRace = 0;
     pendingPrimalfinDiscoverRemaining = 0;
     pendingPrimalfinDiscoverSourceEntityID = 0;
+    pendingUniqueDiscoverRemaining = 0;
+    pendingUniqueDiscoverSourceCardDbfID = 0;
     heroPowerAvailable = available;
     heroPowerUsed = false;
     luckyRollCooldown = 0;
@@ -503,6 +505,7 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     liftOffMissilePod = false;
     liftOffUltraCapacitor = false;
     heroPowerBatch5 = {};
+    spiritRaptorElements.clear();
     heroPowerBatch6 = {};
     heroPowerBatch7 = {};
     heroPowerBatch8 = {};
@@ -655,6 +658,7 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     liftOffUpgradesBoughtThisTurn = 0;
     liftOffFreeUpgradeAvailable = false;
     soldMinionsThisTurn = 0;
+    repeatedPlayCardIDs.clear();
     temporaryMinionPurchaseCost = -1;
     buddyAvengeDeaths = 0;
     refreshExtraShopSlots = 0;
@@ -673,6 +677,8 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     discoverReplayTargetEntityID = 0;
     pendingPrimalfinDiscoverRemaining = 0;
     pendingPrimalfinDiscoverSourceEntityID = 0;
+    pendingUniqueDiscoverRemaining = 0;
+    pendingUniqueDiscoverSourceCardDbfID = 0;
     if (imprisonedTurns > 0) --imprisonedTurns;
     // Reclaimed Souls' preceding-combat records remain available until its
     // Discover is committed during this recruit phase.
@@ -733,6 +739,14 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
             heroPowerBatch9.prizeChoiceReady = false;
         }
     }
+    // Embrace the Elements is a start-of-combat choice that is refreshed for
+    // every recruit turn.  The initial choice is opened by SelectHero; later
+    // turns must reopen the same four canonical Element offerings so each
+    // invocation can be observed by Spirit Raptor instances on the board.
+    if (heroPowerDbfID == 79720 && pendingDecision == Season14Decision::NONE)
+        BeginOfferingDecision(Season14Decision::CHOICE, 0, 79720,
+                              {{79721, 0}, {79722, 0},
+                               {79723, 0}, {79724, 0}});
     return result;
 }
 
@@ -848,13 +862,13 @@ void Season14State::ExpireFirstKillCopy() noexcept
     firstKillCopyArmed = false;
 }
 
-std::int32_t Season14State::OnBuyMinionBatch4()
+Season14HeroPowerBatch4Result Season14State::OnBuyMinionBatch4()
 {
     Season14HeroPowerBatch4Result result{};
     ResolveSeason14HeroPowerBatch4Event(
         heroPowerDbfID, Season14HeroPowerBatch4Event::BUY_MINION,
         heroPowerBatch4, result);
-    return result.purchaseAttack;
+    return result;
 }
 
 Season14HeroPowerBatch2Result Season14State::OnPlayElemental()
@@ -1335,6 +1349,14 @@ void Season14State::ResetTrinketAvengeProgress() noexcept
             // consumed trigger count when the next combat begins.
             if (behavior.effect == TrinketEffect::AFTER_REBORN_COPY)
                 trinket.triggerProgress = 0;
+            // Boom Controller is a one-shot trigger per combat, not a
+            // lifetime trigger.  ResolveBoomController records consumption
+            // in triggerProgress so a deferred full-board snapshot cannot be
+            // emitted twice in the same combat; clear that marker when the
+            // next combat begins.
+            if (behavior.effect ==
+                TrinketEffect::BOOM_CONTROLLER_FIRST_MECH_COPY)
+                trinket.triggerProgress = 0;
         }
     }
 }
@@ -1393,6 +1415,7 @@ Season14State::OnTrinketFriendlyMinionDied()
         const auto behavior = FindTrinketBehavior(
             Cards::FindCardByDbfID(trinket.dbfID).id);
         if ((behavior.effect != TrinketEffect::AVENGE_MINION_STATS &&
+             behavior.effect != TrinketEffect::AVENGE_RIGHTMOST_ATTACK_TO_DRAGON &&
              behavior.effect != TrinketEffect::AVENGE_SUMMON_BEETLES &&
              behavior.effect != TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK) ||
             behavior.value <= 0) continue;
@@ -1401,6 +1424,12 @@ Season14State::OnTrinketFriendlyMinionDied()
             trinket.triggerProgress = 0;
             if (behavior.effect == TrinketEffect::AVENGE_SUMMON_BEETLES) {
                 result.summonBeetles += behavior.amount;
+                continue;
+            }
+            if (behavior.effect ==
+                TrinketEffect::AVENGE_RIGHTMOST_ATTACK_TO_DRAGON)
+            {
+                ++result.transferRightmostAttackToDragon;
                 continue;
             }
             if (behavior.effect == TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK)
@@ -1459,7 +1488,8 @@ void Season14State::OnTavernSpellResolved(bool spellResolved,
         if (behavior.effect ==
             TrinketEffect::END_TURN_LEFTMOST_MINION_STATS_PER_SPELL)
             ++trinket.triggerProgress;
-        if (spellOnMinion && behavior.effect == TrinketEffect::TAVERN_SPELL_STATS)
+        if (spellOnMinion &&
+            behavior.effect == TrinketEffect::TAVERN_SPELL_IMPROVE_AFTER_MINION_CAST)
         {
             // Honeycomb Ring's improvement lasts only for this recruit turn.
             // The base aura remains in tavernSpell*Bonus; this delta is reset
@@ -1480,14 +1510,26 @@ void Season14State::OnTavernSpellResolved(bool spellResolved,
             trinket.triggerProgress = 0;
             pendingSpellCountGold += behavior.amount > 0 ? behavior.amount : 1;
         }
-        if (behavior.effect == TrinketEffect::SPELL_COUNT_BLOOD_GEMS &&
-            behavior.value > 0 && behavior.amount > 0)
+        if (behavior.effect == TrinketEffect::SPELL_COUNT_TAVERN_SPELL_STATS)
+        {
+            if (behavior.value > 0 && trinket.triggerProgress < behavior.value &&
+                ++trinket.triggerProgress >= behavior.value)
+            {
+                // Keep the owned Trinket visible with progress at the threshold;
+                // the guard makes this improvement one-shot.
+                AddTavernSpellAttackBonus(behavior.attack);
+                AddTavernSpellHealthBonus(behavior.health);
+            }
+        }
+        if (behavior.effect == TrinketEffect::SPELL_COUNT_BLOOD_GEMS)
         {
             // Keep the remainder on this Trinket instance across recruit
             // turns. The loop also makes the invariant correct for any
             // caller that batches successful resolutions. Bloodbound
             // Earrings repeat indefinitely; the printed `(N left!)` counter
             // is this remainder, not a lifetime activation budget.
+            if (behavior.value <= 0 || behavior.amount <= 0)
+                continue;
             ++trinket.triggerProgress;
             while (trinket.triggerProgress >= behavior.value &&
                    trinket.remainingUses > 0)
@@ -1940,6 +1982,9 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
             case TrinketEffect::EXTRA_SHOP_SLOT:
                 trinketExtraShopSlots += behavior.value;
                 break;
+            case TrinketEffect::MAGNETIC_MECH_COST_AND_REFRESH_SLOT:
+                magneticMechPurchaseCostDiscount += behavior.amount;
+                break;
             case TrinketEffect::HIGHER_TIER_REFRESH:
                 ++trinketHigherTierRefreshes;
                 break;
@@ -1962,6 +2007,14 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 trinketImmediateGold += behavior.value;
                 if (card.id == "BG32_MagicItem_271")
                     ornateClockGreaterNextTurn = true;
+                break;
+            case TrinketEffect::IMMEDIATE_GOLD_AND_LESSER_NEXT:
+                // Mysterious Orb's Gold is an acquisition-time payload.  It
+                // must be available during the recruit phase in which the
+                // Orb is selected, rather than being delayed until the next
+                // Game::Recruit boundary (which would make it unusable for
+                // the current turn's purchases).
+                mysteriousOrbLesserNext = true;
                 break;
             case TrinketEffect::ACQUIRE_FIXED_CARD_AND_TAVERN_SLOTS:
                 // The fixed card is granted by Player::AcquireTrinket below;
@@ -2006,11 +2059,19 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 break;
             case TrinketEffect::TAVERN_STATS_PER_SOLD:
                 break;
+            case TrinketEffect::AFTER_BUY_MINION_MAGNETIC_SATELLITE:
+                // Purchase-scoped reward; resolved after a successful buy.
+                break;
             case TrinketEffect::TAVERN_SPELL_GROWING_STATS:
                 AddTavernSpellAttackBonus(behavior.attack);
                 AddTavernSpellHealthBonus(behavior.health);
                 break;
             case TrinketEffect::TAVERN_SPELL_IMPROVE_AFTER_MINION_CAST:
+                // Honeycomb Ring starts with the printed +1/+1 Tavern-spell
+                // aura. Its post-minion-cast improvement is turn-local and
+                // is queued by OnTavernSpellResolved below.
+                AddTavernSpellAttackBonus(behavior.attack);
+                AddTavernSpellHealthBonus(behavior.health);
                 break;
             case TrinketEffect::NEXT_TAVERN_SPELL_DISCOUNT:
                 break;

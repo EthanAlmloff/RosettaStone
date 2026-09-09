@@ -86,6 +86,10 @@ struct Season14HeroPowerBatch4State
     std::int32_t turnNumber = 0;
     std::int32_t nextBuyAttack = 0;
     std::int32_t minionsPlayedThisTurn = 0;
+    // Kael'thas's Verdant Spheres counts successful minion purchases, not
+    // plays.  Keep this separate from the generic play counter because both
+    // counters can be live in the same recruit turn.
+    std::int32_t minionsBoughtThisTurn = 0;
     std::int32_t combatDeaths = 0;
 };
 
@@ -134,7 +138,7 @@ Season14HeroPowerBatch4Modifiers(std::int32_t dbfID) noexcept
 }
 
 //! Resolve lifecycle events.  Avenge powers trigger after three friendly
-//! combat deaths, while Verdant Spheres triggers on every third minion played.
+//! combat deaths, while Verdant Spheres triggers on every third minion bought.
 //! The bridge never calls this resolver for an unsupported/targeted family.
 constexpr void ResolveSeason14HeroPowerBatch4Event(
     std::int32_t dbfID, Season14HeroPowerBatch4Event event,
@@ -146,6 +150,7 @@ constexpr void ResolveSeason14HeroPowerBatch4Event(
     {
         ++state.turnNumber;
         state.minionsPlayedThisTurn = 0;
+        state.minionsBoughtThisTurn = 0;
         // For the Horde! arms its next purchase only when the active power is
         // used.  A new turn still clears an unconsumed arm so a failed/unused
         // action cannot leak into a later turn.
@@ -166,14 +171,16 @@ constexpr void ResolveSeason14HeroPowerBatch4Event(
         return;
     }
 
-    if (event == Season14HeroPowerBatch4Event::PLAY_MINION && dbfID == 61917)
+    if (event == Season14HeroPowerBatch4Event::BUY_MINION && dbfID == 61917)
     {
-        ++state.minionsPlayedThisTurn;
-        if (state.minionsPlayedThisTurn == 3)
+        ++state.minionsBoughtThisTurn;
+        if (state.minionsBoughtThisTurn == 3)
         {
-            result.attack = 2;
-            result.health = 2;
-            state.minionsPlayedThisTurn = 0;
+            // The printed hero power grants a Tavern Coin.  The Buddy
+            // observer consumes this boundary in Player after the purchased
+            // minion has its current stats captured.
+            result.goldDelta = 1;
+            state.minionsBoughtThisTurn = 0;
         }
         return;
     }

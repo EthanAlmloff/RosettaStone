@@ -289,6 +289,19 @@ TEST_CASE("[Season14] - Trinket slots reject duplicate and invalid acquisition")
     CHECK(player.season14.trinkets.size() == 1);
 }
 
+TEST_CASE("[Season14] - Mysterious Orb pays Gold at acquisition")
+{
+    Player player;
+    player.remainCoin = 3;
+
+    // BG35_MagicItem_818 is DBF 130836.  Its ten Gold is spendable in the
+    // current recruit phase and is not queued for a later Recruit boundary.
+    CHECK(player.AcquireTrinket({130836, 1, true}));
+    CHECK(player.remainCoin == 13);
+    CHECK(player.season14.TakeImmediateGold() == 0);
+    CHECK(player.season14.mysteriousOrbLesserNext);
+}
+
 TEST_CASE("[Season14] - inactive start-turn Trinkets do not grant")
 {
     Player player;
@@ -381,6 +394,17 @@ TEST_CASE("[Season14] - Felbat and absolute Tavern portraits target seven offers
     CHECK(state.TavernOfferCount(6) == 7);
 }
 
+TEST_CASE("[Season14] - Electrode Attractor owns magnetic discount and refresh offer")
+{
+    Season14State state;
+    state.AddTrinket({131141, 1, true}); // BG35_MagicItem_743
+    CHECK(state.MagneticMechPurchaseCostDiscount() == 2);
+    CHECK(state.HasMagneticMechFixedCost());
+    CHECK(state.TavernOfferCount(3) == 3); // no bonus before a refresh
+    state.refreshExtraShopSlots = 1;
+    CHECK(state.TavernOfferCount(3) == 4);
+}
+
 TEST_CASE("[Season14] - lifecycle hooks pay deterministic Batch-2 effects")
 {
     Season14State state;
@@ -442,6 +466,27 @@ TEST_CASE("[Season14] - spell-count Trinkets use shared resolved-spell callback"
     CHECK(state.PendingSpellCountNagaRewards() == 2);
 }
 
+TEST_CASE("[Season14] - Bubble Crown improves Tavern spell stats once")
+{
+    Season14State state;
+    const auto crown = Cards::FindCardByID("BG35_MagicItem_920").dbfID;
+    state.trinkets.push_back({crown, 1, true});
+
+    CHECK(state.tavernSpellAttackBonus == 0);
+    CHECK(state.tavernSpellHealthBonus == 0);
+    for (int i = 0; i < 11; ++i)
+        state.OnTavernSpellResolved(true);
+    CHECK(state.tavernSpellAttackBonus == 0);
+    CHECK(state.tavernSpellHealthBonus == 0);
+
+    state.OnTavernSpellResolved(true);
+    CHECK(state.tavernSpellAttackBonus == 4);
+    CHECK(state.tavernSpellHealthBonus == 4);
+    state.OnTavernSpellResolved(true);
+    CHECK(state.tavernSpellAttackBonus == 4);
+    CHECK(state.tavernSpellHealthBonus == 4);
+}
+
 TEST_CASE("[Season14] - spell-count Trinkets are per-instance and retry hand rewards")
 {
     // Two Archaic Scrolls have independent cadence; an inactive copy must not
@@ -495,6 +540,24 @@ TEST_CASE("[Season14] - sell and death random Trinkets keep independent cadence"
         CHECK(player.hand.GetCount() == 2);
         CHECK(player.season14.trinkets.front().triggerProgress == 0);
     }
+}
+
+TEST_CASE("[Season14] - Cloud Serpent Horn keeps multiple triggered copies")
+{
+    Player player;
+    const auto dbfID = Cards::FindCardByID("BG35_MagicItem_849").dbfID;
+    REQUIRE(dbfID != 0);
+    player.season14.trinkets.push_back({dbfID, 1, true});
+    player.season14.trinkets.push_back({dbfID, 1, true});
+
+    CHECK(player.season14.OnTrinketFriendlyMinionDied()
+              .transferRightmostAttackToDragon == 0);
+    CHECK(player.season14.OnTrinketFriendlyMinionDied()
+              .transferRightmostAttackToDragon == 0);
+    const auto result = player.season14.OnTrinketFriendlyMinionDied();
+    CHECK(result.transferRightmostAttackToDragon == 2);
+    CHECK(player.season14.trinkets[0].triggerProgress == 0);
+    CHECK(player.season14.trinkets[1].triggerProgress == 0);
 }
 
 TEST_CASE("[Season14] - Temporal Tavern refresh allowance is one-shot")
@@ -616,6 +679,65 @@ TEST_CASE("[Season14] - Funeral Wreath retries a full hand and resets per combat
     CHECK(player.season14.trinkets.front().triggerProgress == 0);
     player.ApplyAfterRebornTrinkets(&source);
     CHECK(player.season14.trinkets.front().triggerProgress == 1);
+}
+
+TEST_CASE("[Season14] - Deathtouch Apple re-arms combat Reborn persistently")
+{
+    const auto dbf = Cards::FindCardByID("BG35_MagicItem_731").dbfID;
+    Player player;
+    player.season14.trinkets.push_back({dbf, 1, true});
+
+    Minion recruit(Cards::FindCardByDbfID(49169));
+    Minion combat = recruit;
+    combat.ReviveWithReborn(); // the observed Reborn event has consumed it
+    player.ApplyAfterRebornTrinkets(&combat);
+
+    CHECK(combat.HasReborn());
+    CHECK(player.season14.trinkets.front().triggerProgress == 1);
+
+    // Combat copies are reconciled after the fight; the re-arm must survive
+    // into the next recruit phase rather than living only on the copy.
+    recruit.ReconcileCombatPersistentState(combat);
+    CHECK(recruit.HasReborn());
+}
+
+TEST_CASE("[Season14] - Deathtouch Apple copies have independent turn caps")
+{
+    const auto dbf = Cards::FindCardByID("BG35_MagicItem_731").dbfID;
+    Player player;
+    player.season14.trinkets.push_back({dbf, 1, true});
+    player.season14.trinkets.push_back({dbf, 1, true});
+    Minion first(Cards::FindCardByDbfID(49169));
+    Minion second(Cards::FindCardByDbfID(49169));
+
+    player.ApplyAfterRebornTrinkets(&first);
+    player.ApplyAfterRebornTrinkets(&second);
+    CHECK(player.season14.trinkets[0].triggerProgress == 1);
+    CHECK(player.season14.trinkets[1].triggerProgress == 1);
+
+    player.season14.trinkets[0].triggerProgress = 3;
+    player.season14.trinkets[1].triggerProgress = 3;
+    player.season14.ResetTrinketAvengeProgress();
+    CHECK(player.season14.trinkets[0].triggerProgress == 3);
+    CHECK(player.season14.trinkets[1].triggerProgress == 3);
+    player.ResolveStartTurnTrinkets();
+    CHECK(player.season14.trinkets[0].triggerProgress == 0);
+    CHECK(player.season14.trinkets[1].triggerProgress == 0);
+}
+
+TEST_CASE("[Season14] - Boom Controller trigger resets each combat")
+{
+    const auto dbf = Cards::FindCardByID("BG30_MagicItem_440").dbfID;
+    Player player;
+    player.season14.trinkets.push_back({dbf, 1, true});
+    auto& trinket = player.season14.trinkets.front();
+    trinket.triggerProgress = 1; // consumed by the previous combat
+
+    player.season14.ResetTrinketAvengeProgress();
+
+    CHECK(FindTrinketBehavior("BG30_MagicItem_440").effect ==
+          TrinketEffect::BOOM_CONTROLLER_FIRST_MECH_COPY);
+    CHECK(trinket.triggerProgress == 0);
 }
 
 TEST_CASE("[Season14] - Dragon's Eye respects active and consumed state")

@@ -78,10 +78,29 @@ inline constexpr std::array BUDDY_TAUNT_SUMMON_STATS_BEHAVIORS = {
  BuddyTauntSummonStatsDefinition{"TB_BaconShop_HERO_95_Buddy_G",77545,4},
 };
 
+// Sr. Tomb Diver is owned by Reno Jackson (TB_BaconShop_HERO_41).  Its
+// deathrattle resolves after the source death has compacted the live board,
+// so the combat boundary selects the right-most surviving instances.  Keep
+// the normal/golden fan-out in the typed registry rather than duplicating the
+// amount in the resolver.
+struct BuddyRightmostGoldenizeDefinition {
+ std::string_view id; std::int32_t dbfID; std::string_view heroID; int targets;
+};
+inline constexpr std::array BUDDY_RIGHTMOST_GOLDENIZE_BEHAVIORS = {
+ BuddyRightmostGoldenizeDefinition{"TB_BaconShop_HERO_41_Buddy",77825,"TB_BaconShop_HERO_41",1},
+ BuddyRightmostGoldenizeDefinition{"TB_BaconShop_HERO_41_Buddy_G",77826,"TB_BaconShop_HERO_41",2},
+};
+
 struct BuddyGoldCoinDefinition { std::string_view id; std::int32_t dbfID; int gold; };
 inline constexpr std::array BUDDY_GOLD_COIN_BEHAVIORS = {
  BuddyGoldCoinDefinition{"TB_BaconShop_HERO_72_Buddy",77511,1},
  BuddyGoldCoinDefinition{"TB_BaconShop_HERO_72_Buddy_G",77547,2},
+};
+
+struct BuddyHeroPowerGoldenizeDefinition { std::string_view id; std::int32_t dbfID; int uses; };
+inline constexpr std::array BUDDY_HERO_POWER_GOLDENIZE_BEHAVIORS = {
+ BuddyHeroPowerGoldenizeDefinition{"TB_BaconShop_HERO_62_Buddy",77800,1},
+ BuddyHeroPowerGoldenizeDefinition{"TB_BaconShop_HERO_62_Buddy_G",77801,2},
 };
 
 //! Combat-kill health bonuses for Icesnarl. This is intentionally separate
@@ -102,6 +121,19 @@ struct BuddyBloodGemDefinition { std::string_view id; std::int32_t dbfID; int ex
 inline constexpr std::array BUDDY_BLOOD_GEM_BEHAVIORS = {
  BuddyBloodGemDefinition{"BG20_HERO_103_Buddy",77478,1},
  BuddyBloodGemDefinition{"BG20_HERO_103_Buddy_G",77536,2},
+};
+
+// Crimson Hand Centurion observes the successful Verdant Spheres trigger
+// (the third minion played in a recruit turn). It copies the current stats
+// of the most recently purchased minion; golden copies double that payload.
+struct BuddyVerdantSpheresDefinition {
+    std::string_view id;
+    std::int32_t dbfID;
+    int statMultiplier;
+};
+inline constexpr std::array BUDDY_VERDANT_SPHERES_BEHAVIORS = {
+ BuddyVerdantSpheresDefinition{"TB_BaconShop_HERO_60_Buddy",77794,1},
+ BuddyVerdantSpheresDefinition{"TB_BaconShop_HERO_60_Buddy_G",77795,2},
 };
 
 struct BuddyHordeDefinition { std::string_view id; std::int32_t dbfID; int healthMultiplier; };
@@ -164,6 +196,21 @@ struct BuddyAfterBuyStatsDefinition { std::string_view id; std::int32_t dbfID; i
 inline constexpr std::array BUDDY_AFTER_BUY_STATS_BEHAVIORS = {
  BuddyAfterBuyStatsDefinition{"TB_BaconShop_HERO_01_Buddy",77479,2},
  BuddyAfterBuyStatsDefinition{"TB_BaconShop_HERO_01_Buddy_G",77538,4},
+};
+
+// Enhance-o Medico observes the minion after it enters the owner's hand.  A
+// Bonus Keyword is counted once at that buy boundary; normal and golden
+// copies retain their printed +3/+3 and +6/+6 fan-out respectively.  Keep the
+// payload typed so the event owner does not silently drift from the pinned
+// normal/golden card definitions.
+struct BuddyBonusKeywordBuyDefinition {
+    std::string_view id;
+    std::int32_t dbfID;
+    int attackHealthPerKeyword;
+};
+inline constexpr std::array BUDDY_BONUS_KEYWORD_BUY_BEHAVIORS = {
+ BuddyBonusKeywordBuyDefinition{"BG24_HERO_204_Buddy",101973,3},
+ BuddyBonusKeywordBuyDefinition{"BG24_HERO_204_Buddy_G",101974,6},
 };
 
 struct BuddyTavernTierStatsDefinition { std::string_view id; std::int32_t dbfID; int tavernTier; int attack; int health; };
@@ -401,6 +448,79 @@ struct BuddySpellcraftOfferDefinition { std::string_view id; std::int32_t dbfID;
 inline constexpr std::array BUDDY_SPELLCRAFT_OFFER_BEHAVIORS = {
  BuddySpellcraftOfferDefinition{"BG23_HERO_304_Buddy",101458,1},
  BuddySpellcraftOfferDefinition{"BG23_HERO_304_Buddy_G",101463,2},
+};
+
+// Phyresz opens a plain-copy Discover after its sale. The candidate pool is
+// instance-owned (exactly one normal copy in hand/board), so only the
+// normal/golden fan-out belongs in this registry.
+struct BuddyUniqueDiscoverDefinition { std::string_view id; std::int32_t dbfID; int choices; };
+inline constexpr std::array BUDDY_UNIQUE_DISCOVER_BEHAVIORS = {
+ BuddyUniqueDiscoverDefinition{"TB_BaconShop_HERO_91_Buddy",77859,1},
+ BuddyUniqueDiscoverDefinition{"TB_BaconShop_HERO_91_Buddy_G",77860,2},
+};
+
+//! Spirit Raptor remembers each distinct Element invocation made while its
+//! instance is owned.  The payload is instance-scoped and the golden copy
+//! replays the remembered set twice when its Deathrattle resolves.
+struct BuddyElementMemoryDefinition { std::string_view id; std::int32_t dbfID; int replayCount; };
+inline constexpr std::array BUDDY_ELEMENT_MEMORY_BEHAVIORS = {
+ BuddyElementMemoryDefinition{"BG22_HERO_001_Buddy",77882,1},
+ BuddyElementMemoryDefinition{"BG22_HERO_001_Buddy_G",77883,2},
+};
+
+//! Raging Contender is owned by Hooktusk and observes the successful
+//! Trash-for-Treasure removal.  The removed minion's original Tavern Tier is
+//! converted to that many Tavern Coins; golden doubles the grant.  Keep this
+//! at the removal boundary so a rejected target never pays out.
+struct BuddyTrashForTreasureDefinition {
+    std::string_view id;
+    std::int32_t dbfID;
+    std::string_view heroID;
+    int tierMultiplier;
+    std::string_view payoutCardID;
+    std::int32_t payoutDbfID;
+};
+inline constexpr std::array BUDDY_TRASH_FOR_TREASURE_BEHAVIORS = {
+ BuddyTrashForTreasureDefinition{"TB_BaconShop_HERO_67_Buddy",77776,"TB_BaconShop_HERO_67",1,"BG28_810",104436},
+ BuddyTrashForTreasureDefinition{"TB_BaconShop_HERO_67_Buddy_G",77777,"TB_BaconShop_HERO_67",2,"BG28_810",104436},
+};
+
+//! Nexus Lord changes Malygos' Arcane Alteration replacement tier.  The
+//! replacement is still selected from the authoritative Battlegrounds pool
+//! at activation time; this table only owns the exact normal/golden scaling.
+struct BuddyArcaneAlterationDefinition {
+    std::string_view id;
+    std::int32_t dbfID;
+    int tierDelta;
+};
+inline constexpr std::array BUDDY_ARCANE_ALTERATION_BEHAVIORS = {
+ BuddyArcaneAlterationDefinition{"TB_BaconShop_HERO_58_Buddy",77723,1},
+ BuddyArcaneAlterationDefinition{"TB_BaconShop_HERO_58_Buddy_G",77802,2},
+};
+
+// Jandice's Apprentice remembers card identities played during the current
+// recruit turn.  Playing a second copy of that identity buffs the whole
+// friendly warband by the owner's Tavern Tier; the golden Buddy doubles the
+// payload.  Keep the cadence and scaling typed so the play boundary cannot
+// accidentally treat every minion play as a trigger.
+struct BuddyRepeatedPlayDefinition { std::string_view id; std::int32_t dbfID; int tierMultiplier; };
+inline constexpr std::array BUDDY_REPEATED_PLAY_BEHAVIORS = {
+ BuddyRepeatedPlayDefinition{"TB_BaconShop_HERO_71_Buddy",77792,1},
+ BuddyRepeatedPlayDefinition{"TB_BaconShop_HERO_71_Buddy_G",77793,2},
+};
+
+//! The Nine Frogs observes successful minion purchases.  Each concrete Buddy
+//! gets nine purchase triggers; the golden copy emits two same-tier Tavern
+//! spells per trigger (the printed counter remains nine).
+struct BuddySameTierSpellOnBuyDefinition {
+    std::string_view id;
+    std::int32_t dbfID;
+    int spellsPerTrigger;
+    int triggers;
+};
+inline constexpr std::array BUDDY_SAME_TIER_SPELL_ON_BUY_BEHAVIORS = {
+ BuddySameTierSpellOnBuyDefinition{"BG28_HERO_801_Buddy",113631,1,9},
+ BuddySameTierSpellOnBuyDefinition{"BG28_HERO_801_Buddy_G",113632,2,9},
 };
 }
 #endif

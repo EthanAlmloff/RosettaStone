@@ -3,6 +3,10 @@
 #include <Rosetta/Battlegrounds/Models/LifecycleEnchantment.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GenerateBloodGemsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSpellcraftToHandTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SkyGolemPortraitDeathrattleTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -25,6 +29,12 @@ struct ReviewedLifecycleSpec
 struct ReviewedChildLifecycleSpec
 {
     std::string_view parent;
+    std::string_view child;
+    Minion::TemporaryEnchantment payload;
+};
+
+struct ReviewedTemporaryChildSpec
+{
     std::string_view child;
     Minion::TemporaryEnchantment payload;
 };
@@ -73,6 +83,24 @@ constexpr ReviewedLifecycleSpec REVIEWED_LIFECYCLES[] = {
 // owns the random choice, while this table owns the canonical child and typed
 // expiry payload.
 constexpr ReviewedChildLifecycleSpec REVIEWED_CHILD_LIFECYCLES[] = {
+    // Goldrinn's deathrattle applies Soul of the Beast to each friendly
+    // Beast.  The parent resolver owns the race-wide selection and golden
+    // repetition; this row owns the canonical child identity and the
+    // temporary stat payload/expiry.
+    { "BGS_018", "BGS_018e", Minion::TemporaryEnchantment::Stats },
+    // Pufferquil's trigger is owned by Player's successful targeted-spell
+    // path; this entry owns the exact temporary Venomous child identity.
+    { "BG25_039", "BG25_039e", Minion::TemporaryEnchantment::Venomous },
+    // The golden Pufferquil child is a permanent keyword (the golden card
+    // text omits "until next turn").  The resolver handles that distinction
+    // below while this row keeps the parent/child identity explicit.
+    { "BG25_039_G", "BG25_039_Ge", Minion::TemporaryEnchantment::Venomous },
+    // Thorncaptain's hand-add trigger owns the +1 Health parent payload; the
+    // zero-stat child is retained solely for typed expiry/provenance.
+    { "BG25_045", "BG25_045e", Minion::TemporaryEnchantment::Stats },
+    // Golden Thorncaptain has no distinct child record; it uses the same
+    // canonical temporary child identity with the doubled +2 Health payload.
+    { "BG25_045_G", "BG25_045e", Minion::TemporaryEnchantment::Stats },
     { "BG27_024", "BG27_024e1", Minion::TemporaryEnchantment::DivineShield },
     { "BG27_024", "BG27_024e2", Minion::TemporaryEnchantment::StatsAndWindfury },
     { "BG27_024", "BG27_024e3", Minion::TemporaryEnchantment::Venomous },
@@ -84,7 +112,20 @@ constexpr ReviewedChildLifecycleSpec REVIEWED_CHILD_LIFECYCLES[] = {
     // typed expiry payload.
     { "BG24_Reward_115", "BG24_Reward_115e2", Minion::TemporaryEnchantment::StatsAndStealth },
     { "BG32_MagicItem_279", "BG32_MagicItem_279e", Minion::TemporaryEnchantment::DivineShield },
+    // Haunted Carapace owns the +3/+1 parent payload.  The child is a
+    // provenance/expiry marker, not a second stat application.
+    { "BG33_112", "BG33_112e", Minion::TemporaryEnchantment::Stats },
+    // Tough Tusk's first Blood Gem trigger has separate normal and golden
+    // children.  The normal child expires at the next recruit turn; the
+    // golden child is a permanent Divine Shield, as printed.
+    { "BG20_102", "BG20_102e", Minion::TemporaryEnchantment::DivineShield },
+    { "BG20_102_G", "BG20_102_Ge", Minion::TemporaryEnchantment::DivineShield },
 };
+
+// Do not admit card-data-only children here.  The Duo records below remain
+// excluded because no Battlegrounds parent resolver currently invokes this
+// registry for the team-pass parent.  Registering those child IDs alone would
+// make AddEnchantmentTask appear executable while bypassing the parent path.
 
 // These are persistent child entities whose own CardDef contains the
 // deathrattle.  Keep normal and golden IDs explicit: the reviewed identity
@@ -93,6 +134,13 @@ constexpr std::string_view REVIEWED_PERSISTENT_CHILDREN[] = {
     "BG27_004e", "BG27_004_Ge", "BG29_875e", "BG29_875_Ge",
     "BG30_119e", "BG30_119_Ge", "BG31_325e", "BG31_325_Ge",
     "BG32_172e", "BG32_172_Ge", "BG21_000e", "BG21_000_Ge",
+    // Trinket start-of-combat children.  Their parent resolver selects the
+    // eligible race/targets; these IDs own the canonical deathrattle payload.
+    "BG30_MagicItem_411e", "BG30_MagicItem_917e", "BG30_MagicItem_952e",
+    // Sky Golem Portrait's start-of-combat grant is an exact persistent
+    // child: the child owns the canonical Deathrattle payload, while the
+    // portrait resolver owns timing and the copied-board target set.
+    "BG35_MagicItem_740e2",
 };
 }
 
@@ -158,6 +206,20 @@ bool ApplyReviewedLifecycleEnchantment(Minion& target,
     return false;
 }
 
+bool ApplyReviewedTemporaryChildEnchantment(Minion& target,
+                                            std::string_view childID,
+                                            int attack, int health)
+{
+    // No Batch240 child is executable until its parent resolver is wired to
+    // this gate.  Keep the helper fail-closed rather than treating a direct
+    // child ID as proof that the parent trigger and target semantics exist.
+    (void)target;
+    (void)childID;
+    (void)attack;
+    (void)health;
+    return false;
+}
+
 bool ApplyReviewedLifecycleEnchantment(Minion& target,
                                        std::string_view parentID,
                                        std::string_view childID,
@@ -169,8 +231,21 @@ bool ApplyReviewedLifecycleEnchantment(Minion& target,
         if (spec.parent != parentID || spec.child != childID ||
             spec.payload != payload)
             continue;
+        if (parentID == "BG25_039_G" && childID == "BG25_039_Ge")
+        {
+            target.SetGameTag(GameTag::POISONOUS, 1);
+            return true;
+        }
+        if (parentID == "BG20_102_G" && childID == "BG20_102_Ge")
+        {
+            target.SetGameTag(GameTag::DIVINE_SHIELD, 1);
+            return true;
+        }
         target.ApplyTemporaryEnchantment(payload, attack, health);
-        target.RecordTemporaryEnchantment(childID);
+        // Goldrinn's task records per-trigger occurrences separately so the
+        // combat snapshot can carry its stacked aura back to recruit state.
+        if (parentID != "BGS_018")
+            target.RecordTemporaryEnchantment(childID);
         return true;
     }
     return false;
@@ -215,6 +290,34 @@ bool ApplyReviewedPersistentChildEnchantment(Minion& target,
     for (const auto reviewed : REVIEWED_PERSISTENT_CHILDREN)
     {
         if (reviewed != childID) continue;
+        // These three trinket children have intentionally empty CardDefs in
+        // the generated card set.  Install their exact child task here so
+        // the parent start-of-combat resolver and child provenance remain a
+        // single executable path.
+        if (childID == "BG30_MagicItem_411e")
+        {
+            target.AddDarkGiftDeathrattleTask(
+                SimpleTasks::GenerateBloodGemsTask{2});
+            return true;
+        }
+        if (childID == "BG30_MagicItem_917e")
+        {
+            target.AddDarkGiftDeathrattleTask(
+                SimpleTasks::RandomSpellcraftToHandTask{});
+            return true;
+        }
+        if (childID == "BG30_MagicItem_952e")
+        {
+            target.AddDarkGiftDeathrattleTask(
+                SimpleTasks::SummonTask{"BG26_537", 1});
+            return true;
+        }
+        if (childID == "BG35_MagicItem_740e2")
+        {
+            target.AddDarkGiftDeathrattleTask(
+                SimpleTasks::SkyGolemPortraitDeathrattleTask{});
+            return true;
+        }
         const auto enchantmentCard = Cards::FindCardByID(childID);
         // These are persistent deathrattle *children*, not ordinary stat
         // enchantments.  Generic::AddEnchantment only evaluates the CardDef's

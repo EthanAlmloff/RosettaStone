@@ -21,6 +21,7 @@ TaskStatus EndTurnConsumeHighestTavernTask::Run(Player& p, Minion& s) {
      p.returnMinionCallback(consumed.GetPoolIndex());
  s.SetAttack(s.GetAttack()+consumed.GetAttack()*m_multiplier);
  s.SetHealth(s.GetHealth()+consumed.GetHealth()*m_multiplier);
+ p.ApplyDemonConsumeBonus(s, consumed);
  // Flaming Portrait mirrors each successful consume to the live neighbors of
  // the triggering Flaming Enforcer. Resolve this after removing the Tavern
  // card so only the consumed stats are copied and each adjacent instance is

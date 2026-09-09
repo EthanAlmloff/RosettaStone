@@ -187,6 +187,9 @@ class Player
     bool BeginSpawningPoolMorphChoice();
     //! Each friendly Demon consumes one random Tavern minion for its stats.
     bool DevourRandomTavernForDemons(int multiplier);
+    //! Apply per-owned Consuming Claw payload after a successful Demon devour.
+    //! The consumed snapshot must be captured before removing its Tavern slot.
+    void ApplyDemonConsumeBonus(Minion& demon, const Minion& consumed);
     void UpdateSkyGolemsForDeathrattle();
     //! Summons an exact state copy of a friendly minion with a fresh entity
     //! identity. Used by Cloning Gallery; does not charge or consume hand.
@@ -204,6 +207,9 @@ class Player
     //! Begins Void Power's one-time Tier-5 Discover when its unlock fires.
     bool BeginVoidPowerDiscover();
     bool BeginFeelDevastationDiscover();
+    bool BeginOminousStoneDiscover(std::int32_t sourceCardDbfID);
+    bool BeginWaxLanceDiscover(std::int32_t sourceCardDbfID);
+    bool BeginMaldraxxusDaggerDiscover(std::int32_t sourceCardDbfID);
     bool CanPurchaseTavernSlot(std::size_t idx) const;
     bool PurchaseTavernSlot(std::size_t idx);
 
@@ -245,6 +251,9 @@ class Player
     //! keeps generated effects (such as Rally) on the same aura/keyword
     //! path as a Blood Gem spell played from hand.
     void ApplyBloodGemTo(Minion& target);
+    //! Resolve Scrapsmith Portrait's permanent Blood Gem on friendly
+    //! Scrapsmiths after a friendly Taunt minion dies.
+    void ResolveScrapsmithPortraitDeath(const Minion& deadMinion);
     //! Notify persistent trinkets that a card was discarded.
     void OnCardDiscarded();
 
@@ -260,6 +269,11 @@ class Player
     //! This is the sole player-owned entry point for generated Trinket cards.
     bool AcquireTrinket(Season14PersistentEffect effect);
     int GrantTrinketStartTurnCards();
+    //! Grants a Lockbox or advances the currently owned Lockbox's opening
+    //! cadence.  This is shared by Escapee/Bilgewater effects and portraits.
+    void GrantOrAdvanceLockbox(int turnsSooner = 1);
+    //! Advances and, when due, resolves the public Lockbox hand card.
+    void ResolveLockboxAtRecruitStart();
 
     //! Resolves a pending public Choice/Discover offering into the player's
     //! hand.  Only concrete minion and spell cards are accepted; unsupported
@@ -314,10 +328,27 @@ class Player
     void ApplyAfterPlayCardTrinkets(Race playedRace = Race::INVALID,
                                     bool magnetic = false,
                                     bool playedDemon = false,
-                                    bool playedMurloc = false);
+                                    bool playedMurloc = false,
+                                    std::uint64_t playedEntityID = 0);
+    //! Resolve Ur'zul Sticker after the played minion's Battlecry and the
+    //! normal post-play observers.  The entity ID excludes the played copy,
+    //! even when another copy has the same card DBF.
+    void ApplyUrZulStickerTriggers(bool playedDemon,
+                                   std::uint64_t playedEntityID);
     void ApplyAfterRebornTrinkets(const Minion* reborn = nullptr);
+    //! Resolve portraits whose trigger is a real recruit-phase destroy.
+    //! Selling, consuming, transforming, and ordinary zone removal do not
+    //! call this observer; callers invoke it after deathrattles and any
+    //! resulting replacement summons have resolved.
+    void ApplyOutsideCombatDestroyTrinkets();
     void ApplyStartCombatTrinkets();
+    //! Resolve Boom Controller after a complete death boundary. The saved
+    //! first-Mech snapshot remains armed while the combat board is full.
+    void ResolveBoomController(FieldZone& combatField);
     void ResolveStartTurnTrinkets();
+    //! Consumes War Drum's once-per-recruit-turn allowance after a successful
+    //! Battlecry and returns the exact number of extra resolutions to run.
+    int ConsumeWarDrumRepeats();
     bool ShouldDuplicateDragonBattlecry() const noexcept;
     void ApplyFirstMinionDivineShield(Minion& minion);
     void ApplyDeferredTavernSpellStats();
@@ -334,7 +365,8 @@ class Player
         const std::array<std::uint64_t, 32>& entityIDs,
         std::uint8_t entityCount);
     bool ApplyArcaneAlteration(std::size_t slot, std::uint64_t entityID,
-                               std::int32_t replacementDbfID);
+                               std::int32_t replacementDbfID,
+                               std::int32_t replacementTier);
     bool ApplySwapShopMinion(std::size_t boardSlot, std::uint64_t boardEntityID,
                              std::size_t tavernSlot, std::uint64_t tavernEntityID);
 
@@ -418,6 +450,8 @@ class Player
 
     int remainCoin = 0;
     std::string lastBoughtTavernSpellID;
+    //! Current stats of the most recently purchased minion. This snapshot is
+    //! consumed by Kael'thas's Buddy when Verdant Spheres triggers.
     int totalCoin = 0;
     int armor = 0;
     int currentTier = 0;

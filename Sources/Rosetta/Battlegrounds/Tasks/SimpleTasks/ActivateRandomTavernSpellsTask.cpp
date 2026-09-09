@@ -17,12 +17,27 @@ TaskStatus ActivateRandomTavernSpellsTask::Run(Player& p) {
     const bool generatedRewardSequence =
         p.season14.HasGeneratedRewardStartTurnRandomSpells() &&
         p.season14.HasPendingGeneratedRewardRandomSpells();
+    const bool lavishCapeSequence =
+        !generatedRewardSequence &&
+        p.season14.HasPendingLavishCapeRandomSpells();
     const int casts = generatedRewardSequence
-        ? p.season14.GeneratedRewardRandomSpellsRemaining() : m_amount;
-    if (casts <= 0) return TaskStatus::COMPLETE;
+        ? p.season14.GeneratedRewardRandomSpellsRemaining()
+        : lavishCapeSequence
+            ? p.season14.LavishCapeRandomSpellsRemaining()
+            : m_amount;
+    if (casts <= 0) {
+        if (generatedRewardSequence)
+            p.season14.FinishGeneratedRewardRandomSpells();
+        else if (lavishCapeSequence)
+            p.season14.FinishLavishCapeRandomSpells();
+        return TaskStatus::COMPLETE;
+    }
     std::vector<const Card*> pool;
     for (const auto& c : Cards::GetAllCards()) {
-        if (!c.isBattlegroundsPoolSpell || c.normalDbfID != 0) continue;
+        if (!c.isBattlegroundsPoolSpell || c.normalDbfID != 0 ||
+            (c.GetCardType() != CardType::SPELL &&
+             c.GetCardType() != CardType::BATTLEGROUND_SPELL))
+            continue;
         const auto behavior = FindTavernSpellBehavior(c.id);
         if (behavior.effect == TavernSpellEffect::NONE) continue;
         if (!TavernSpellRequiresTarget(behavior.effect)) {
@@ -114,9 +129,12 @@ TaskStatus ActivateRandomTavernSpellsTask::Run(Player& p) {
                 if (behavior.effect == TavernSpellEffect::TARGET_DOUBLE_STATS_HAND_LOCK) {
                     legalTarget = legalTarget && !p.hand.IsFull();
                 }
-                if (behavior.effect == TavernSpellEffect::DESTROY_UNDEAD_RANDOM_TO_HAND ||
-                    behavior.effect == TavernSpellEffect::DESTROY_UNDEAD_GIVE_PERSISTENT_ATTACK) {
-                    legalTarget = legalTarget && !p.hand.IsFull();
+                if (behavior.effect == TavernSpellEffect::DESTROY_UNDEAD_RANDOM_TO_HAND) {
+                    // Free casts do not have a spell card in hand to consume;
+                    // reserve every printed random reward slot and fail closed
+                    // when the typed race pool is unavailable.
+                    legalTarget = legalTarget && behavior.randomCount > 0 &&
+                        p.hand.GetCount() + behavior.randomCount <= MAX_HAND_SIZE;
                 }
                 if (behavior.effect == TavernSpellEffect::TARGET_CONSUME_SHOP_STATS) {
                     std::size_t available = 0;
@@ -134,7 +152,13 @@ TaskStatus ActivateRandomTavernSpellsTask::Run(Player& p) {
         }
         pool.push_back(&c);
     }
-    if (pool.empty()) return TaskStatus::STOP;
+    if (pool.empty()) {
+        if (generatedRewardSequence)
+            p.season14.FinishGeneratedRewardRandomSpells();
+        else if (lavishCapeSequence)
+            p.season14.FinishLavishCapeRandomSpells();
+        return TaskStatus::STOP;
+    }
     for (int i = 0; i < casts; ++i) {
         const auto& card = *pool[Random::get<std::size_t>(0, pool.size() - 1)];
         const auto& id = card.id;
@@ -144,12 +168,16 @@ TaskStatus ActivateRandomTavernSpellsTask::Run(Player& p) {
         // resumes this exact outcome instead of rolling a second spell.
         if (generatedRewardSequence)
             p.season14.SetGeneratedRewardRandomSpellsRemaining(casts - i - 1);
+        else if (lavishCapeSequence)
+            p.season14.SetLavishCapeRandomSpellsRemaining(casts - i - 1);
         if (TavernSpellRequiresTarget(behavior.effect))
             p.season14.pendingTaughtSpell = {true, 0,
                                               static_cast<std::int32_t>(card.dbfID)};
         if (!p.CastTavernSpellFree(id)) {
             if (generatedRewardSequence)
                 p.season14.FinishGeneratedRewardRandomSpells();
+            else if (lavishCapeSequence)
+                p.season14.FinishLavishCapeRandomSpells();
             return TaskStatus::STOP;
         }
         if (p.season14.pendingDecision != Season14Decision::NONE)
@@ -157,6 +185,8 @@ TaskStatus ActivateRandomTavernSpellsTask::Run(Player& p) {
     }
     if (generatedRewardSequence)
         p.season14.FinishGeneratedRewardRandomSpells();
+    else if (lavishCapeSequence)
+        p.season14.FinishLavishCapeRandomSpells();
     return TaskStatus::COMPLETE;
 }
 TaskStatus ActivateRandomTavernSpellsTask::Run(Player& p, Minion& s) { if(m_amount<=0||s.IsDestroyed()) return TaskStatus::STOP; std::vector<std::string> pool; for(const auto& c:Cards::GetAllCards()) if(c.isBattlegroundsPoolSpell&&c.normalDbfID==0&&FindTavernSpellBehavior(c.id).effect!=TavernSpellEffect::NONE) pool.emplace_back(c.id); if(pool.empty()) return TaskStatus::STOP; for(int i=0;i<m_amount;++i){ const auto& id=pool[Random::get<std::size_t>(0,pool.size()-1)]; p.CastTavernSpellFree(id,1,s.GetZonePosition()); } return TaskStatus::COMPLETE; }

@@ -453,6 +453,7 @@ void Game::Recruit()
         player.season14.firstMinionPlayedThisTurn = false;
         player.season14.battlecryBuysThisTurn = 0;
         player.season14.minionsPlayedThisTurn = 0;
+        player.season14.repeatedPlayCardIDs.clear();
         // Cliffdiver Sticker scales from Battlecries triggered this recruit
         // turn, never from the lifetime Battlecry counter.
         player.season14.battlecriesTriggered = 0;
@@ -462,6 +463,18 @@ void Game::Recruit()
             minion.value().ResetActivateUses();
             minion.value().ResetBuyTriggerUses();
         });
+        // Per-turn purchase observers own their cadence on the persistent
+        // effect, not on a transient board Minion. Reset Magicfin's cap only
+        // at the recruit boundary so duplicate Stickers remain independent.
+        for (auto& trinket : player.season14.trinkets) {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto card = Cards::FindCardByDbfID(trinket.dbfID);
+            if (FindTrinketBehavior(card.id).effect ==
+                TrinketEffect::AFTER_BUY_TAVERN_SPELL_MURLOC ||
+                FindTrinketBehavior(card.id).effect ==
+                    TrinketEffect::AFTER_BUY_MINION_MAGNETIC_SATELLITE)
+                trinket.triggerProgress = 0;
+        }
 
         // Assign the index of the player to fight next.
         player.playerIdxNextFight = FindPlayerNextFight(player.idx);
@@ -984,6 +997,13 @@ void Game::CompleteRecruitPhase()
                     player.currentTier, player.currentTier, true);
                 if (candidates.empty() || player.hand.IsFull()) break;
                 const auto pick = Random::get<std::size_t>(0, candidates.size() - 1);
+                // The generated hand minion is a fresh entity drawn from the
+                // live Tavern pool.  Mark the selected pool entry unavailable
+                // before copying its canonical card definition; otherwise
+                // Botani can repeatedly mint the same pool copy without
+                // changing pool/entity state.
+                const auto poolIndex = candidates[pick].GetPoolIndex();
+                if (!m_gameState.minionPool.TakeMinion(poolIndex)) break;
                 player.AddMinionCopyToHand(candidates[pick]);
             }
             for (int copy = 0; copy < lanternCopies; ++copy) {
