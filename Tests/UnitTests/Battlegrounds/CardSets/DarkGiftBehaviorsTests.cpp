@@ -19,6 +19,15 @@ using namespace Battlegrounds;
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - verified Patch 36.4 batch")
 {
+    const auto steady = FindDarkGiftBehavior("BG36_MidGameEffect_000t51");
+    CHECK(steady.effect == DarkGiftEffect::STEADY_GROWTH);
+    CHECK(steady.attack == 2);
+    CHECK(steady.health == 2);
+    CHECK(steady.steadyGrowthSecondAttack == 2);
+    CHECK(steady.steadyGrowthSecondHealth == 3);
+    CHECK(steady.steadyGrowthLaterAttack == 3);
+    CHECK(steady.steadyGrowthLaterHealth == 4);
+
     const auto fortitude = FindDarkGiftBehavior("BG36_MidGameEffect_000t73");
     CHECK(fortitude.effect == DarkGiftEffect::TARGET_STATS);
     CHECK(fortitude.attack == 5);
@@ -63,6 +72,66 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - verified Patch 36.4 batch")
     CHECK(defensive.effect == DarkGiftEffect::DEATHRATTLE_STATS);
     CHECK(defensive.attack == 0);
     CHECK(defensive.health == 10);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Steady Growth uses corrected cadence")
+{
+    Minion target(Cards::FindCardByID("BGS_039"));
+    const auto beforeAttack = target.GetAttack();
+    const auto beforeHealth = target.GetHealth();
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t51");
+    REQUIRE(ApplyDarkGift(target, behavior));
+
+    target.ApplySteadyGrowth();
+    CHECK(target.GetAttack() == beforeAttack + 2);
+    CHECK(target.GetHealth() == beforeHealth + 2);
+    target.ApplySteadyGrowth();
+    CHECK(target.GetAttack() == beforeAttack + 4);
+    CHECK(target.GetHealth() == beforeHealth + 5);
+    target.ApplySteadyGrowth();
+    CHECK(target.GetAttack() == beforeAttack + 7);
+    CHECK(target.GetHealth() == beforeHealth + 9);
+    target.ApplySteadyGrowth();
+    CHECK(target.GetAttack() == beforeAttack + 10);
+    CHECK(target.GetHealth() == beforeHealth + 13);
+}
+
+TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Steady Growth cadence is per gifted minion")
+{
+    const Card base = Cards::FindCardByID("BGS_039");
+    REQUIRE_FALSE(base.id.empty());
+    const auto behavior = FindDarkGiftBehavior("BG36_MidGameEffect_000t51");
+    Minion first(base);
+    Minion second(base);
+    const int firstAttack = first.GetAttack();
+    const int firstHealth = first.GetHealth();
+    const int secondAttack = second.GetAttack();
+    const int secondHealth = second.GetHealth();
+
+    // A Dark Gift is attached to the selected minion instance.  Advancing one
+    // instance must not advance (or buff) another instance carrying the same
+    // gift, even when their acquisition turns differ.
+    REQUIRE(ApplyDarkGift(first, behavior));
+    first.ApplySteadyGrowth();
+    CHECK(first.GetAttack() == firstAttack + 2);
+    CHECK(first.GetHealth() == firstHealth + 2);
+    CHECK(second.GetAttack() == secondAttack);
+    CHECK(second.GetHealth() == secondHealth);
+
+    REQUIRE(ApplyDarkGift(second, behavior));
+    first.ApplySteadyGrowth();
+    second.ApplySteadyGrowth();
+    CHECK(first.GetAttack() == firstAttack + 4);
+    CHECK(first.GetHealth() == firstHealth + 5);
+    CHECK(second.GetAttack() == secondAttack + 2);
+    CHECK(second.GetHealth() == secondHealth + 2);
+
+    first.ApplySteadyGrowth();
+    second.ApplySteadyGrowth();
+    CHECK(first.GetAttack() == firstAttack + 7);
+    CHECK(first.GetHealth() == firstHealth + 9);
+    CHECK(second.GetAttack() == secondAttack + 4);
+    CHECK(second.GetHealth() == secondHealth + 5);
 }
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Elixir of Vim doubles attack on Rally")

@@ -24,6 +24,10 @@ enum class CardLifecycle : unsigned char
     BUDDY_LUCIFRON,
     BUDDY_PIGEON_LORD,
     BUDDY_ELEMENTIUM_SQUIRREL_BOMB,
+    // Solemn Serenader observes a successful targeted Hero Power in
+    // Player::ApplyHeroPowerTarget.  Its effect is phase-owned rather than a
+    // fixed Power task graph, but the CardDef must still identify that owner.
+    BUDDY_SOLEMN_SERENADER,
     // Choose-One minions and their generated option entities are resolved
     // by Player's modal state machine.  The lifecycle tag keeps the
     // authoritative ownership explicit without attaching a second Power

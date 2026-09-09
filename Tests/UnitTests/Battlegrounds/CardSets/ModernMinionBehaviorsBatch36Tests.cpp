@@ -13,6 +13,8 @@ TEST_CASE("[Batch36] - deterministic Choose One source and option registry")
                            "BG30_123", "BG30_123_G", "BG30_123t",
                            "BG30_123_Gt", "BG30_123t2", "BG30_123_Gt2",
                            "BG36_330", "BG36_330_G", "BG36_330t",
-                           "BG36_330_Gt", "BG36_330t2", "BG36_330_Gt2"})
+                           "BG36_330_Gt", "BG36_330t2", "BG36_330_Gt2",
+                           "BG36_341", "BG36_341_G", "BG36_341t",
+                           "BG36_341_Gt", "BG36_341t2", "BG36_341_Gt2"})
         CHECK(cards.contains(id));
 }

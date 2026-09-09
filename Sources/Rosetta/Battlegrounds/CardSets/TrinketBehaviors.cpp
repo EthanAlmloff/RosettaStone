@@ -83,6 +83,10 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG30_MagicItem_544") return {TrinketEffect::AFTER_PLAY_ELEMENTAL_SHOP_BUFF, 2, 2};
     if (id == "BG30_MagicItem_544t") return {TrinketEffect::AFTER_PLAY_ELEMENTAL_SHOP_BUFF, 5, 5};
     if (id == "BG36_MagicItem_800") return {TrinketEffect::AFTER_TAVERN_SPELL_SHOP_BUFF, 1, 1};
+    // Felsteel Cleaver consumes the Tavern minion that was just targeted by
+    // a spell, then transfers its final stats to a random friendly minion.
+    // The target entity is snapshotted by Season14State before this hook.
+    if (id == "BG36_MagicItem_831") return {TrinketEffect::AFTER_SPELL_ON_SHOP_CONSUME};
     if (id == "BG35_MagicItem_710") return {TrinketEffect::AFTER_TAVERN_SPELL_RACE_BUFF, 2, 2, 0, Race::PIRATE};
     if (id == "BG30_MagicItem_414") return {TrinketEffect::AFTER_BUY_RANDOM_FRIENDLY_BUFF, 2, 1, 2};
     if (id == "BG30_MagicItem_414t") return {TrinketEffect::AFTER_BUY_RANDOM_FRIENDLY_BUFF, 4, 4, 2};
@@ -222,6 +226,16 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     // the end of each recruit turn.  The actual spell ID is read from the
     // owner's lastTavernSpellDbfID state at resolution time.
     if (id == "BG36_MagicItem_372") return {TrinketEffect::END_TURN_LAST_TAVERN_SPELL, 0, 0, 3};
+    // Inductive Gyroblade creates a canonical Magnetic Satellite at recruit
+    // end.  `attack`/`health` are its base payload, while `value` is the
+    // per-Tavern-spell improvement for this turn.  The golden form uses the
+    // pinned 8/8 Satellite identity and the same scaling.
+    if (id == "BG36_MagicItem_810") return {
+        TrinketEffect::END_TURN_SPELL_SCALED_SATELLITE, 4, 4, 1,
+        Race::INVALID, 0, 1, false, false, false, "BG34_Giant_610t"};
+    if (id == "BG36_MagicItem_810t") return {
+        TrinketEffect::END_TURN_SPELL_SCALED_SATELLITE, 8, 8, 1,
+        Race::INVALID, 0, 1, false, false, false, "BG34_Giant_610_Gt"};
     // Emergency Gearblade casts Repair Job on the left-most friendly Mech at
     // recruit end. Resolve through the normal free-spell path so the
     // canonical +4/+8 payload and target-aware lifecycle are reused.
@@ -724,6 +738,7 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG32_MagicItem_823", CardDef{});
     cards.emplace("BG35_MagicItem_150", CardDef{});
     cards.emplace("BG36_MagicItem_830", CardDef{});
+    cards.emplace("BG36_MagicItem_831", CardDef{});
     cards.emplace("BG36_MagicItem_300", CardDef{});
     cards.emplace("BG35_MagicItem_700", CardDef{});
     cards.emplace("BG30_MagicItem_864", CardDef{});

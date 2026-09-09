@@ -629,7 +629,12 @@ void Player::ResolveHeroPowerUseBuddies(std::uint64_t targetEntityID, int repeat
     {
         recruitField.ForEachAlive([&](const MinionData& data) {
             const auto& buddy = data.value();
-            if (buddy.GetCardID() == definition.id)
+            // CardDefs owns lifecycle dispatch.  Keep the catalogue entry's
+            // ID only for its payload divisor; do not make an empty/static
+            // registration the runtime owner of this trigger.
+            if (CardDefs::FindCardDefByID(buddy.GetCardID()).lifecycle ==
+                    CardLifecycle::BUDDY_SOLEMN_SERENADER &&
+                buddy.GetCardID() == definition.id)
                 bonus += buddy.GetAttack() / definition.attackDivisor;
         });
     }
@@ -888,30 +893,6 @@ bool Player::ApplyGeneratedQuestReward(std::int32_t dbfID)
                 candidate.isBattlegroundsPoolMinion &&
                 candidate.normalDbfID == 0 && candidate.hasBehavior)
                 candidates.push_back(candidate);
-        if (candidates.empty()) return false;
-        const auto& selected = candidates[
-            Random::get<std::size_t>(0, candidates.size() - 1)];
-        hand.Add(CardData{Minion(selected)});
-    }
-    if (dbfID == 104673) {
-        // Gilnean War Horn's {0} is the Battlecry minion selected by the
-        // completed quest.  The compact simulator does not carry that quest
-        // payload, so resolve it from the current public warband and fail
-        // closed when no legal linked entity exists.
-        if (hand.IsFull()) return false;
-        std::vector<Card> candidates;
-        recruitField.ForEachAlive([&candidates](MinionData& data) {
-            const auto& minion = data.value();
-            if (!minion.HasBattlecry()) return;
-            const auto card = Cards::FindCardByID(minion.GetCardID());
-            // The server-selected {0} is a normal, supported Battlecry
-            // minion.  Never copy a golden/generated/unsupported placeholder
-            // merely because the current warband happens to contain it.
-            if (!card.id.empty() && card.GetCardType() == CardType::MINION &&
-                card.isBattlegroundsPoolMinion && card.normalDbfID == 0 &&
-                card.hasBehavior)
-                candidates.push_back(card);
-        });
         if (candidates.empty()) return false;
         const auto& selected = candidates[
             Random::get<std::size_t>(0, candidates.size() - 1)];
@@ -1229,6 +1210,24 @@ void Player::ResolveTrinketEndTurn()
                 continue;
             for (int i = 0; i < behavior.amount && !hand.IsFull(); ++i)
                 hand.Add(CardData{Spell(card)});
+            continue;
+        }
+        if (behavior.effect == TrinketEffect::END_TURN_SPELL_SCALED_SATELLITE) {
+            if (behavior.cardID.empty() || hand.IsFull()) continue;
+            const auto card = Cards::FindCardByID(behavior.cardID);
+            // Satellite is a canonical token with complete card metadata but
+            // intentionally has no CardDef behavior of its own.  It is a
+            // magnetic attachment payload, not a pool minion; requiring
+            // `hasBehavior` here would silently discard every Gyroblade
+            // reward even though the token's identity/tags are authoritative.
+            if (card.id.empty() || card.GetCardType() != CardType::MINION ||
+                behavior.amount <= 0) continue;
+            const int scale = behavior.amount *
+                              season14.SuccessfulSpellsThisRecruitTurn();
+            Minion satellite(card);
+            satellite.SetAttack(behavior.attack + scale);
+            satellite.SetHealth(behavior.health + scale);
+            hand.Add(CardData{std::move(satellite)});
             continue;
         }
         if (behavior.effect == TrinketEffect::END_TURN_LEFTMOST_MECH_REPAIR) {
@@ -5311,24 +5310,10 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
 
     if (card.GetCardType() == CardType::BATTLEGROUND_QUEST_REWARD)
     {
-        if (!IsSeason14GeneratedQuestReward(card.dbfID)) return false;
-        if (card.dbfID == 104673) {
-            // War Horn's linked minion is selected by the server when the
-            // reward is granted.  Recheck the same legal pool before
-            // consuming the public reward choice; otherwise a stale/replay
-            // state could commit the reward without either its copy or aura.
-            if (hand.IsFull()) return false;
-            bool hasLegalBattlecry = false;
-            recruitField.ForEachAlive([&hasLegalBattlecry](MinionData& data) {
-                if (hasLegalBattlecry || !data.value().HasBattlecry()) return;
-                const auto candidate = Cards::FindCardByID(data.value().GetCardID());
-                hasLegalBattlecry =
-                    candidate.GetCardType() == CardType::MINION &&
-                    candidate.isBattlegroundsPoolMinion &&
-                    candidate.normalDbfID == 0 && candidate.hasBehavior;
-            });
-            if (!hasLegalBattlecry) return false;
-        }
+        // A typed registry row is not enough to make a modal selectable:
+        // unresolved linked payloads (for example Gilnean War Horn's `{0}`)
+        // remain fail-closed until their parent/replay contract is present.
+        if (!IsExecutableSeason14GeneratedQuestReward(card.dbfID)) return false;
         if (card.dbfID == 110310) {
             if (hand.IsFull()) return false;
             const bool hasTierSeven = std::any_of(
@@ -5631,6 +5616,49 @@ void Player::ApplyTavernSpellTrinkets()
                 minion.SetHealth(minion.GetHealth() + 2 * copies);
             });
     }
+    // Felsteel Cleaver resolves after the targeted Tavern minion has received
+    // the spell payload.  Snapshot the stable shop entity before removing it,
+    // then transfer its final stats to one random friendly minion.  A full
+    // hand is irrelevant; an empty warband is not: in that case the printed
+    // consume cannot resolve and the shop target remains available.
+    if (season14.lastTavernSpellShopTargetEntityID != 0)
+    {
+        Minion* shopTarget = nullptr;
+        tavern.fieldZone.ForEachAlive([&](MinionData& data) {
+            if (static_cast<std::uint64_t>(data.value().GetIndex()) ==
+                season14.lastTavernSpellShopTargetEntityID)
+                shopTarget = &data.value();
+        });
+        std::vector<int> recipients;
+        recruitField.ForEachAlive([&recipients](MinionData& data) {
+            recipients.push_back(data.value().GetZonePosition());
+        });
+        bool cleaverActive = false;
+        for (const auto& trinket : season14.trinkets)
+        {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto behavior = FindTrinketBehavior(
+                Cards::FindCardByDbfID(trinket.dbfID).id);
+            if (behavior.effect == TrinketEffect::AFTER_SPELL_ON_SHOP_CONSUME)
+            {
+                cleaverActive = true;
+                break;
+            }
+        }
+        if (cleaverActive && shopTarget != nullptr && !recipients.empty())
+        {
+            Random::shuffle(recipients.begin(), recipients.end());
+            auto& recipient = recruitField[static_cast<std::size_t>(recipients.front())];
+            const int attack = shopTarget->GetAttack();
+            const int health = shopTarget->GetHealth();
+            const int poolIndex = shopTarget->GetPoolIndex();
+            recipient.SetAttack(recipient.GetAttack() + attack);
+            recipient.SetHealth(recipient.GetHealth() + health);
+            tavern.fieldZone.Remove(*shopTarget);
+            if (poolIndex >= 0) returnMinionCallback(poolIndex);
+        }
+    }
+    season14.lastTavernSpellShopTargetEntityID = 0;
     // Flighty Portrait's text is a hand/warband aura rather than a generic
     // board or Tavern-shop stat bonus.  Resolve it only after a successful
     // Tavern spell, so generated/free/modal casts share the same boundary.
@@ -6633,13 +6661,16 @@ bool Player::ApplySpellChoice(std::size_t offeringIdx, std::size_t targetIdx)
     const auto card = Cards::FindCardByDbfID(season14.spellModal.sourceCardDbfID);
     const auto effect = FindTavernSpellBehavior(card.id);
     if (!TavernSpellRequiresTarget(effect.effect)) return false;
+    const auto targetEntityID = targetShop
+        ? static_cast<std::uint64_t>(target.GetIndex()) : 0;
     ApplySpellBoardEffect(*this, effect, static_cast<int>(targetIdx), false, card.dbfID);
     ApplyImperialDefenderCopies(
         *this, static_cast<int>(targetIdx), card.targetingType,
         [&](int buddyIdx) {
             ApplySpellBoardEffect(*this, effect, buddyIdx, false, card.dbfID);
         });
-    season14.OnTavernSpellResolved(true, card.dbfID, !targetShop);
+    season14.OnTavernSpellResolved(
+        true, card.dbfID, !targetShop, targetEntityID);
     ResolveSpellCountTrinkets();
     ApplyTavernSpellTrinkets();
     const bool resumeGeneratedRewardSpells =
@@ -9412,6 +9443,11 @@ bool Player::CastTavernSpellFree(const std::string& cardID, int amount,
     }
     for (int i = 0; i < amount; ++i)
     {
+        const bool targetShop = targetIdx >= 0 && TavernSpellTargetsShop(behavior.effect);
+        const auto targetEntity = targetShop
+            ? static_cast<std::uint64_t>(tavern.fieldZone[
+                  static_cast<std::size_t>(targetIdx)].GetIndex())
+            : 0;
         ApplySpellBoardEffect(*this, behavior, targetIdx, false, card.dbfID);
         season14.Emit(Season14Event::SPELL_CAST);
         // A target-aware trigger only fires when this free cast was resolved
@@ -9424,6 +9460,13 @@ bool Player::CastTavernSpellFree(const std::string& cardID, int amount,
                 data.value().ActivateTrigger(TriggerType::AFTER_CAST_SPELL, target);
             });
         }
+        // Free/generated casts are still successful Tavern-spell resolutions:
+        // they must participate in the same spell counter and observer hooks
+        // as hand-cast and modal continuations.  Keeping this immediately
+        // before ApplyTavernSpellTrinkets preserves the normal post-resolution
+        // ordering and lets effects such as Inductive Gyroblade observe them.
+        season14.OnTavernSpellResolved(
+            true, card.dbfID, targetIdx >= 0 && !targetShop, targetEntity);
         ApplyTavernSpellTrinkets();
     }
     return true;
@@ -9524,11 +9567,7 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
             });
     }
     const TavernSpellBehavior behavior = FindTavernSpellBehavior(spell.GetID());
-    const bool shopTarget = behavior.effect ==
-                            TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY ||
-                            behavior.effect == TavernSpellEffect::TARGET_SHOP_COPY ||
-                            behavior.effect == TavernSpellEffect::TARGET_SHOP_COPY_TIER ||
-                            behavior.effect == TavernSpellEffect::TARGET_SHOP_MOVE_NON_GOLDEN;
+    const bool shopTarget = TavernSpellTargetsShop(behavior.effect);
     if (behavior.gold < 0 ||
         TavernSpellRequiresTarget(behavior.effect) != (targetIdx >= 0) ||
         (shopTarget && (targetIdx < 0 || targetIdx >= tavern.fieldZone.GetCount() ||
@@ -9979,6 +10018,17 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     const bool spellcraftSpell = spell.IsTemporary();
     bool temporarySpell = spellcraftSpell;
     TavernSpellBehavior effect = FindTavernSpellBehavior(spell.GetID());
+    // Capture a shop target before resolving the spell.  Some valid target
+    // spells (move/copy) mutate or remove the Tavern entity during their
+    // effect, but Felsteel Cleaver needs the original stable entity ID at the
+    // shared post-resolution boundary.
+    const bool spellTargetShop = targetIdx >= 0 &&
+                                 TavernSpellTargetsShop(effect.effect);
+    const std::uint64_t spellTargetEntityID =
+        spellTargetShop
+            ? static_cast<std::uint64_t>(tavern.fieldZone[
+                  static_cast<std::size_t>(targetIdx)].GetIndex())
+            : 0;
     if (spell.GetID() == "BG31_920t" || spell.GetID() == "BG31_920_Gt")
         effect.value = spell.GetDynamicTier();
     // Thaumaturgy scales by one stat point per three successful Tavern
@@ -10533,7 +10583,9 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     // consumed only after a supported spell has actually resolved.  The
     // legality check above ensures unaffordable/unsupported attempts leave
     // the discount untouched.
-    season14.OnTavernSpellResolved(true, sourceSpellDbfID, targetIdx >= 0);
+    season14.OnTavernSpellResolved(true, sourceSpellDbfID,
+                                   targetIdx >= 0 && !spellTargetShop,
+                                   spellTargetEntityID);
     ResolveSpellCountTrinkets();
     IncrementStartCombatSpellImprovements();
     const auto spellAttack = season14.TakeSpellMinionAttackDelta();

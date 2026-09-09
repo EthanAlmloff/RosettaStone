@@ -30,9 +30,21 @@ DarkGiftBehavior FindDarkGiftBehavior(std::string_view id)
         return { DarkGiftEffect::TIME_TURNING };
     if (id == "BG36_MidGameEffect_000t50") // Tarecgosa's Blessing.
         return { DarkGiftEffect::TARECGOSA_BLESSING };
-    // Steady Growth (BG36_MidGameEffect_000t51) remains fail-closed: the
-    // checked-in 36.4 DBF export contains +0/+0 placeholders and no
-    // authoritative schedule. Do not infer executable values from comments.
+    // User-supplied Patch 36.2.2 correction carried forward to pinned 36.4:
+    // +2/+2, then +2/+3, then +3/+4 at each later end of recruit turn. The
+    // 36.4 DBF row remains unchanged as provenance and has +0/+0 placeholders.
+    if (id == "BG36_MidGameEffect_000t51")
+    {
+        DarkGiftBehavior behavior;
+        behavior.effect = DarkGiftEffect::STEADY_GROWTH;
+        behavior.attack = 2;
+        behavior.health = 2;
+        behavior.steadyGrowthSecondAttack = 2;
+        behavior.steadyGrowthSecondHealth = 3;
+        behavior.steadyGrowthLaterAttack = 3;
+        behavior.steadyGrowthLaterHealth = 4;
+        return behavior;
+    }
     if (id == "BG36_MidGameEffect_000t82") // Affinity: every two turns.
         return { DarkGiftEffect::AFFINITY };
     if (id == "BG36_MidGameEffect_000t65") // Polarization: end-turn Magnetic Mech.
@@ -240,7 +252,11 @@ bool DarkGiftTargetIsLegal(const Minion& target,
         case DarkGiftEffect::TARECGOSA_BLESSING:
             return true;
         case DarkGiftEffect::STEADY_GROWTH:
-            return behavior.attack != 0 || behavior.health != 0;
+            return (behavior.attack != 0 || behavior.health != 0) &&
+                   (behavior.steadyGrowthSecondAttack != 0 ||
+                    behavior.steadyGrowthSecondHealth != 0) &&
+                   (behavior.steadyGrowthLaterAttack != 0 ||
+                    behavior.steadyGrowthLaterHealth != 0);
         case DarkGiftEffect::AFFINITY:
             return target.GetRace() != Race::INVALID;
         case DarkGiftEffect::POLARIZATION:
@@ -308,6 +324,15 @@ bool ApplyDarkGift(Minion& target, const DarkGiftBehavior& behavior,
     }
     if (behavior.effect == DarkGiftEffect::TARECGOSA_BLESSING) {
         target.SetTarecgosaBlessing();
+        return true;
+    }
+    if (behavior.effect == DarkGiftEffect::STEADY_GROWTH)
+    {
+        target.SetSteadyGrowth(behavior.attack, behavior.health,
+                               behavior.steadyGrowthSecondAttack,
+                               behavior.steadyGrowthSecondHealth,
+                               behavior.steadyGrowthLaterAttack,
+                               behavior.steadyGrowthLaterHealth);
         return true;
     }
     if (behavior.effect == DarkGiftEffect::AFFINITY) {
@@ -505,6 +530,7 @@ void DarkGiftBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     // the only executor and is reached through the semantic bridge action.
     for (const auto* id : { "BG36_MidGameEffect_000t",
                             "BG36_MidGameEffect_000t2",
+                            "BG36_MidGameEffect_000t51",
                             "BG36_MidGameEffect_000t52",
                             "BG36_MidGameEffect_000t73",
                             "BG36_MidGameEffect_000t72",

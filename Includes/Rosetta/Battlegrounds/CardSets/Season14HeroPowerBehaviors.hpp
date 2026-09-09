@@ -368,7 +368,12 @@ inline constexpr std::array<Season14GeneratedChoiceDefinition, 79>
         {"BG24_Reward_351", 96149, Season14GeneratedChoiceDefinition::Effect::TOTEMIC_TAVERN, true},
         {"BG24_Reward_352", 96150, Season14GeneratedChoiceDefinition::Effect::PURIFIED_SHARD, true},
         {"BG24_Reward_360", 97436, Season14GeneratedChoiceDefinition::Effect::THE_WALL, true},
-        {"BG27_Reward_802", 104673, Season14GeneratedChoiceDefinition::Effect::BATTLECRY_REPEAT, true},
+        // Gilnean War Horn contains a server-selected `{0}` Battlecry
+        // minion.  Patch 36.4's card snapshot does not carry that linked
+        // quest payload, and choosing an arbitrary current-board Battlecry
+        // would credit the wrong target.  Keep the typed identity visible,
+        // but fail closed until the parent quest/replay payload is modeled.
+        {"BG27_Reward_802", 104673, Season14GeneratedChoiceDefinition::Effect::BATTLECRY_REPEAT, false, "linked_battlecry_target_unpinned"},
         {"BG28_Reward_514", 110343, Season14GeneratedChoiceDefinition::Effect::START_TURN_RANDOM_SPELLS, true},
         {"BG33_Reward_004", 122015, Season14GeneratedChoiceDefinition::Effect::AVENGE_REFRESH, true},
         {"BG27_Reward_812", 104821, Season14GeneratedChoiceDefinition::Effect::TAVERN_EXTRA_MINIONS, true},

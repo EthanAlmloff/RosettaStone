@@ -575,7 +575,8 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
 //! the public modal contract used by automatic random-spell effects.
 inline bool TavernSpellTargetsShop(TavernSpellEffect effect) noexcept
 {
-    return effect == TavernSpellEffect::TARGET_SHOP_COPY ||
+    return effect == TavernSpellEffect::SHOP_STATS_TO_RANDOM_FRIENDLY ||
+           effect == TavernSpellEffect::TARGET_SHOP_COPY ||
            effect == TavernSpellEffect::TARGET_SHOP_COPY_TIER ||
            effect == TavernSpellEffect::TARGET_SHOP_MOVE_NON_GOLDEN;
 }

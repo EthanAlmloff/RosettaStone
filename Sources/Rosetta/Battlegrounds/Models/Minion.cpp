@@ -603,6 +603,16 @@ bool Minion::MergeIntoGolden(const Minion& other)
     const int buyTriggerUses = std::max(m_buyTriggerUses, other.m_buyTriggerUses);
     const int steadyAttack = sum(m_steadyGrowthAttack, other.m_steadyGrowthAttack);
     const int steadyHealth = sum(m_steadyGrowthHealth, other.m_steadyGrowthHealth);
+    const int steadySecondAttack = sum(m_steadyGrowthSecondAttack,
+                                       other.m_steadyGrowthSecondAttack);
+    const int steadySecondHealth = sum(m_steadyGrowthSecondHealth,
+                                       other.m_steadyGrowthSecondHealth);
+    const int steadyLaterAttack = sum(m_steadyGrowthLaterAttack,
+                                      other.m_steadyGrowthLaterAttack);
+    const int steadyLaterHealth = sum(m_steadyGrowthLaterHealth,
+                                      other.m_steadyGrowthLaterHealth);
+    const auto steadyTurns = std::max(m_steadyGrowthTurns,
+                                      other.m_steadyGrowthTurns);
     const int avengeDeaths = sum(m_avengeDeaths, other.m_avengeDeaths);
     const int threshold = std::max(m_attackThresholdDivineShield,
                                    other.m_attackThresholdDivineShield);
@@ -698,6 +708,11 @@ bool Minion::MergeIntoGolden(const Minion& other)
     m_buyTriggerUses = buyTriggerUses;
     m_steadyGrowthAttack = steadyAttack;
     m_steadyGrowthHealth = steadyHealth;
+    m_steadyGrowthSecondAttack = steadySecondAttack;
+    m_steadyGrowthSecondHealth = steadySecondHealth;
+    m_steadyGrowthLaterAttack = steadyLaterAttack;
+    m_steadyGrowthLaterHealth = steadyLaterHealth;
+    m_steadyGrowthTurns = steadyTurns;
     m_avengeDeaths = avengeDeaths;
     m_attackThresholdDivineShield = threshold;
     m_attackThresholdTriggered = thresholdTriggered;

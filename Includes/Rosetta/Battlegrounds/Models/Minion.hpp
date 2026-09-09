@@ -121,16 +121,42 @@ class Minion
     bool HasTarecgosaBlessing() const noexcept { return m_tarecgosaBlessing; }
     void SetTimeTurning(bool enabled = true) noexcept { m_timeTurning = enabled; }
     bool HasTimeTurning() const noexcept { return m_timeTurning; }
-    void SetSteadyGrowth(int attack, int health) noexcept
+    //! Arm the three-step end-of-recruit cadence. The third payload repeats.
+    void SetSteadyGrowth(int firstAttack, int firstHealth,
+                         int secondAttack, int secondHealth,
+                         int laterAttack, int laterHealth) noexcept
     {
-        m_steadyGrowthAttack = attack;
-        m_steadyGrowthHealth = health;
+        m_steadyGrowthAttack = firstAttack;
+        m_steadyGrowthHealth = firstHealth;
+        m_steadyGrowthSecondAttack = secondAttack;
+        m_steadyGrowthSecondHealth = secondHealth;
+        m_steadyGrowthLaterAttack = laterAttack;
+        m_steadyGrowthLaterHealth = laterHealth;
+        m_steadyGrowthTurns = 0;
     }
-    bool HasSteadyGrowth() const noexcept { return m_steadyGrowthAttack != 0 || m_steadyGrowthHealth != 0; }
+    bool HasSteadyGrowth() const noexcept
+    {
+        return m_steadyGrowthAttack != 0 || m_steadyGrowthHealth != 0 ||
+               m_steadyGrowthSecondAttack != 0 ||
+               m_steadyGrowthSecondHealth != 0 ||
+               m_steadyGrowthLaterAttack != 0 ||
+               m_steadyGrowthLaterHealth != 0;
+    }
     void ApplySteadyGrowth() noexcept
     {
-        m_attack += m_steadyGrowthAttack;
-        m_health += m_steadyGrowthHealth;
+        const auto attack = m_steadyGrowthTurns == 0
+                                 ? m_steadyGrowthAttack
+                                 : m_steadyGrowthTurns == 1
+                                       ? m_steadyGrowthSecondAttack
+                                       : m_steadyGrowthLaterAttack;
+        const auto health = m_steadyGrowthTurns == 0
+                                 ? m_steadyGrowthHealth
+                                 : m_steadyGrowthTurns == 1
+                                       ? m_steadyGrowthSecondHealth
+                                       : m_steadyGrowthLaterHealth;
+        m_attack += attack;
+        m_health += health;
+        if (m_steadyGrowthTurns < 2) ++m_steadyGrowthTurns;
     }
     // Reapplying the same gift is idempotent and must not reset a partially
     // elapsed two-turn cadence.  A changed captured race is a new target
@@ -633,6 +659,11 @@ class Minion
     bool m_tarecgosaBlessing = false;
     int m_steadyGrowthAttack = 0;
     int m_steadyGrowthHealth = 0;
+    int m_steadyGrowthSecondAttack = 0;
+    int m_steadyGrowthSecondHealth = 0;
+    int m_steadyGrowthLaterAttack = 0;
+    int m_steadyGrowthLaterHealth = 0;
+    unsigned char m_steadyGrowthTurns = 0;
     Race m_affinityRace = Race::INVALID;
     int m_affinityTurns = 0;
     bool m_polarization = false;

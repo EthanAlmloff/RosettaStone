@@ -41,3 +41,17 @@ TEST_CASE("[Battlegrounds : ModernMinionBehaviors] Buddy scaling contracts")
     CHECK(2 == 2);     // Akali normal cadence: every two turns
     CHECK(1 == 1);     // Akali golden cadence: every turn
 }
+
+TEST_CASE("[Battlegrounds : ModernMinionBehaviors] Solemn Serenader owns a typed target lifecycle")
+{
+    std::map<std::string, CardDef> cards;
+    ModernMinionBehaviors::AddAll(cards);
+
+    for (const auto* id : {"BG26_HERO_102_Buddy", "BG26_HERO_102_Buddy_G"})
+    {
+        REQUIRE(cards.contains(id));
+        CHECK(cards.at(id).lifecycle == CardLifecycle::BUDDY_SOLEMN_SERENADER);
+        CHECK(cards.at(id).power.GetBattlecryTask().empty());
+        CHECK(cards.at(id).power.GetDeathrattleTask().empty());
+    }
+}

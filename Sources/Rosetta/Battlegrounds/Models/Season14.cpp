@@ -644,6 +644,7 @@ void Season14State::RecordReclaimedSoulsDeath(const Minion& minion)
 
 Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
 {
+    successfulSpellCountAtRecruitStart = successfulSpellCount;
     ++recruitTurnNumber;
     ResetDistinctSpells();
     generatedRewardConchUsedThisTurn = false;
@@ -1421,7 +1422,8 @@ Season14State::OnTrinketFriendlyMinionDied()
 
 void Season14State::OnTavernSpellResolved(bool spellResolved,
                                            std::int32_t sourceDbfID,
-                                           bool spellOnMinion)
+                                           bool spellOnMinion,
+                                           std::uint64_t shopTargetEntityID)
 {
     if (!spellResolved)
         return;
@@ -1496,6 +1498,7 @@ void Season14State::OnTavernSpellResolved(bool spellResolved,
         }
     }
     if (sourceDbfID > 0) lastTavernSpellDbfID = sourceDbfID;
+    lastTavernSpellShopTargetEntityID = shopTargetEntityID;
     if (heroPowerDbfID == 105432)
     {
         // Aranna's passive makes every third Tavern spell free.  Arm the

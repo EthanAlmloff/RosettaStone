@@ -57,6 +57,9 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // trigger.
                            ELEMENTAL_STAT_GIVER_BONUS,
                            AFTER_TAVERN_SPELL_SHOP_BUFF,
+                           // Felsteel Cleaver consumes the Tavern minion
+                           // targeted by a successful spell after resolution.
+                           AFTER_SPELL_ON_SHOP_CONSUME,
                            AFTER_TAVERN_SPELL_RACE_BUFF,
                            TAVERN_SPELL_STATS,
                            TAVERN_SPELL_GROWING_STATS,
@@ -254,6 +257,10 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            AFTER_PLAY_DEMON_DAMAGE,
                            END_TURN_LEFTMOST_STATS_PER_BATTLECRY,
                            END_TURN_FIXED_CARD,
+                           // Inductive Gyroblade creates a Magnetic
+                           // Satellite at recruit end whose stats scale by
+                           // Tavern spells successfully cast this turn.
+                           END_TURN_SPELL_SCALED_SATELLITE,
                            // At recruit end, grant copies of the last Tavern
                            // spell cast this turn.  The spell identity is
                            // resolved from Season14's public last-spell

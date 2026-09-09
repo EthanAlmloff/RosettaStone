@@ -124,8 +124,10 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     // Hero Power use; the lifecycle hook lives on Player.
     AddStatic(cards, "TB_BaconShop_HERO_15_Buddy");
     AddStatic(cards, "TB_BaconShop_HERO_15_Buddy_G");
-    AddStatic(cards, "BG26_HERO_102_Buddy");
-    AddStatic(cards, "BG26_HERO_102_Buddy_G");
+    cards.emplace("BG26_HERO_102_Buddy",
+                  CardDef{CardLifecycle::BUDDY_SOLEMN_SERENADER});
+    cards.emplace("BG26_HERO_102_Buddy_G",
+                  CardDef{CardLifecycle::BUDDY_SOLEMN_SERENADER});
     // Weebomination resolves its end-of-turn health gain against final board
     // positions and the hero's current missing health in Game.
     AddStatic(cards, "TB_BaconShop_HERO_34_Buddy");

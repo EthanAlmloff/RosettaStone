@@ -840,6 +840,9 @@ class Season14State
     std::int32_t spellMinionAttackProgress = 0;
     //! Number of successfully resolved spells this game.
     std::int32_t successfulSpellCount = 0;
+    // Snapshot used by end-of-turn Trinkets whose payload scales with the
+    // number of Tavern spells cast during the current recruit turn.
+    std::int32_t successfulSpellCountAtRecruitStart = 0;
     //! Rewards produced by spell-count Trinkets and not yet delivered by
     //! Player. Hand rewards remain pending when the hand is full.
     std::int32_t pendingSpellCountNagaRewards = 0;
@@ -906,6 +909,10 @@ class Season14State
     std::int32_t persistentBeetleHealth = 0;
     std::int32_t nextTavernSpellDiscount = 0;
     std::int32_t lastTavernSpellDbfID = 0;
+    //! Stable public entity targeted by the most recently resolved Tavern
+    //! spell, when that target was in Bob's Tavern.  This is consumed by
+    //! target-aware Trinket hooks before the next spell overwrites it.
+    std::uint64_t lastTavernSpellShopTargetEntityID = 0;
     std::int32_t persistentTavernTierAttack = 0;
     std::int32_t persistentTavernTierHealth = 0;
     std::int32_t persistentTavernTierMax = 0;
@@ -1157,8 +1164,14 @@ class Season14State
     // minion (for example Honeycomb Ring).  Keep the default for callers
     // that resolve non-targeted Tavern spells.
     void OnTavernSpellResolved(bool spellResolved, std::int32_t sourceDbfID = 0,
-                               bool spellOnMinion = false);
+                               bool spellOnMinion = false,
+                               std::uint64_t shopTargetEntityID = 0);
     std::int32_t SuccessfulSpellCount() const noexcept { return successfulSpellCount; }
+    std::int32_t SuccessfulSpellsThisRecruitTurn() const noexcept
+    {
+        return std::max<std::int32_t>(0, successfulSpellCount -
+                                         successfulSpellCountAtRecruitStart);
+    }
     std::int32_t PendingSpellCountNagaRewards() const noexcept
     { return pendingSpellCountNagaRewards; }
     bool ConsumeSpellCountNagaReward() noexcept

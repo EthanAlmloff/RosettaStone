@@ -330826,5 +330826,276 @@
     "techLevel": 1,
     "text": "<b>Taunt</b>",
     "type": "MINION"
+},
+{
+    "cardClass": "NEUTRAL",
+    "collectionText": "[x]At the start of the game,\nchoose from 2 Protoss\nminions to get after you\nbuy 14 cards. <i>(Done!)</i>",
+    "cost": 0,
+    "dbfId": 119196,
+    "hideCost": true,
+    "id": "BG31_HERO_802p",
+    "mechanics": [
+        "TRIGGER_VISUAL"
+    ],
+    "name": "Warp Gate",
+    "set": "BATTLEGROUNDS",
+    "text": "[x]At the start of the game,\nchoose from 2 Protoss\nminions to get after you\nbuy 14 cards. <i>(14 left!)</i>",
+    "type": "HERO_POWER"
+},
+{
+    "artist": "L. Lullabi & I. Campelo da Silva",
+    "attack": 3,
+    "classes": [
+        "DRUID",
+        "MAGE",
+        "PRIEST",
+        "ROGUE"
+    ],
+    "cost": 3,
+    "dbfId": 113732,
+    "health": 4,
+    "id": "SC_751t",
+    "isMiniSet": true,
+    "mechanics": [
+        "CHARGE"
+    ],
+    "name": "Zealot",
+    "set": "SPACE",
+    "text": "<b>Charge</b>",
+    "type": "MINION"
+},
+{
+    "artist": "Timur Shevtsov",
+    "attack": 5,
+    "cardClass": "ROGUE",
+    "collectible": true,
+    "cost": 6,
+    "dbfId": 113165,
+    "flavor": "*stab*\n*stab*\n*stab*\n\"Hey, where'd my SCVs go?\"",
+    "health": 3,
+    "id": "SC_752",
+    "isMiniSet": true,
+    "mechanics": [
+        "BATTLECRY",
+        "STEALTH",
+        "TRIGGER_VISUAL"
+    ],
+    "name": "Dark Templar",
+    "rarity": "RARE",
+    "set": "SPACE",
+    "targetingArrowText": "Destroy an enemy minion.",
+    "text": "[x]<b>Stealth</b>. <b>Battlecry:</b> Destroy\nan enemy minion.\n<i>Play another Templar to\nmerge into an Archon!</i>",
+    "type": "MINION"
+},
+{
+    "artist": "Kevin Sidharta",
+    "attack": 2,
+    "cardClass": "DRUID",
+    "collectible": true,
+    "cost": 12,
+    "dbfId": 113174,
+    "flavor": "Yeah, my teammates always call me this.",
+    "health": 14,
+    "id": "SC_756",
+    "isMiniSet": true,
+    "mechanics": [
+        "TRIGGER_VISUAL"
+    ],
+    "name": "Carrier",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "rarity": "COMMON",
+    "set": "SPACE",
+    "text": "[x]At the end of your turn,\nsummon four 4/1\nInterceptors that attack\nrandom enemies.",
+    "type": "MINION"
+},
+{
+    "artist": "Vlad Botos",
+    "attack": 4,
+    "cardClass": "DRUID",
+    "cost": 2,
+    "dbfId": 113175,
+    "health": 1,
+    "id": "SC_756t",
+    "isMiniSet": true,
+    "name": "Interceptor",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "set": "SPACE",
+    "type": "MINION"
+},
+{
+    "artist": "James Ryman",
+    "attack": 9,
+    "cardClass": "MAGE",
+    "collectible": true,
+    "cost": 12,
+    "dbfId": 113177,
+    "flavor": "How's the weather up there?",
+    "health": 4,
+    "id": "SC_758",
+    "isMiniSet": true,
+    "mechanics": [
+        "BATTLECRY"
+    ],
+    "name": "Colossus",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "rarity": "RARE",
+    "set": "SPACE",
+    "text": "[x]<b>Battlecry:</b> Deal 1 damage\nto all enemies, twice.\n<i>(Improved by Protoss spells\nyou cast this game!)</i>",
+    "type": "MINION"
+},
+{
+    "artist": "Mooncolony",
+    "attack": 10,
+    "cardClass": "PRIEST",
+    "collectible": true,
+    "cost": 12,
+    "dbfId": 113203,
+    "flavor": "You talk to your mothership with that mouth!?",
+    "health": 10,
+    "id": "SC_762",
+    "isMiniSet": true,
+    "mechanics": [
+        "BATTLECRY",
+        "DEATHRATTLE",
+        "TAUNT"
+    ],
+    "name": "Mothership",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "rarity": "EPIC",
+    "set": "SPACE",
+    "text": "[x]<b>Taunt</b>\n<b>Battlecry and Deathrattle:</b>\nGet two random\nProtoss minions.",
+    "type": "MINION"
+},
+{
+    "artist": "Vlad Botos",
+    "attack": 5,
+    "cardClass": "DRUID",
+    "collectible": true,
+    "cost": 7,
+    "dbfId": 113735,
+    "flavor": "Hi Mortal, I'm Dad.",
+    "health": 8,
+    "id": "SC_763",
+    "isMiniSet": true,
+    "mechanics": [
+        "BATTLECRY",
+        "DIVINE_SHIELD",
+        "TAUNT"
+    ],
+    "name": "Immortal",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "rarity": "RARE",
+    "set": "SPACE",
+    "text": "[x]<b>Taunt</b>, <b>Divine Shield</b>\n<b>Battlecry:</b> Spend 4 Mana to\ndouble this minion's stats.",
+    "type": "MINION"
+},
+{
+    "artist": "Melvin Chan",
+    "attack": 2,
+    "cardClass": "PRIEST",
+    "collectible": true,
+    "cost": 2,
+    "dbfId": 113738,
+    "flavor": "Need a dispenser here!",
+    "health": 2,
+    "id": "SC_764",
+    "isMiniSet": true,
+    "mechanics": [
+        "DEATHRATTLE",
+        "LIFESTEAL"
+    ],
+    "name": "Sentry",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "rarity": "COMMON",
+    "set": "SPACE",
+    "text": "<b>Lifesteal</b>. <b>Deathrattle:</b>\nYour Protoss minions cost (1) less this game.",
+    "type": "MINION"
+},
+{
+    "artist": "James Ryman",
+    "attack": 3,
+    "cardClass": "ROGUE",
+    "collectible": true,
+    "cost": 6,
+    "dbfId": 113739,
+    "flavor": "If this job doesn't work out, I can always fall back on being a Psionic Storm Chaser.",
+    "health": 5,
+    "id": "SC_765",
+    "isMiniSet": true,
+    "mechanics": [
+        "BATTLECRY",
+        "TRIGGER_VISUAL"
+    ],
+    "name": "High Templar",
+    "rarity": "RARE",
+    "set": "SPACE",
+    "text": "[x]<b>Battlecry:</b> Deal 2 damage\nto all enemies.\n<i>Play another Templar to\nmerge into an Archon!</i>",
+    "type": "MINION"
+},
+{
+    "artist": "Drew Hill",
+    "attack": 3,
+    "classes": [
+        "DRUID",
+        "MAGE",
+        "PRIEST",
+        "ROGUE"
+    ],
+    "collectible": true,
+    "cost": 3,
+    "dbfId": 113733,
+    "flavor": "Raymond just had this empty feeling.",
+    "health": 2,
+    "id": "SC_783",
+    "isMiniSet": true,
+    "mechanics": [
+        "BATTLECRY",
+        "DIVINE_SHIELD",
+        "RUSH"
+    ],
+    "name": "Void Ray",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "rarity": "RARE",
+    "set": "SPACE",
+    "text": "<b>Rush</b>, <b>Divine Shield</b>\n<b>Battlecry:</b> If this costs (0), gain +2/+2.",
+    "type": "MINION"
+},
+{
+    "artist": "James Ryman",
+    "attack": 8,
+    "cardClass": "ROGUE",
+    "cost": 8,
+    "dbfId": 113202,
+    "health": 8,
+    "id": "SC_671t1",
+    "isMiniSet": true,
+    "mechanics": [
+        "TRIGGER_VISUAL"
+    ],
+    "name": "Archon",
+    "set": "SPACE",
+    "text": "[x]At the end of your turn,\ndeal 8 damage to the\nenemy hero and 2 damage\nto their minions.",
+    "type": "MINION"
 }
 ]

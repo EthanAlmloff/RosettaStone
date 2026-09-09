@@ -78,6 +78,11 @@ struct DarkGiftBehavior
     int incubationTurns = 0;
     //! Fodders added to the next refreshes by Demonology.
     int fodderRefreshes = 0;
+    //! Steady Growth's second-turn and third/later-turn payloads.
+    int steadyGrowthSecondAttack = 0;
+    int steadyGrowthSecondHealth = 0;
+    int steadyGrowthLaterAttack = 0;
+    int steadyGrowthLaterHealth = 0;
 };
 
 //! Returns the complete behavior for a supported gift, or NONE when the
