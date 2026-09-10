@@ -11,7 +11,7 @@ namespace RosettaStone::Battlegrounds::SimpleTasks {
 namespace {
 using Random = effolkronium::random_thread_local;
 
-std::vector<Card> ElementalPool() {
+std::vector<Card> ElementalPool(const Player& player) {
   std::vector<Card> result;
   for (const auto& card : Cards::GetAllCards()) {
     if (card.isBattlegroundsPoolMinion && card.hasBehavior &&
@@ -28,7 +28,7 @@ TaskStatus WindfallTornadoDiscoverTask::Run(Player& player, Minion& source) {
   if (m_choices <= 0 || player.hand.IsFull() ||
       player.season14.pendingDecision != Season14Decision::NONE)
     return TaskStatus::COMPLETE;
-  auto candidates = ElementalPool();
+  auto candidates = ElementalPool(player);
   if (candidates.empty()) return TaskStatus::STOP;
   Random::shuffle(candidates.begin(), candidates.end());
   const auto count = std::min<std::size_t>(3, candidates.size());

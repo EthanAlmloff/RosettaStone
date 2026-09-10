@@ -1305,6 +1305,25 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Season 14 typed economy and trig
     CHECK(cliffdiver.health == 2);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - fixed reward and spell trinkets")
+{
+    for (const auto& [id, reward] : {
+             std::pair{"BG30_MagicItem_543", "EBG_Spell_032"},
+             std::pair{"BG32_MagicItem_172", "BG31_176"},
+             std::pair{"BG35_MagicItem_303", "BG34_Giant_072"}}) {
+        const auto behavior = FindTrinketBehavior(id);
+        CHECK(behavior.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+        CHECK(behavior.cardID == reward);
+        CHECK(behavior.amount == 1);
+        CHECK(behavior.repeatAtStartTurn ==
+              (std::string_view(id) != "BG35_MagicItem_303"));
+    }
+    const auto spell = FindTrinketBehavior("BG32_MagicItem_893");
+    CHECK(spell.effect == TrinketEffect::SPELL_CAST_LEFTMOST_MINION_STATS);
+    CHECK(spell.attack == 3);
+    CHECK(spell.health == 3);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Gem Donation first sale")
 {
     const auto behavior = FindTrinketBehavior("BG32_MagicItem_809");

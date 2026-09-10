@@ -49,11 +49,21 @@ bool ApplyReviewedTemporaryChildEnchantment(Minion& target,
 bool RecordReviewedLifecycleEnchantment(Minion& target,
                                         std::string_view parentID);
 
+//! Record an exact parent-qualified child marker when the payload is owned by
+//! a Player/Season14 state machine rather than Minion temporary stats.
+bool RecordReviewedLifecycleEnchantment(Minion& target,
+                                        std::string_view parentID,
+                                        std::string_view childID);
+
 //! Record a child whose payload is owned by a non-Minion state machine.
 //! Parent and child IDs are admitted only as exact reviewed pairs; the
 //! caller remains responsible for applying the authoritative state payload.
 bool RecordReviewedExternalLifecycleEnchantment(
     Minion& target, std::string_view parentID, std::string_view childID);
+
+bool ApplyReviewedEndTurnChildEnchantment(Minion& target,
+                                          std::string_view parentID,
+                                          std::string_view childID);
 
 //! Record the exact child marker for a Dark Gift whose payload lives in the
 //! DarkGiftBehavior state machine.  This is deliberately parent-qualified;

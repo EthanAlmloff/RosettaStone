@@ -2043,6 +2043,12 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     if (behavior.effect == TrinketEffect::DEATHLY_PHYLACTERY)
                         ++repeatFirstDeathrattleCount;
                 }
+            // Titus' Tribute (BG28_843e) is a player-scoped temporary
+            // enchantment. Unlike first-deathrattle Trinkets, it applies to
+            // every friendly Deathrattle in this combat, so add its exact
+            // parent-owned repeat count for every activation boundary.
+            repeatFirstDeathrattleCount +=
+                owner.season14.TitusTributeExtraActivations();
             // Thornspike Pauldron is keyed to each Deathrattle trigger, not
             // to the removed minion/death boundary.  In particular, a
             // repeated first Deathrattle is two triggers.  Arm the temporary

@@ -10,6 +10,7 @@
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Managers/GameManager.hpp>
 #include <Rosetta/Battlegrounds/Models/Battle.hpp>
+#include <Rosetta/Battlegrounds/Models/LifecycleEnchantment.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ActivateRandomTavernSpellsTask.hpp>
 
@@ -27,6 +28,29 @@ using Random = effolkronium::random_thread_local;
 
 namespace
 {
+// End-of-turn repeat sources are additive.  Each source contributes an
+// additional dispatch to the same boundary; no source is allowed to multiply
+// another source's already-expanded count (which would make duplicate
+// stickers or Primal Staff recurse unexpectedly).
+constexpr int EndTurnPassCount(int basePasses, int primalStaffExtra,
+                               int drakkariExtra, int lucifronExtra,
+                               int ghastlyExtra, int trinketExtra) noexcept
+{
+    return basePasses + primalStaffExtra + drakkariExtra + lucifronExtra +
+           ghastlyExtra + trinketExtra;
+}
+
+static_assert(EndTurnPassCount(1, 0, 0, 0, 0, 0) == 1);
+static_assert(EndTurnPassCount(1, 1, 0, 0, 0, 0) == 2);
+static_assert(EndTurnPassCount(1, 2, 0, 0, 0, 0) == 3);
+// Normal/golden Drakkari and Lucifron each add one/two independent passes.
+static_assert(EndTurnPassCount(1, 0, 1, 1, 0, 0) == 3);
+static_assert(EndTurnPassCount(1, 0, 2, 2, 0, 0) == 5);
+// Ghastly's second base dispatch and two duplicate extra-trigger Trinkets
+// remain additive, not recursive.
+static_assert(EndTurnPassCount(1, 0, 0, 0, 1, 2) == 4);
+static_assert(EndTurnPassCount(1, 2, 2, 2, 1, 2) == 10);
+
 class OpponentNotFound final : public std::logic_error
 {
  public:
@@ -562,6 +586,19 @@ void Game::Recruit()
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.RefreshSousChefHeroPowerUses();
         player.remainCoin += heroPowerResult.goldDelta;
+        // Turn-start CardDef triggers are committed once, at the recruit
+        // boundary.  Accord-o-Tron owns the Gold task in its CardDef; this
+        // adjacent marker records only the exact child identity after that
+        // task, so normal, golden, and generated/trinket copies share one
+        // semantic path without double-paying Gold.
+        player.recruitField.ForEachAlive([](MinionData& data) {
+            auto& minion = data.value();
+            minion.ActivateTrigger(TriggerType::TURN_START, minion);
+            const auto& id = minion.GetCardID();
+            if (id == "BG26_147" || id == "BG26_147_G")
+                (void)RecordReviewedExternalLifecycleEnchantment(
+                    minion, id, "BG26_147e");
+        });
         // The canonical Season 14 Trinket offers are public four-choice
         // modals on recruit turns 6 and 9.  Open them before other start-turn
         // effects so those effects cannot replace or reorder the scheduled
@@ -686,12 +723,26 @@ void Game::CompleteRecruitPhase()
     {
         if (player.playState == PlayState::PLAYING)
         {
+            // Primal Staff is a counted, one-turn player enchantment.  Take a
+            // snapshot for every end-of-turn dispatch below; treating it as
+            // a bool silently loses a second cast, while consuming it in one
+            // of the dispatches makes later scopes disagree about the number
+            // of passes.  The counter is cleared only after every scope has
+            // used the snapshot (at the end of this player boundary).
+            const int primalStaffExtraPasses =
+                player.season14.PrimalStaffExtraPasses();
             player.ResolveRecruitEndDeaths();
-            player.ResolveLiftOffEndTurn();
-            player.ResolveFodderDefilerEndTurn();
-            player.ResolveEnigmaticHeadstoneEndTurn();
-            player.ResolveTrinketEndTurn();
-            player.ResolveGeneratedQuestRewardSnickerSnacks();
+            // Player-owned end-of-turn effects, including Trinkets, are a
+            // complete ordered group.  Each Primal Staff cast contributes
+            // one additional group pass; never re-enter the phase itself.
+            for (int pass = 0; pass < 1 + primalStaffExtraPasses; ++pass)
+            {
+                player.ResolveLiftOffEndTurn();
+                player.ResolveFodderDefilerEndTurn();
+                player.ResolveEnigmaticHeadstoneEndTurn();
+                player.ResolveTrinketEndTurn();
+                player.ResolveGeneratedQuestRewardSnickerSnacks();
+            }
             // Advance persistent end-of-turn counters (including Patient
             // Scout's tier improvement) before combat begins.
             // Drakkari Enchanter multiplies minion end-of-turn effects. The
@@ -702,6 +753,13 @@ void Game::CompleteRecruitPhase()
                 if (data.value().GetCardID() == "BG26_ICC_901") drakkariPasses = std::max(drakkariPasses, 2);
                 else if (data.value().GetCardID() == "BG26_ICC_901_G") drakkariPasses = std::max(drakkariPasses, 3);
             });
+            // Primal Staff (BG28_955e) repeats this turn's end-of-turn
+            // effects, independently of Titus' Deathrattle scope and
+            // independently of Drakkari's persistent aura.
+            // Each Primal Staff cast contributes one complete additional
+            // pass.  This is additive with the persistent Drakkari pass.
+            const int drakkariExtraPasses = drakkariPasses - 1;
+            drakkariPasses += primalStaffExtraPasses;
             for (int pass = 0; pass < drakkariPasses; ++pass)
             {
                 player.ResolveGeneratedQuestRewardEndTurn();
@@ -711,8 +769,11 @@ void Game::CompleteRecruitPhase()
                 // end-of-turn triggers.
                 player.ResolveGeneratedQuestRewardTinyHenchmen();
             }
-            player.ResolveSulfurasEndTurn();
-            player.ResolveCthunEndTurn();
+            const int playerEndTurnPasses = 1 + primalStaffExtraPasses;
+            for (int pass = 0; pass < playerEndTurnPasses; ++pass) {
+                player.ResolveSulfurasEndTurn();
+                player.ResolveCthunEndTurn();
+            }
             player.AdvanceCthunUpgrade();
             if (player.season14.ShouldFreezeRemainingTavern())
             {
@@ -725,6 +786,8 @@ void Game::CompleteRecruitPhase()
             // End-of-turn Trinkets resolve after the final recruit action.
             // Wallet increases the cap for subsequent turns, while Gilded
             // Anchor buffs only Golden minions currently in the warband.
+            for (int pass = 0; pass < 1 + primalStaffExtraPasses; ++pass)
+            {
             const auto endTurnMaxGold = player.season14.TakeEndTurnMaxGold();
             // trinketEndTurnMaxGold is consumed here before RECRUIT_END.
             if (endTurnMaxGold > 0)
@@ -833,13 +896,6 @@ void Game::CompleteRecruitPhase()
                         });
                         continue;
                     }
-                    if (behavior.effect == TrinketEffect::END_TURN_UNDEAD_ATTACK)
-                    {
-                        player.ApplyPersistentRaceStats(behavior.race,
-                                                        behavior.attack,
-                                                        behavior.health);
-                        continue;
-                    }
                     if (behavior.effect != TrinketEffect::END_TURN_DIVINE_SHIELD_ATTACK)
                         continue;
                     player.recruitField.ForEachAlive([&](MinionData& data) {
@@ -922,12 +978,13 @@ void Game::CompleteRecruitPhase()
                 }
                 break;
             }
+            }
             // Resolve ordinary minion end-of-turn triggers after the final
             // recruit action and before combat.  Trigger dispatch is kept on
             // the authoritative board instances so generated effects (such
             // as Cataclysmic Harbinger's last-spell copy) cannot be skipped.
-            const int endTurnPasses = player.season14.HasGeneratedRewardGhastlyMask() ? 2 : 1;
-            int resolvedEndTurnPasses = endTurnPasses;
+            const int ghastlyExtraPasses =
+                player.season14.HasGeneratedRewardGhastlyMask() ? 1 : 0;
             int lucifronExtraPasses = 0;
             player.recruitField.ForEachAlive([&lucifronExtraPasses](const MinionData& data) {
                 const auto& id = data.value().GetCardID();
@@ -935,8 +992,11 @@ void Game::CompleteRecruitPhase()
                     CardLifecycle::BUDDY_LUCIFRON)
                     lucifronExtraPasses += id.ends_with("_G") ? 2 : 1;
             });
-            resolvedEndTurnPasses = std::max(resolvedEndTurnPasses,
-                1 + lucifronExtraPasses);
+            // Primal Staff, Drakkari, Lucifron, Ghastly, and extra-trigger
+            // Trinkets are independent additive dispatch sources.  Compute
+            // one count after collecting all sources so no source can
+            // accidentally multiply an already-expanded count.
+            int extraTriggerTrinkets = 0;
             for (const auto& trinket : player.season14.trinkets)
             {
                 if (!trinket.active || trinket.remainingUses == 0) continue;
@@ -944,16 +1004,25 @@ void Game::CompleteRecruitPhase()
                         Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
                     TrinketEffect::END_TURN_EXTRA_TRIGGER)
                 {
-                    resolvedEndTurnPasses = std::max(resolvedEndTurnPasses, 2);
-                    break;
+                    // Each active copy is another end-of-turn repeat.  Do
+                    // not clamp this to one: duplicate stickers stack, and
+                    // Primal Staff's counted repeats are added below.
+                    ++extraTriggerTrinkets;
                 }
             }
+            const int resolvedEndTurnPasses = EndTurnPassCount(
+                1, primalStaffExtraPasses, drakkariExtraPasses,
+                lucifronExtraPasses, ghastlyExtraPasses, extraTriggerTrinkets);
             for (int pass = 0; pass < resolvedEndTurnPasses; ++pass) {
                 player.recruitField.ForEachAlive([](MinionData& data) {
                     auto& minion = data.value();
                     minion.ActivateTrigger(TriggerType::TURN_END, minion);
                 });
             }
+            // All counted Primal Staff casts have now been applied to every
+            // end-of-turn scope, including the ordinary TURN_END dispatch
+            // and Trinket passes.  Consume once, after the complete boundary.
+            player.season14.ConsumePrimalStaff();
             // Master Gadrin resolves from the final recruit-board positions.
             // Normal copies Attack to the minion on its left; golden copies
             // to both adjacent minions. This is a copy, not an additive buff.

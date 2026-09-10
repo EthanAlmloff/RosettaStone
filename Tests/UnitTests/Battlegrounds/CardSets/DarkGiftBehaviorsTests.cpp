@@ -240,6 +240,17 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - direct target family")
 
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - unsupported is fail closed")
 {
+    const auto scars = FindDarkGiftBehavior("BG36_MidGameEffect_000t28");
+    CHECK(scars.effect == DarkGiftEffect::COUNTER_STATS);
+    CHECK(scars.attack == 3);
+    CHECK(scars.health == 3);
+    CHECK(scars.counterKind == 1);
+    const auto siphon = FindDarkGiftBehavior("BG36_MidGameEffect_000t30");
+    CHECK(siphon.effect == DarkGiftEffect::COUNTER_STATS);
+    CHECK(siphon.attack == 3);
+    CHECK(siphon.health == 3);
+    CHECK(siphon.counterKind == 3);
+
     CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t28t").effect ==
           DarkGiftEffect::COUNTER_STATS);
     CHECK(FindDarkGiftBehavior("BG36_MidGameEffect_000t64t").effect ==

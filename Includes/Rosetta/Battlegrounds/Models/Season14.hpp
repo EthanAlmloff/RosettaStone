@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -415,11 +416,16 @@ class Season14State
     //! modal itself remains in the normal decision state so replay captures
     //! its exact two DBF offerings rather than a random host-side choice.
     bool generatedRewardEtherealEvidence = false;
+    //! Yogg-tastic Tasties reuses Player's canonical seeded Yogg wheel.
+    bool generatedRewardYoggTasties = false;
     bool generatedRewardGhastlyMask = false;
     //! Exact pinned minion selected for Ghastly Mask's {0} card.  The DBF is
     //! retained after delivery so replay cannot reroll the linked entity.
     std::int32_t generatedRewardGhastlyCardDbfID = 0;
     bool generatedRewardGhastlyCardDelivered = false;
+    //! The concrete Battlecry minion selected for Gilnean War Horn's {0}.
+    //! Persisting the DBF prevents replayed acquisition from rerolling it.
+    std::int32_t generatedRewardBattlecryMinionDbfID = 0;
     bool generatedRewardUnmurloc = false;
     //! Pinned hero DBF selected by Un-Murloc Your Potential.  The paired
     //! hero-power DBF is validated against the same manifest pair at apply.
@@ -533,11 +539,14 @@ class Season14State
     bool HasGeneratedRewardKidnapSack() const noexcept { return generatedRewardKidnapSack; }
     bool HasGeneratedRewardAnotherHiddenBody() const noexcept { return generatedRewardAnotherHiddenBody; }
     bool HasGeneratedRewardEtherealEvidence() const noexcept { return generatedRewardEtherealEvidence; }
+    bool HasGeneratedRewardYoggTasties() const noexcept { return generatedRewardYoggTasties; }
     bool HasGeneratedRewardGhastlyMask() const noexcept { return generatedRewardGhastlyMask; }
     std::int32_t GeneratedRewardGhastlyCardDbfID() const noexcept { return generatedRewardGhastlyCardDbfID; }
     void SetGeneratedRewardGhastlyCardDbfID(std::int32_t dbfID) noexcept { generatedRewardGhastlyCardDbfID = dbfID; }
     bool GhastlyCardDelivered() const noexcept { return generatedRewardGhastlyCardDelivered; }
     void MarkGhastlyCardDelivered() noexcept { generatedRewardGhastlyCardDelivered = true; }
+    std::int32_t GeneratedRewardBattlecryMinionDbfID() const noexcept { return generatedRewardBattlecryMinionDbfID; }
+    void SetGeneratedRewardBattlecryMinionDbfID(std::int32_t dbfID) noexcept { generatedRewardBattlecryMinionDbfID = dbfID; }
     bool HasGeneratedRewardUnmurloc() const noexcept { return generatedRewardUnmurloc; }
     std::int32_t GeneratedRewardUnmurlocHeroDbfID() const noexcept { return generatedRewardUnmurlocHeroDbfID; }
     void SetGeneratedRewardUnmurloc(std::int32_t heroDbfID) noexcept {
@@ -730,6 +739,11 @@ class Season14State
         return true;
     }
     bool powerOfStormActive = false;
+    //! Exact card-data child marker for the active Power of the Storm
+    //! lifecycle.  This is provenance only; the public choice resolver owns
+    //! the hero-power transformation and must not be run a second time.
+    bool powerOfStormChildAttached = false;
+    std::string powerOfStormChildID;
     std::int32_t luckyRollCooldown = 0;
 
     //! State for the currently implemented modern hero-power families.
@@ -970,6 +984,16 @@ class Season14State
     std::int32_t refreshUpgradeCostDiscount = 0;
     std::int32_t temporaryTavernSpellAttack = 0;
     std::int32_t temporaryTavernSpellHealth = 0;
+    //! Exact player-enchantment state for Titus' Tribute (BG28_843e).
+    //! This is deliberately separate from end-of-turn repetition: Titus is
+    //! active through combat and expires at the next recruit boundary.
+    std::int32_t titusTributeDeathrattleRepeats = 0;
+    std::string titusTributeChildID;
+    //! Exact player-enchantment state for Primal Staff (BG28_955e).
+    //! It applies only to this recruit turn's end-of-turn effects and is
+    //! consumed at the recruit/combat boundary.
+    std::int32_t primalStaffEndTurnRepeats = 0;
+    std::string primalStaffChildID;
     //! Cumulative improvement applied to newly created Tasty Lobsters.  This
     //! is player-owned game state, so it survives combat, deaths, Tavern
     //! refreshes, and recruit-phase transitions.
@@ -1068,6 +1092,8 @@ class Season14State
     std::int32_t deferredMinionAttack = 0;
     std::int32_t deferredMinionHealth = 0;
     std::uint8_t deferredMinionStatTurns = 0;
+    std::int32_t nextTurnTavernAttack = 0;
+    std::int32_t nextTurnTavernHealth = 0;
     std::int32_t persistentBeetleAttack = 0;
     std::int32_t persistentBeetleHealth = 0;
     std::int32_t nextTavernSpellDiscount = 0;
@@ -1141,6 +1167,37 @@ class Season14State
     //! Applies deterministic hero-power hooks at the start of recruit.
     //! The result contains effects paid immediately by Player/Game.
     Season14HeroPowerBatch2Result BeginRecruitTurn();
+    //! Arms BG28_843e and records the exact generated child identity.
+    void ArmTitusTribute() {
+        // Each resolved parent spell contributes one additional activation.
+        // Keep the counter additive: assigning one here silently discarded a
+        // second Titus' Tribute cast in the same recruit turn.
+        ++titusTributeDeathrattleRepeats;
+        titusTributeChildID = "BG28_843e";
+    }
+    //! Arms BG28_955e for this recruit turn only.
+    void ArmPrimalStaff() {
+        // Preserve one extra pass per resolved parent spell.  The consumer
+        // owns the recruit-boundary reset, so repeated casts must not be
+        // collapsed to a boolean.
+        ++primalStaffEndTurnRepeats;
+        primalStaffChildID = "BG28_955e";
+    }
+    bool HasTitusTribute() const noexcept
+    { return titusTributeDeathrattleRepeats > 0; }
+    bool HasPrimalStaff() const noexcept
+    { return primalStaffEndTurnRepeats > 0; }
+    //! Return the number of extra Deathrattle activations and leave the base
+    //! activation to the caller.  Titus is additive and stacks by cast.
+    std::int32_t TitusTributeExtraActivations() const noexcept
+    { return titusTributeDeathrattleRepeats; }
+    //! Return the number of extra end-of-turn passes and leave the base pass
+    //! to the caller.  The caller consumes this at the boundary.
+    std::int32_t PrimalStaffExtraPasses() const noexcept
+    { return primalStaffEndTurnRepeats; }
+    void ConsumePrimalStaff() noexcept { primalStaffEndTurnRepeats = 0; }
+    std::string_view TitusTributeChildID() const noexcept { return titusTributeChildID; }
+    std::string_view PrimalStaffChildID() const noexcept { return primalStaffChildID; }
     bool TakeVoidPowerDiscoverReady() noexcept
     {
         return ConsumeVoidPowerDiscover(heroPowerBatch6);
@@ -1284,6 +1341,10 @@ class Season14State
     void AddBloodGemBonus(std::int32_t attack, std::int32_t health) noexcept;
     void AddTavernSpellHealthBonus(std::int32_t health) noexcept;
     void AddTavernSpellAttackBonus(std::int32_t attack) noexcept;
+    void ArmNextTurnTavernStats(std::int32_t attack, std::int32_t health) noexcept
+    { nextTurnTavernAttack += attack; nextTurnTavernHealth += health; }
+    std::pair<std::int32_t, std::int32_t> TakeNextTurnTavernStats() noexcept
+    { const auto result = std::make_pair(nextTurnTavernAttack, nextTurnTavernHealth); nextTurnTavernAttack = 0; nextTurnTavernHealth = 0; return result; }
     void AddTemporaryTavernSpellStats(std::int32_t attack,
                                       std::int32_t health) noexcept
     { temporaryTavernSpellAttack += attack; temporaryTavernSpellHealth += health; }

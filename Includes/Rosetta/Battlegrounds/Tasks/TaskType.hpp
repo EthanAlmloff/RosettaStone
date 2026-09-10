@@ -65,6 +65,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AttackGainHealthTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/HealthGainHealthTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TemporarySelfStatsTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/PersistentSelfStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/OnePerTypeRallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyRaceBuffTask.hpp>
@@ -191,7 +192,7 @@ using TaskType =
                  SimpleTasks::AfterSellRaceStatsTask,
                  SimpleTasks::SummonedMinionStatMultiplierTask,
                  SimpleTasks::RallyTavernSpellHealthBonusTask,
-                 SimpleTasks::RandomTavernSpellToHandTask, SimpleTasks::DestroyUndeadBuffSelfTask, SimpleTasks::ActivateFishbaitTask, SimpleTasks::ActivateRandomTavernSpellsTask, SimpleTasks::DealDamageSelfBuffTask,
+                 SimpleTasks::RandomTavernSpellToHandTask, SimpleTasks::DestroyUndeadBuffSelfTask, SimpleTasks::ActivateFishbaitTask, SimpleTasks::ActivateRandomTavernSpellsTask, SimpleTasks::DealDamageSelfBuffTask, SimpleTasks::PersistentSelfStatsTask,
                  SimpleTasks::RandomSpellcraftToHandTask,
                  SimpleTasks::QuilboarBloodGolemDeathrattleTask,
                  SimpleTasks::SummonTauntBuffSelfTask,

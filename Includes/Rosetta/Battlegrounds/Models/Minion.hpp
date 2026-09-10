@@ -398,6 +398,7 @@ class Minion
     //! Attaches a Dark Gift-owned task to this instance's persistent power.
     void AddDarkGiftRallyTask(TaskType&& task);
     void AddDarkGiftDeathrattleTask(TaskType&& task);
+    bool MergeMagneticTriggerFrom(const Minion& component);
 
     //! Returns the flag that indicates whether it has taunt.
     //! \return The flag that indicates whether it has taunt.

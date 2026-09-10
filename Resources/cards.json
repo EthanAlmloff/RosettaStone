@@ -331201,5 +331201,208 @@
     "spellSchool": "LESSER_TRINKET",
     "text": "[x]Make a random friendly\nminion from Tier 4 or below\nGolden. At the start of\neach turn, repeat this.",
     "type": "BATTLEGROUND_TRINKET"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 3,
+    "dbfId": 104440,
+    "id": "BG28_814",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Echoing Roar",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "TAVERN",
+    "targetingArrowText": "Give \"At the end of your turn, gain +2/+2.\"",
+    "techLevel": 3,
+    "text": "Give a friendly minion \"At the end of your turn, gain +2/+2.\"",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 110802,
+    "id": "BG28_814e",
+    "mechanics": [
+        "END_OF_TURN_TRIGGER"
+    ],
+    "name": "Echoing Roar",
+    "set": "BATTLEGROUNDS",
+    "text": "At the end of your turn, gain +2/+2.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 111535,
+    "id": "BG28_814e2",
+    "name": "Echoed Roar",
+    "set": "BATTLEGROUNDS",
+    "text": "+0/+0.",
+    "type": "ENCHANTMENT"
+},
+{
+    "artist": "Kevin Sidharta",
+    "attack": 4,
+    "battlegroundsPremiumDbfId": 120024,
+    "cardClass": "PALADIN",
+    "cost": 0,
+    "dbfId": 120023,
+    "health": 2,
+    "id": "BG32_171",
+    "mechanics": [
+        "END_OF_TURN_TRIGGER",
+        "MAGNETIC"
+    ],
+    "name": "Springy Spriggan",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 3,
+    "text": "[x]<b>Magnetic</b>\nAt the end of your turn,\ngive your other Mechs\n+1 Attack.",
+    "type": "MINION"
+},
+{
+    "attack": 8,
+    "battlegroundsNormalDbfId": 120023,
+    "cardClass": "PALADIN",
+    "cost": 0,
+    "dbfId": 120024,
+    "health": 4,
+    "id": "BG32_171_G",
+    "mechanics": [
+        "END_OF_TURN_TRIGGER",
+        "MAGNETIC"
+    ],
+    "name": "Springy Spriggan",
+    "race": "MECHANICAL",
+    "races": [
+        "MECHANICAL"
+    ],
+    "set": "BATTLEGROUNDS",
+    "techLevel": 3,
+    "text": "[x]<b>Magnetic</b>\nAt the end of your turn,\ngive your other Mechs\n+2 Attack.",
+    "type": "MINION"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120042,
+    "id": "BG32_171e2",
+    "mechanics": [
+        "MAGNETIC"
+    ],
+    "name": "Springy Spriggan",
+    "set": "BATTLEGROUNDS",
+    "text": "At the end of your turn, give your other Mechs +1 Attack.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 120043,
+    "id": "BG32_171_Ge2",
+    "mechanics": [
+        "MAGNETIC"
+    ],
+    "name": "Springy Spriggan",
+    "set": "BATTLEGROUNDS",
+    "text": "At the end of your turn, give your other Mechs +2 Attack.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 116012,
+    "id": "BG31_850e",
+    "name": "Decisive",
+    "set": "BATTLEGROUNDS",
+    "text": "This <b>Choose One</b> minion has both effects combined.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 122120,
+    "id": "BG33_152e",
+    "name": "Improvising",
+    "set": "BATTLEGROUNDS",
+    "text": "Increased stats until next turn.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 122119,
+    "id": "BG33_152pe",
+    "name": "Improviser Player Enchant (DNT)",
+    "set": "BATTLEGROUNDS",
+    "text": "Minions in the Tavern have increased stats this turn. (DNT)",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 125863,
+    "id": "BG34_854e",
+    "name": "Eastern Winds",
+    "set": "BATTLEGROUNDS",
+    "text": "+0/+0.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 125862,
+    "id": "BG34_854pe",
+    "name": "Random minion Tavern Minion Buff Player Ench [DNT]",
+    "set": "BATTLEGROUNDS",
+    "text": "A random minion in the Tavern gains stats.",
+    "type": "ENCHANTMENT"
+},
+{
+    "artist": "Gabriel Lopes",
+    "cardClass": "NEUTRAL",
+    "cost": 3,
+    "dbfId": 104461,
+    "id": "BG28_843",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Titus' Tribute",
+    "referencedTags": [
+        "DEATHRATTLE"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "TAVERN",
+    "techLevel": 4,
+    "text": "Your <b>Deathrattles</b> trigger twice until\nnext turn.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 104463,
+    "id": "BG28_843e",
+    "mechanics": [
+        "AURA"
+    ],
+    "name": "Titus' Tribute Player Enchant (DNT)",
+    "set": "BATTLEGROUNDS",
+    "text": "Your <b>Deatharttles</b> trigger twice until next turn.",
+    "type": "ENCHANTMENT"
+},
+{
+    "cardClass": "NEUTRAL",
+    "cost": 3,
+    "dbfId": 105905,
+    "id": "BG28_955",
+    "isBattlegroundsPoolSpell": false,
+    "name": "Primal Staff",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "TAVERN",
+    "techLevel": 5,
+    "text": "Your end of turn effects trigger twice this turn.",
+    "type": "BATTLEGROUND_SPELL"
+},
+{
+    "cardClass": "NEUTRAL",
+    "dbfId": 105906,
+    "id": "BG28_955e",
+    "mechanics": [
+        "TAG_ONE_TURN_EFFECT"
+    ],
+    "name": "Primal Staff Player Enchant (DNT)",
+    "set": "BATTLEGROUNDS",
+    "text": "Your end of turn effects trigger twice this turn.",
+    "type": "ENCHANTMENT"
 }
 ]

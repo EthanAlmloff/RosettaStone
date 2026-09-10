@@ -34,6 +34,14 @@ void Trigger::SetTasks(std::vector<TaskType>&& tasks)
     m_tasks = tasks;
 }
 
+void Trigger::AppendTasks(const Trigger& other)
+{
+    if (m_triggerType != other.m_triggerType ||
+        m_triggerSource != other.m_triggerSource)
+        return;
+    m_tasks.insert(m_tasks.end(), other.m_tasks.begin(), other.m_tasks.end());
+}
+
 void Trigger::SetCondition(SelfCondition&& condition)
 {
     m_condition = condition;

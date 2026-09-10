@@ -90,6 +90,36 @@ TEST_CASE("[Generated mappings] - every reviewed row has a live CardDef")
     }
 }
 
+TEST_CASE("[Generated mappings] - Patch 36.4 launch rows retain executable payloads")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    // These exact rows were previously only discovered by the coverage
+    // scanner.  Keep the trigger contract here so registration alone cannot
+    // grant focused-test credit.
+    for (const auto id : {"BG30_125", "BG30_125_G", "BG32_111", "BG32_111_G",
+                          "BG32_170", "BG32_170_G", "BG32_820", "BG32_820_G",
+                          "BG32_821", "BG32_821_G", "BG32_842", "BG32_842_G",
+                          "BG33_155", "BG33_155_G", "BG33_323", "BG33_323_G",
+                          "BG35_142", "BG35_142_G", "BG35_152",
+                          "BG35_152_G", "BG35_604", "BG35_604_G", "BG36_508",
+                          "BG36_508_G", "BG36_520", "BG36_520_G", "BG36_921",
+                          "BG36_921_G"})
+    {
+        REQUIRE(cards.contains(id));
+        const auto& power = cards.at(id).power;
+        CHECK(power.GetBattlecryTask().size() + power.GetDeathrattleTask().size() +
+                  power.GetRallyTask().size() + (power.GetActivate().has_value() ? 1U : 0U) +
+                  (power.GetTrigger().has_value() ? 1U : 0U) >
+              0U);
+    }
+    // BG33_825_G is a metadata-only static row: its exact CardDef identity is
+    // still checked so it cannot silently disappear from the pool.
+    REQUIRE(cards.contains("BG33_825_G"));
+    CHECK(cards.at("BG33_825_G").power.GetBattlecryTask().empty());
+    CHECK(cards.at("BG33_825_G").power.GetDeathrattleTask().empty());
+}
+
 TEST_CASE("[Generated mappings] - Silent Deliverer golden pool counts")
 {
     std::map<std::string, CardDef> cards;
@@ -187,6 +217,19 @@ TEST_CASE("[Generated mappings] - lifecycle enchantment deathrattles retain exac
         REQUIRE(cards.contains(id));
         CHECK(!cards.at(id).power.GetDeathrattleTask().empty());
     }
+}
+
+TEST_CASE("[Generated mappings] - BG32_172 golden deathrattle summons golden token")
+{
+    std::map<std::string, CardDef> cards;
+    GeneratedBehaviorMappings::AddAll(cards);
+    REQUIRE(cards.contains("BG32_172_G"));
+    const auto& tasks = cards.at("BG32_172_G").power.GetDeathrattleTask();
+    REQUIRE(tasks.size() == 1);
+    const auto* summon = std::get_if<SimpleTasks::SummonTask>(&tasks.front());
+    REQUIRE(summon != nullptr);
+    CHECK(summon->m_cardID == "BG_TTN_401_G");
+    CHECK(summon->m_amount == 1);
 }
 
 TEST_CASE("[Generated mappings] - Roaring Recruiter buffs only the attacking Dragon")

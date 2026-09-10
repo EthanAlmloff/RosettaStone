@@ -116,6 +116,14 @@ void ModernMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     AddStatic(cards, "BG31_323_G");
     AddStatic(cards, "BG31_327");
     AddStatic(cards, "BG31_327_G");
+    Power improviser;
+    improviser.AddAvenge({AvengeEffect::BUFF_TAVERN_NEXT_TURN, 2, 1, 1,
+                          Race::INVALID, false});
+    cards.emplace("BG33_152", CardDef{std::move(improviser)});
+    Power improviserGolden;
+    improviserGolden.AddAvenge({AvengeEffect::BUFF_TAVERN_NEXT_TURN, 2, 2, 2,
+                                Race::INVALID, false});
+    cards.emplace("BG33_152_G", CardDef{std::move(improviserGolden)});
     AddStatic(cards, "BG32_873"); AddStatic(cards, "BG32_873_G");
     AddStatic(cards, "BG34_322"); AddStatic(cards, "BG34_322_G");
     // Karl the Lost buffs friendly Divine Shield minions after a successful

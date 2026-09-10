@@ -22,5 +22,7 @@ void ModernMinionBehaviorsBatch16::AddAll(
     goldenTrigger.SetTriggerSource(TriggerSource::SELF);
     goldenTrigger.SetTasks(std::vector<TaskType>{ SimpleTasks::GainGoldTask{ 2 } });
     golden.AddTrigger(std::move(goldenTrigger));
+    cards.emplace("BG26_147", CardDef{ std::move(normal) });
+    cards.emplace("BG26_147_G", CardDef{ std::move(golden) });
 }
 }

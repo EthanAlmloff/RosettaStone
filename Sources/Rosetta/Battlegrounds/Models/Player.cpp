@@ -1242,6 +1242,29 @@ bool Player::ApplyGeneratedQuestReward(std::int32_t dbfID)
         season14.SetGeneratedRewardUnmurloc(selected.heroDbfID);
     }
     if (!season14.ApplyGeneratedQuestReward(dbfID)) return false;
+    if (dbfID == 104673) {
+        // Gilnean War Horn's {0} is resolved when the reward is acquired,
+        // not when a later Battlecry happens.  Draw only from the current
+        // lobby's executable normal Battlecry pool and retain the DBF so a
+        // replay or retry cannot silently choose a different minion.
+        if (hand.IsFull()) return false;
+        auto selectedDbfID = season14.GeneratedRewardBattlecryMinionDbfID();
+        if (selectedDbfID == 0) {
+            auto candidates = SupportedBattlecryMinions(activeTribes);
+            if (candidates.empty()) return false;
+            selectedDbfID = candidates[Random::get<std::size_t>(
+                0, candidates.size() - 1)].dbfID;
+            season14.SetGeneratedRewardBattlecryMinionDbfID(selectedDbfID);
+        }
+        const auto selected = Cards::FindCardByDbfID(selectedDbfID);
+        if (selected.dbfID == 0 || selected.normalDbfID != 0 ||
+            selected.GetCardType() != CardType::MINION ||
+            !selected.isBattlegroundsPoolMinion || !selected.hasBehavior ||
+            !HasActiveTribe(activeTribes, selected) ||
+            !CardDefs::FindCardDefByID(selected.id).HasBattlecry())
+            return false;
+        hand.Add(CardData{Minion(selected)});
+    }
     if (dbfID == 96150) {
         // Purified Shard is an immediate win condition.  Mark the player
         // terminal at selection time so the lobby coordinator stops offering
@@ -1726,6 +1749,12 @@ void Player::ResolveGeneratedQuestRewardSnickerSnacks()
 
 void Player::ResolveGeneratedQuestRewardStartTurn()
 {
+    // Yogg-tastic Tasties is the quest-reward form of the same Wheel of
+    // Yogg-Saron used by Yogg-Tastic Pastry.  Keep one canonical outcome
+    // engine so weighting, seeded randomness, and hand/pool boundaries do
+    // not drift between the Trinket and reward implementations.
+    if (season14.HasGeneratedRewardYoggTasties())
+        (void)ResolveYoggWheel();
     // Quaint Boutique and Jumbo Warehouse arm their four-gold grant when the
     // reward is selected; deliver deferred gold exactly once at recruit start.
     remainCoin += season14.TakeNextTurnGold();
@@ -2767,6 +2796,7 @@ void Player::PrepareTavern()
     }
 
     const auto batch4 = season14.HeroPowerBatch4PassiveModifiers();
+    const auto nextTurnTavernStats = season14.TakeNextTurnTavernStats();
     if (season14.persistentShopAttack != 0 ||
         season14.persistentShopHealth != 0 ||
         !season14.persistentShopRaceStats.empty() ||
@@ -2774,6 +2804,7 @@ void Player::PrepareTavern()
         batch4.mechShopHealth != 0 || season14.persistentTavernTierMax != 0 ||
         season14.temporaryRefreshShopAttack != 0 ||
         season14.temporaryRefreshShopHealth != 0 ||
+        nextTurnTavernStats.first != 0 || nextTurnTavernStats.second != 0 ||
         season14.HasGeneratedRewardAlterEgo() ||
         std::any_of(season14.trinkets.begin(), season14.trinkets.end(),
                     [](const auto& trinket) {
@@ -2785,7 +2816,8 @@ void Player::PrepareTavern()
                     }))
     {
         tavern.fieldZone.ForEach(
-            [this, &existingPoolIndices, batch4](MinionData& minion) {
+            [this, &existingPoolIndices, batch4, &nextTurnTavernStats](
+                MinionData& minion) {
                 if (existingPoolIndices.contains(
                         minion.value().GetPoolIndex()))
                 {
@@ -2799,7 +2831,11 @@ void Player::PrepareTavern()
                 minion.value().SetAttack(minion.value().GetAttack() +
                                          season14.temporaryRefreshShopAttack);
                 minion.value().SetHealth(minion.value().GetHealth() +
-                                         season14.temporaryRefreshShopHealth);
+                                             season14.temporaryRefreshShopHealth);
+                minion.value().SetAttack(minion.value().GetAttack() +
+                                         nextTurnTavernStats.first);
+                minion.value().SetHealth(minion.value().GetHealth() +
+                                         nextTurnTavernStats.second);
                 if (minion.value().GetCardID() == "BG35_150t" &&
                     (season14.persistentFodderAttack != 0 ||
                      season14.persistentFodderHealth != 0))
@@ -5602,10 +5638,19 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             // supported source at the modal boundary so ApplyChooseOne can
             // resolve both branches transactionally.  This intentionally
             // does not bypass the source lifecycle or offering validation.
-            if (season14.trailblazerCombinedChooseOne)
+            if (season14.trailblazerCombinedChooseOne) {
                 minion.SetCombinedChooseOne(true);
+                (void)RecordReviewedLifecycleEnchantment(
+                    minion,
+                    minion.GetCardID().ends_with("_G") ? "BG31_327_G" : "BG31_327",
+                    "BG31_850e");
+            }
             if (combinedChooseOneUses > 0 && targetless) {
                 minion.SetCombinedChooseOne(true);
+                (void)RecordReviewedLifecycleEnchantment(
+                    minion,
+                    minion.GetCardID().ends_with("_G") ? "BG31_327_G" : "BG31_327",
+                    "BG31_850e");
                 --combinedChooseOneUses;
             }
             if (minion.HasCombinedChooseOne() && targetless &&
@@ -7547,6 +7592,9 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
         // unresolved linked payloads (for example Gilnean War Horn's `{0}`)
         // remain fail-closed until their parent/replay contract is present.
         if (!IsExecutableSeason14GeneratedQuestReward(card.dbfID)) return false;
+        if (card.dbfID == 104673 &&
+            (hand.IsFull() || SupportedBattlecryMinions(activeTribes).empty()))
+            return false;
         if (card.dbfID == 110310) {
             if (hand.IsFull()) return false;
             const bool hasTierSeven = std::any_of(
@@ -8347,6 +8395,20 @@ void Player::ApplyOutsideCombatDestroyTrinkets()
 
 void Player::ApplyStartCombatTrinkets()
 {
+    // Start-of-combat Trinkets can explicitly activate friendly Deathrattles
+    // outside Battle::RemoveMinion.  Route those activations through the
+    // active Titus' Tribute scope as well; otherwise Titus only doubled
+    // death-caused activations and silently missed Soul Fermenter, Rylak, and
+    // the generic Deathrattle starter.  This helper is deliberately local to
+    // combat-start paths: recruit-side bespoke Deathrattle tasks must not
+    // inherit a combat-only replay boundary.
+    const auto activateCombatDeathrattle = [this](Minion& minion) {
+        if (!minion.HasDeathrattle()) return;
+        minion.ActivateTask(PowerType::DEATHRATTLE, *this);
+        for (std::int32_t repeat = 0;
+             repeat < season14.TitusTributeExtraActivations(); ++repeat)
+            minion.ActivateTask(PowerType::DEATHRATTLE, *this);
+    };
     // Recruit-phase Blood Gem improvements armed by Deathrattles expire at
     // this combat boundary, before any new start-of-combat effects resolve.
     season14.ResetTemporaryBloodGemBonus();
@@ -8410,7 +8472,7 @@ void Player::ApplyStartCombatTrinkets()
                 if (snapshot.HasDeathrattle())
                 {
                     ++season14.deathrattlesTriggered;
-                    snapshot.ActivateTask(PowerType::DEATHRATTLE, *this);
+                    activateCombatDeathrattle(snapshot);
                 }
                 captured.push_back(std::move(snapshot));
             }
@@ -8442,7 +8504,7 @@ void Player::ApplyStartCombatTrinkets()
                 battleField.ForEachAlive([&](MinionData& data) {
                     auto& minion = data.value();
                     if (minion.GetIndex() == id)
-                        minion.ActivateTask(PowerType::DEATHRATTLE, *this);
+                        activateCombatDeathrattle(minion);
                 });
             continue;
         }
@@ -8691,7 +8753,7 @@ void Player::ApplyStartCombatTrinkets()
             for (const auto id : ids)
                 battleField.ForEachAlive([&](MinionData& data) {
                     if (data.value().GetIndex() == id)
-                        data.value().ActivateTask(PowerType::DEATHRATTLE, *this);
+                        activateCombatDeathrattle(data.value());
                 });
             continue;
         }
@@ -12006,6 +12068,20 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
     {
         case TavernSpellEffect::NONE:
             return;
+        case TavernSpellEffect::TEMPORARY_DEATHRATTLE_REPEAT:
+            // Titus' Tribute is a player enchantment, not a minion aura.
+            // Preserve the exact pinned child ID in Season14State while the
+            // Battle resolver owns the actual repeated activation boundary.
+            if (lifecycleSpellID == "BG28_843")
+                player.season14.ArmTitusTribute();
+            return;
+        case TavernSpellEffect::TEMPORARY_END_TURN_REPEAT:
+            // Primal Staff has a separate scope from Titus: it repeats only
+            // this recruit turn's end-of-turn effects.  Do not merge these
+            // counters or let the flag leak into the following turn.
+            if (lifecycleSpellID == "BG28_955")
+                player.season14.ArmPrimalStaff();
+            return;
         case TavernSpellEffect::BLOOD_GEM:
         case TavernSpellEffect::BLOOD_GEM_TAUNT:
         case TavernSpellEffect::BLOOD_GEM_DIVINE_SHIELD:
@@ -12907,6 +12983,15 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         case TavernSpellEffect::RANDOM_SHOP_STATS_ON_REFRESH:
             player.season14.ArmRefreshRandomShopStats(effect.attack,
                                                        effect.health);
+            // Easterly Winds owns the random-refresh payload in Season14;
+            // retain the exact parent-qualified child on the Air Revenant
+            // source for replay/provenance without applying a second buff.
+            player.recruitField.ForEachAlive([](MinionData& data) {
+                const auto& id = data.value().GetCardID();
+                if (id == "BG34_858" || id == "BG34_858_G")
+                    (void)RecordReviewedLifecycleEnchantment(
+                        data.value(), id, "BG34_854pe");
+            });
             return;
         case TavernSpellEffect::SELL_TARGET_GIVE_RANDOM_STATS:
         {
@@ -13114,6 +13199,20 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
                     target, parentID, effect.attack, effect.health))
                 target.ApplyTemporaryEnchantment(Minion::TemporaryEnchantment::Stats,
                                                   effect.attack, effect.health);
+            return;
+        }
+        case TavernSpellEffect::TARGET_END_TURN_STATS:
+        {
+            if (targetIdx < 0 || targetIdx >= player.recruitField.GetCount() ||
+                sourceCardDbfID <= 0)
+                return;
+            const auto parent = Cards::FindCardByDbfID(sourceCardDbfID).id;
+            const std::string_view child =
+                parent == "BG28_814" ? "BG28_814e" : "";
+            if (!child.empty())
+                static_cast<void>(ApplyReviewedEndTurnChildEnchantment(
+                    player.recruitField[static_cast<std::size_t>(targetIdx)],
+                    parent, child));
             return;
         }
         case TavernSpellEffect::TAVERN_SPELL_STATS_PERMANENT:
@@ -15233,6 +15332,11 @@ bool Player::BeginPowerOfStormChoice()
         offerings.push_back({candidates[i].dbfID, 0});
     season14.BeginOfferingDecision(Season14Decision::CHOICE, 0, 71909,
                                    std::move(offerings));
+    // The parent activation is now committed: retain only the exact child
+    // provenance marker.  The modal itself remains the sole owner of the
+    // hero-power transformation, so no enchantment task is executed here.
+    season14.powerOfStormChildAttached = true;
+    season14.powerOfStormChildID = "BG20_HERO_202pe";
     return true;
 }
 

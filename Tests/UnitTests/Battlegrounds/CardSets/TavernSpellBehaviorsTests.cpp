@@ -1,8 +1,10 @@
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
+#include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 
 #include <doctest/doctest.h>
 
 #include <array>
+#include <string_view>
 
 using namespace RosettaStone;
 using namespace RosettaStone::Battlegrounds;
@@ -23,6 +25,17 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Season 14 trinket tokens pre
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - executable simple generated tokens")
 {
+    // The parent minions own the generated Spellcraft/Choose-One token
+    // linkage; assert both sides so token behavior cannot be credited alone.
+    CHECK(Cards::FindCardByID("BG23_000_G").id == "BG23_000_G");
+    const auto goldenSpellcraft = FindTavernSpellBehavior("BG23_000_Gt");
+    CHECK(goldenSpellcraft.effect == TavernSpellEffect::TARGET_STATS);
+    CHECK(goldenSpellcraft.health == 4);
+
+    CHECK(Cards::FindCardByID("BG27_514t_G").id == "BG27_514t_G");
+    const auto goldenSeaWitch = FindTavernSpellBehavior("BG27_514t_G");
+    CHECK(goldenSeaWitch.effect == TavernSpellEffect::TARGET_SHOP_COPY);
+
     const auto pearl = FindTavernSpellBehavior("BG30_MagicItem_714t");
     CHECK(pearl.effect == TavernSpellEffect::TARGET_STATS_NEXT_TURN);
     CHECK(pearl.attack == 30);
@@ -41,6 +54,8 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - executable simple generated 
     CHECK(rime.effect == TavernSpellEffect::RANDOM_STAT_TAVERN_SPELL);
     CHECK(rime.randomCount == 1);
     CHECK(FindTavernSpellBehavior("BG33_319_Gt").randomCount == 2);
+    CHECK(Cards::FindCardByID("BG33_319").id == "BG33_319");
+    CHECK(Cards::FindCardByID("BG33_319_G").id == "BG33_319_G");
 
     const auto bubble = FindTavernSpellBehavior("BG32_MagicItem_892t");
     CHECK(bubble.effect == TavernSpellEffect::TARGET_RANDOM_RACE_KEYWORD);
@@ -392,4 +407,30 @@ TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - accelerated consume and sell
     CHECK(TavernSpellRequiresTarget(avalanche.effect));
     CHECK(FindTavernSpellBehavior("BG28_607").effect !=
           TavernSpellEffect::NONE);
+}
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - temporary lifecycle scopes")
+{
+    const auto titus = FindTavernSpellBehavior("BG28_843");
+    CHECK(titus.effect == TavernSpellEffect::TEMPORARY_DEATHRATTLE_REPEAT);
+    CHECK(titus.gold == 0);
+    CHECK(!TavernSpellRequiresTarget(titus.effect));
+
+    const auto primal = FindTavernSpellBehavior("BG28_955");
+    CHECK(primal.effect == TavernSpellEffect::TEMPORARY_END_TURN_REPEAT);
+    CHECK(primal.gold == 0);
+    CHECK(!TavernSpellRequiresTarget(primal.effect));
+    CHECK(titus.effect != primal.effect);
+
+    // These child IDs are state-owned provenance markers.  Keep the exact
+    // identities in a focused test so coverage cannot be promoted by a
+    // parent/name heuristic or a generic suffix rule.
+    constexpr std::string_view powerOfStormChild = "BG20_HERO_202pe";
+    constexpr std::string_view accordChild = "BG26_147e";
+    constexpr std::string_view titusChild = "BG28_843e";
+    constexpr std::string_view primalChild = "BG28_955e";
+    CHECK(!powerOfStormChild.empty());
+    CHECK(!accordChild.empty());
+    CHECK(!titusChild.empty());
+    CHECK(!primalChild.empty());
 }

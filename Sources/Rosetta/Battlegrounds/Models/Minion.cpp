@@ -8,6 +8,7 @@
 #include <Rosetta/Battlegrounds/Enchants/Power.hpp>
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
+#include <Rosetta/Battlegrounds/Models/LifecycleEnchantment.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemAttackerTask.hpp>
@@ -253,6 +254,15 @@ void Minion::MagnetizeOnto(Minion& target) const
         target.m_hasDeathrattle = true;
     }
 
+    // Springy Spriggan's end-turn trigger is part of the Magnetic payload.
+    // Merge it once per successful attachment; golden components carry their
+    // own doubled task payload.
+    if ((GetCardID() == "BG32_171" || GetCardID() == "BG32_171_G") &&
+        target.MergeMagneticTriggerFrom(*this)) {
+        target.RecordTemporaryEnchantment(
+            GetCardID() == "BG32_171_G" ? "BG32_171_Ge2" : "BG32_171e2");
+    }
+
     // Beatboxer mirrors only a successful attachment, after the original
     // target has received its complete stat/keyword/deathrattle payload.
     // Reusing MagnetizeOnto preserves that payload and its exact ordering;
@@ -292,6 +302,11 @@ void Minion::MagnetizeOnto(Minion& target) const
             owner.magnetizationMirrorInProgress = false;
         }
     }
+}
+
+bool Minion::MergeMagneticTriggerFrom(const Minion& component)
+{
+    return m_card.power.MergeTrigger(component.m_card.power);
 }
 
 void Minion::CopyDeathrattleTo(Minion& target) const
@@ -2461,6 +2476,13 @@ int Minion::TriggerAvenge(Player& player)
                 for (int i = 0; i < definition->attack; ++i)
                     player.ApplyBloodGemTo(data.value());
             });
+        }
+        else if (definition->effect == AvengeEffect::BUFF_TAVERN_NEXT_TURN)
+        {
+            player.season14.ArmNextTurnTavernStats(
+                definition->attack, definition->health);
+            (void)RecordReviewedLifecycleEnchantment(
+                *this, GetCardID(), "BG33_152e");
         }
     }
     if (definition->permanent && activations > 0)

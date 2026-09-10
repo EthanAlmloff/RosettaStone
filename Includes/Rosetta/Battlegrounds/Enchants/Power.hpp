@@ -41,7 +41,7 @@ enum class ActivateEffect : unsigned char
     ACTIVATE_FISHBAIT,
     ACTIVATE_RANDOM_TAVERN_SPELLS,
 };
-enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD, ADD_RANDOM_PROTOSS, PROGRESSIVE_END_TURN, PLAY_BLOOD_GEMS_RACE };
+enum class AvengeEffect : unsigned char { NONE, BUFF_SELF, BUFF_RACE, ADD_CARD, ADD_RANDOM_UNDEAD, ADD_RANDOM_PROTOSS, PROGRESSIVE_END_TURN, PLAY_BLOOD_GEMS_RACE, BUFF_TAVERN_NEXT_TURN };
 struct AvengeDefinition
 {
     AvengeEffect effect = AvengeEffect::NONE;
@@ -111,6 +111,7 @@ class Power
     //! Returns trigger.
     //! \return A reference to trigger.
     std::optional<Trigger>& GetTrigger();
+    const std::optional<Trigger>& GetTrigger() const;
 
     //! Adds battlecry task.
     //! \param task A battlecry task to add.
@@ -138,6 +139,7 @@ class Power
     //! Adds trigger.
     //! \param trigger An trigger to add.
     void AddTrigger(Trigger&& trigger);
+    bool MergeTrigger(const Power& other);
 
  private:
     std::vector<TaskType> m_battlecryTask;

@@ -85,6 +85,11 @@ std::optional<Trigger>& Power::GetTrigger()
     return m_trigger;
 }
 
+const std::optional<Trigger>& Power::GetTrigger() const
+{
+    return m_trigger;
+}
+
 void Power::AddBattlecryTask(TaskType&& task)
 {
     m_battlecryTask.emplace_back(task);
@@ -118,5 +123,19 @@ void Power::AddEnchant(Enchant&& enchant)
 void Power::AddTrigger(Trigger&& trigger)
 {
     m_trigger = trigger;
+}
+
+bool Power::MergeTrigger(const Power& other)
+{
+    if (!other.m_trigger.has_value()) return true;
+    if (!m_trigger.has_value()) {
+        m_trigger = other.m_trigger;
+        return true;
+    }
+    if (m_trigger->GetTriggerType() != other.m_trigger->GetTriggerType() ||
+        m_trigger->GetTriggerSource() != other.m_trigger->GetTriggerSource())
+        return false;
+    m_trigger->AppendTasks(*other.m_trigger);
+    return true;
 }
 }  // namespace RosettaStone::Battlegrounds

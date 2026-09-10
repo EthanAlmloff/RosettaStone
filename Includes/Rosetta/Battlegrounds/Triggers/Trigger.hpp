@@ -41,6 +41,7 @@ class Trigger
 
     //! Returns the configured tasks for focused behavior inspection.
     const std::vector<TaskType>& GetTasks() const { return m_tasks; }
+    void AppendTasks(const Trigger& other);
 
     //! Sets the value of trigger source.
     //! \param val The value of trigger source.

@@ -334,7 +334,7 @@ inline constexpr std::array<Season14GeneratedChoiceDefinition, 79>
         // identities are retained so replay cannot silently substitute another
         // effect.
         {"BG24_Reward_363", 97485, Season14GeneratedChoiceDefinition::Effect::ETHEREAL_EVIDENCE, true},
-        {"BG24_Reward_135", 92563, Season14GeneratedChoiceDefinition::Effect::YOGG_TASTIES, false, "wheel_outcomes_unpinned"},
+        {"BG24_Reward_135", 92563, Season14GeneratedChoiceDefinition::Effect::YOGG_TASTIES, true},
         {"BG24_Reward_535", 96151, Season14GeneratedChoiceDefinition::Effect::UNMURLOC_YOUR_POTENTIAL, false, "reward_absent_from_pinned_manifest"},
         {"BG24_Reward_310", 91980, Season14GeneratedChoiceDefinition::Effect::PARTNER_IN_CRIME, true},
         {"BG24_Reward_313", 92554, Season14GeneratedChoiceDefinition::Effect::WONDROUS_WISDOMBALL, true},
@@ -373,7 +373,7 @@ inline constexpr std::array<Season14GeneratedChoiceDefinition, 79>
         // quest payload, and choosing an arbitrary current-board Battlecry
         // would credit the wrong target.  Keep the typed identity visible,
         // but fail closed until the parent quest/replay payload is modeled.
-        {"BG27_Reward_802", 104673, Season14GeneratedChoiceDefinition::Effect::BATTLECRY_REPEAT, false, "linked_battlecry_target_unpinned"},
+        {"BG27_Reward_802", 104673, Season14GeneratedChoiceDefinition::Effect::BATTLECRY_REPEAT, true},
         {"BG28_Reward_514", 110343, Season14GeneratedChoiceDefinition::Effect::START_TURN_RANDOM_SPELLS, true},
         {"BG33_Reward_004", 122015, Season14GeneratedChoiceDefinition::Effect::AVENGE_REFRESH, true},
         {"BG27_Reward_812", 104821, Season14GeneratedChoiceDefinition::Effect::TAVERN_EXTRA_MINIONS, true},

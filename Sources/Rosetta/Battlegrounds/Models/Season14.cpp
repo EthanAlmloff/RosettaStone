@@ -150,6 +150,9 @@ bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
         case Season14GeneratedChoiceDefinition::Effect::ETHEREAL_EVIDENCE:
             generatedRewardEtherealEvidence = true;
             return true;
+        case Season14GeneratedChoiceDefinition::Effect::YOGG_TASTIES:
+            generatedRewardYoggTasties = true;
+            return true;
         case Season14GeneratedChoiceDefinition::Effect::FRIENDS_ALONG_THE_WAY:
             // The reward text's {0} is the lobby's selected minion type.  The
             // lobby exposes the ten-race pool through RACES_IN_BATTLEGROUNDS;
@@ -484,7 +487,14 @@ bool Season14State::SelectDecision(std::size_t offeringIndex)
 void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
                                  bool available)
 {
-    if (dbfID == 71909) powerOfStormActive = true;
+    // Selecting one of Storm's temporary hero powers must not clear the
+    // parent passive.  Only acquisition of the parent resets its one-time
+    // provenance marker; subsequent selections remain under that parent.
+    if (dbfID == 71909) {
+        powerOfStormActive = true;
+        powerOfStormChildAttached = false;
+        powerOfStormChildID.clear();
+    }
     heroPowerDbfID = dbfID;
     heroPowerCost = std::max<std::int32_t>(0, cost);
     perfectCrimeDiscount = 0;
@@ -541,6 +551,10 @@ void Season14State::SetHeroPower(std::int32_t dbfID, std::int32_t cost,
     firstKillCopyArmed = false;
     firstKillCopy.reset();
     lastTavernSpellDbfID = 0;
+    titusTributeDeathrattleRepeats = 0;
+    titusTributeChildID.clear();
+    primalStaffEndTurnRepeats = 0;
+    primalStaffChildID.clear();
     tavernLightingAttack = dbfID == 122960 ? 1 : 0;
     tavernLightingHealth = dbfID == 122960 ? 1 : 0;
     tavernLightingTurns = 0;
@@ -707,6 +721,12 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     refreshShopStatsDeltaHealth = 0;
     temporaryTavernSpellAttack = 0;
     temporaryTavernSpellHealth = 0;
+    // BG28_843e expires at the next recruit turn; BG28_955e is strictly
+    // this-turn state and is also cleared defensively at the same boundary.
+    titusTributeDeathrattleRepeats = 0;
+    titusTributeChildID.clear();
+    primalStaffEndTurnRepeats = 0;
+    primalStaffChildID.clear();
     // No public Discover modal may survive a recruit-phase boundary.  Clear
     // any queued Cathedral/Sushi replay defensively with the other
     // per-turn state so an interrupted modal cannot leak into the next turn.

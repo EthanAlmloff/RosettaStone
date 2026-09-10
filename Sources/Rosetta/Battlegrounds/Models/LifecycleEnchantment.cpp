@@ -90,6 +90,17 @@ constexpr ReviewedLifecycleSpec REVIEWED_LIFECYCLES[] = {
 // promoted accidentally.  Level variants intentionally share the printed
 // child identity, as in the card data.
 constexpr ReviewedExternalLifecycleSpec REVIEWED_EXTERNAL_LIFECYCLES[] = {
+    // Power of the Storm and Accord-o-Tron own their semantic payload in the
+    // hero-power/turn-start state machines.  These exact pairs are markers
+    // only; they must never be routed through a generic enchantment executor.
+    { "BG20_HERO_202p", "BG20_HERO_202pe" },
+    { "BG26_147", "BG26_147e" },
+    { "BG26_147_G", "BG26_147e" },
+    { "BG28_814", "BG28_814e" },
+    { "BG28_843", "BG28_843e" },
+    { "BG28_955", "BG28_955e" },
+    { "BG32_171", "BG32_171e2" },
+    { "BG32_171_G", "BG32_171_Ge2" },
     { "BG31_HERO_801ptc", "BG31_HERO_801ptce" },
     { "BG31_HERO_801ptc2", "BG31_HERO_801ptce" },
     { "BG31_HERO_801ptc3", "BG31_HERO_801ptce" },
@@ -118,6 +129,20 @@ constexpr ReviewedExternalLifecycleSpec REVIEWED_EXTERNAL_LIFECYCLES[] = {
 // owns the random choice, while this table owns the canonical child and typed
 // expiry payload.
 constexpr ReviewedChildLifecycleSpec REVIEWED_CHILD_LIFECYCLES[] = {
+    // Thorned Trailblazer's Choose One modifier is parent-owned.  The child
+    // carries no independent stats; it is retained as an exact replay marker
+    // when the combined branch is committed.
+    { "BG31_327", "BG31_850e", Minion::TemporaryEnchantment::Stats },
+    { "BG31_327_G", "BG31_850e", Minion::TemporaryEnchantment::Stats },
+    // Improviser applies its Avenge payload to the next Tavern turn.  The
+    // player-owned stat window is authoritative; this child is provenance.
+    { "BG33_152", "BG33_152e", Minion::TemporaryEnchantment::Stats },
+    { "BG33_152_G", "BG33_152e", Minion::TemporaryEnchantment::Stats },
+    // Air Revenant's Easterly Winds arms one random Tavern target per
+    // refresh.  The refresh state owns the stat mutation; this child is the
+    // exact parent-qualified marker.
+    { "BG34_858", "BG34_854pe", Minion::TemporaryEnchantment::Stats },
+    { "BG34_858_G", "BG34_854pe", Minion::TemporaryEnchantment::Stats },
     // Goldrinn's deathrattle applies Soul of the Beast to each friendly
     // Beast.  The parent resolver owns the race-wide selection and golden
     // repetition; this row owns the canonical child identity and the
@@ -321,6 +346,19 @@ bool RecordReviewedLifecycleEnchantment(Minion& target,
     return false;
 }
 
+bool RecordReviewedLifecycleEnchantment(Minion& target,
+                                        std::string_view parentID,
+                                        std::string_view childID)
+{
+    for (const auto& spec : REVIEWED_CHILD_LIFECYCLES)
+    {
+        if (spec.parent != parentID || spec.child != childID) continue;
+        target.RecordTemporaryEnchantment(childID);
+        return true;
+    }
+    return false;
+}
+
 bool RecordReviewedExternalLifecycleEnchantment(
     Minion& target, std::string_view parentID, std::string_view childID)
 {
@@ -331,6 +369,19 @@ bool RecordReviewedExternalLifecycleEnchantment(
         return true;
     }
     return false;
+}
+
+bool ApplyReviewedEndTurnChildEnchantment(Minion& target,
+                                          std::string_view parentID,
+                                          std::string_view childID)
+{
+    if (parentID != "BG28_814" || childID != "BG28_814e") return false;
+    const auto child = Cards::FindCardByID(childID);
+    if (child.id.empty() || !child.power.GetTrigger().has_value()) return false;
+    Minion component(child);
+    if (!target.MergeMagneticTriggerFrom(component)) return false;
+    target.RecordTemporaryEnchantment(childID);
+    return true;
 }
 
 bool RecordReviewedDarkGiftChild(Minion& target, std::string_view parentID)
