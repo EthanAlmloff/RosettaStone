@@ -149,3 +149,25 @@ TEST_CASE("[GeneratedChoices] - typed lifecycle reward ownership")
     CHECK(state.ApplyGeneratedQuestReward(110551));
     CHECK(state.HasGeneratedRewardStableAmalgamation());
 }
+
+TEST_CASE("[GeneratedChoices] - Yogg wheel and Gilnean War Horn lifecycle state")
+{
+    CHECK(Cards::FindCardByID("BG24_Reward_135").dbfID == 92563);
+    CHECK(Cards::FindCardByID("BG27_Reward_802").dbfID == 104673);
+    CHECK(IsExecutableSeason14GeneratedQuestReward(92563));
+    CHECK(IsExecutableSeason14GeneratedQuestReward(104673));
+
+    Season14State state;
+    CHECK(state.ApplyGeneratedQuestReward(92563));
+    CHECK(state.HasGeneratedRewardYoggTasties());
+    CHECK(state.ApplyGeneratedQuestReward(104673));
+    CHECK(state.HasGeneratedRewardBattlecryRepeat());
+    CHECK(state.GeneratedRewardBattlecryMinionDbfIDs().empty());
+    CHECK(state.GeneratedRewardYoggTastiesCount() == 1);
+    CHECK(state.GeneratedRewardBattlecryRepeatCount() == 1);
+    CHECK(state.ApplyGeneratedQuestReward(92563));
+    CHECK(state.GeneratedRewardYoggTastiesCount() == 2);
+    CHECK(state.ApplyGeneratedQuestReward(104673));
+    CHECK(state.GeneratedRewardBattlecryRepeatCount() == 2);
+    CHECK(state.GeneratedRewardYoggOutcomes().empty());
+}

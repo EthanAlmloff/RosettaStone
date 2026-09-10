@@ -151,7 +151,8 @@ bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
             generatedRewardEtherealEvidence = true;
             return true;
         case Season14GeneratedChoiceDefinition::Effect::YOGG_TASTIES:
-            generatedRewardYoggTasties = true;
+            if (generatedRewardYoggTasties != std::numeric_limits<std::uint32_t>::max())
+                ++generatedRewardYoggTasties;
             return true;
         case Season14GeneratedChoiceDefinition::Effect::FRIENDS_ALONG_THE_WAY:
             // The reward text's {0} is the lobby's selected minion type.  The
@@ -242,7 +243,8 @@ bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
             generatedRewardTheWall = true;
             return true;
         case Season14GeneratedChoiceDefinition::Effect::BATTLECRY_REPEAT:
-            generatedRewardBattlecryRepeat = true;
+            if (generatedRewardBattlecryRepeat != std::numeric_limits<std::uint32_t>::max())
+                ++generatedRewardBattlecryRepeat;
             return true;
         case Season14GeneratedChoiceDefinition::Effect::AVENGE_REFRESH:
             generatedRewardAvengeRefresh = true;
@@ -633,6 +635,31 @@ bool Season14State::BeginTransformDecision(std::uint64_t sourceEntityID,
     transformModal = { Season14TransformStage::TARGET, sourceEntityID,
                        sourceCardDbfID, targetEntityID, targetIndex, targetTier };
     return true;
+}
+
+bool Season14State::BeginTransformReplayDecision(std::int32_t sourceCardDbfID,
+                                                 std::uint64_t excludedEntityID,
+                                                 std::uint8_t remaining)
+{
+    if (remaining == 0 || excludedEntityID == 0 ||
+        pendingDecision != Season14Decision::NONE)
+        return false;
+    pendingDecision = Season14Decision::CHOOSE_ONE;
+    pendingSourceEntityID = 0;
+    pendingSourceCardDbfID = sourceCardDbfID;
+    pendingOfferings.clear();
+    choiceOfferings.clear();
+    transformModal = { Season14TransformStage::TARGET, 0, sourceCardDbfID,
+                       0, -1, 0, true, remaining, excludedEntityID };
+    return true;
+}
+
+void Season14State::ArmTransformReplay(std::uint8_t count,
+                                        std::uint64_t excludedEntityID) noexcept
+{
+    transformModal.locketReplay = count != 0;
+    transformModal.locketReplayRemaining = count;
+    transformModal.locketReplayExcludedEntityID = excludedEntityID;
 }
 
 void Season14State::CancelTransformDecision() noexcept

@@ -318,6 +318,10 @@ class Player
     //! hand.  Only concrete minion and spell cards are accepted; unsupported
     //! modal effects remain pending and fail closed.
     bool ApplyChoice(std::size_t offeringIdx);
+    //! Commits the second stage of Token of the Old Gods.  This owns the
+    //! transform/replay transaction so the native action bridge never has to
+    //! reconstruct spell side effects or stale entity references.
+    bool ApplyTransformChoice(std::size_t offeringIdx);
     //! Applies Conviction's selected improvement option and its random
     //! friendly-minion buff. The modal itself is replayable through Choice.
     bool ApplyConvictionHeroPower();

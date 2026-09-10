@@ -1241,30 +1241,24 @@ bool Player::ApplyGeneratedQuestReward(std::int32_t dbfID)
             Random::get<std::size_t>(0, candidates.size() - 1)];
         season14.SetGeneratedRewardUnmurloc(selected.heroDbfID);
     }
-    if (!season14.ApplyGeneratedQuestReward(dbfID)) return false;
     if (dbfID == 104673) {
         // Gilnean War Horn's {0} is resolved when the reward is acquired,
         // not when a later Battlecry happens.  Draw only from the current
         // lobby's executable normal Battlecry pool and retain the DBF so a
         // replay or retry cannot silently choose a different minion.
         if (hand.IsFull()) return false;
-        auto selectedDbfID = season14.GeneratedRewardBattlecryMinionDbfID();
-        if (selectedDbfID == 0) {
-            auto candidates = SupportedBattlecryMinions(activeTribes);
-            if (candidates.empty()) return false;
-            selectedDbfID = candidates[Random::get<std::size_t>(
-                0, candidates.size() - 1)].dbfID;
-            season14.SetGeneratedRewardBattlecryMinionDbfID(selectedDbfID);
-        }
-        const auto selected = Cards::FindCardByDbfID(selectedDbfID);
-        if (selected.dbfID == 0 || selected.normalDbfID != 0 ||
-            selected.GetCardType() != CardType::MINION ||
-            !selected.isBattlegroundsPoolMinion || !selected.hasBehavior ||
-            !HasActiveTribe(activeTribes, selected) ||
-            !CardDefs::FindCardDefByID(selected.id).HasBattlecry())
+        auto candidates = SupportedBattlecryMinions(activeTribes);
+        if (candidates.empty()) return false;
+        const auto& selected = candidates[Random::get<std::size_t>(
+            0, candidates.size() - 1)];
+        if (selected.dbfID == 0) return false;
+        if (!selected.isBattlegroundsPoolMinion || selected.normalDbfID != 0)
+            return false;
+        if (!season14.RecordGeneratedRewardBattlecryMinionDbfID(selected.dbfID))
             return false;
         hand.Add(CardData{Minion(selected)});
     }
+    if (!season14.ApplyGeneratedQuestReward(dbfID)) return false;
     if (dbfID == 96150) {
         // Purified Shard is an immediate win condition.  Mark the player
         // terminal at selection time so the lobby coordinator stops offering
@@ -1753,7 +1747,7 @@ void Player::ResolveGeneratedQuestRewardStartTurn()
     // Yogg-Saron used by Yogg-Tastic Pastry.  Keep one canonical outcome
     // engine so weighting, seeded randomness, and hand/pool boundaries do
     // not drift between the Trinket and reward implementations.
-    if (season14.HasGeneratedRewardYoggTasties())
+    for (std::uint32_t i = 0; i < season14.GeneratedRewardYoggTastiesCount(); ++i)
         (void)ResolveYoggWheel();
     // Quaint Boutique and Jumbo Warehouse arm their four-gold grant when the
     // reward is selected; deliver deferred gold exactly once at recruit start.
@@ -2922,6 +2916,8 @@ bool Player::ResolveYoggWheel()
     // 19% each and Rod of Roasting at 5%.  Keep the table explicit so a
     // replay can audit the draw without relying on card ordering.
     const int roll = Random::get<int>(0, 99);
+    if (!season14.RecordGeneratedRewardYoggOutcome(static_cast<std::uint8_t>(roll)))
+        return false;
 
     if (roll < 19) {
         // Curse: one random friendly gains the current stats of a distinct
@@ -5416,11 +5412,12 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
                     else minion.ActivateTask(PowerType::POWER, *this);
                 }
             }
-            if ((minion.HasBattlecry() || hackerfin) &&
-                season14.HasGeneratedRewardBattlecryRepeat()) {
-                if (hackerfin) ResolveHackerfinBattlecry(minion);
-                else minion.ActivateTask(PowerType::POWER, *this);
-            }
+            if (minion.HasBattlecry() || hackerfin)
+                for (std::uint32_t i = 0;
+                     i < season14.GeneratedRewardBattlecryRepeatCount(); ++i) {
+                    if (hackerfin) ResolveHackerfinBattlecry(minion);
+                    else minion.ActivateTask(PowerType::POWER, *this);
+                }
             // War Drum is a once-per-recruit-turn allowance.  Consume it
             // only after the play and ordinary repeat sources have succeeded;
             // direct task activation avoids recursively re-triggering Drum.
@@ -5457,15 +5454,31 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
             const auto originalTargetedTasks = miniZerek
                 ? minion.GetTasks(PowerType::POWER)
                 : std::vector<TaskType>{};
-            Minion& target = requiresTavernMinionTarget
-                                 ? tavern.fieldZone[static_cast<std::size_t>(targetIdx)]
-                                 : recruitField[static_cast<std::size_t>(targetIdx)];
+            // Add() shifts occupied slots when inserting before the target;
+            // retain the entity identity so repeated targeted Battlecries do
+            // not silently retarget a different minion.
+            const auto targetEntityID = requiresTavernMinionTarget
+                                            ? tavern.fieldZone[static_cast<std::size_t>(targetIdx)].GetIndex()
+                                            : recruitField[static_cast<std::size_t>(targetIdx)].GetIndex();
+            const auto findTarget = [this, requiresTavernMinionTarget,
+                                     targetEntityID]() -> Minion* {
+                auto& zone = requiresTavernMinionTarget ? tavern.fieldZone
+                                                        : recruitField;
+                Minion* result = nullptr;
+                zone.ForEachAlive([&](MinionData& data) {
+                    if (data.value().GetIndex() == targetEntityID)
+                        result = &data.value();
+                });
+                return result;
+            };
             const auto activateTargetedBattlecry = [&]() {
+                auto* target = findTarget();
+                if (target == nullptr) return;
                 if (miniZerek)
-                    minion.ActivateTask(PowerType::POWER, *this, target,
+                    minion.ActivateTask(PowerType::POWER, *this, *target,
                                         originalTargetedTasks);
                 else
-                    minion.ActivateTask(PowerType::POWER, *this, target);
+                    minion.ActivateTask(PowerType::POWER, *this, *target);
                 // Smogger's normal and golden Battlecries are the same
                 // targeted stat-giver at 1x/2x Tavern Tier.  Resolve this
                 // through the shared executor so typed Fountain Pen and
@@ -5475,7 +5488,7 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
                     const int scale = minion.GetCardID() == "BG21_021_G" ? 2 : 1;
                     SimpleTasks::ElementalStatGiverTask{currentTier * scale,
                                                         currentTier * scale}
-                        .Run(*this, target);
+                        .Run(*this, *target);
                 }
             };
 
@@ -5514,9 +5527,11 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
                     RefreshTavern(true);
                 }
             }
-            if (minion.GetCardID() == "TB_BaconShop_HERO_93_Buddy" &&
-                target.HasDeathrattle())
-                target.MakeGolden();
+            if (minion.GetCardID() == "TB_BaconShop_HERO_93_Buddy") {
+                if (auto* target = findTarget(); target != nullptr &&
+                    target->HasDeathrattle())
+                    target->MakeGolden();
+            }
             ResolveHackerfinBattlecry(minion);
             int brannRepeats = 0;
             recruitField.ForEachAlive([&brannRepeats](MinionData& data) {
@@ -5538,11 +5553,12 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
                     else activateTargetedBattlecry();
                 }
             }
-            if ((originalTargetedBattlecry || hackerfin) &&
-                season14.HasGeneratedRewardBattlecryRepeat()) {
-                if (hackerfin) ResolveHackerfinBattlecry(minion);
-                else activateTargetedBattlecry();
-            }
+            if (originalTargetedBattlecry || hackerfin)
+                for (std::uint32_t i = 0;
+                     i < season14.GeneratedRewardBattlecryRepeatCount(); ++i) {
+                    if (hackerfin) ResolveHackerfinBattlecry(minion);
+                    else activateTargetedBattlecry();
+                }
             const int warDrumRepeats = (originalTargetedBattlecry || hackerfin)
                 ? ConsumeWarDrumRepeats() : 0;
             for (int i = 0; i < warDrumRepeats; ++i) {
@@ -7588,9 +7604,8 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
 
     if (card.GetCardType() == CardType::BATTLEGROUND_QUEST_REWARD)
     {
-        // A typed registry row is not enough to make a modal selectable:
-        // unresolved linked payloads (for example Gilnean War Horn's `{0}`)
-        // remain fail-closed until their parent/replay contract is present.
+        // A typed registry row is selectable only when its executor can
+        // resolve all dynamic payloads from authoritative lobby state.
         if (!IsExecutableSeason14GeneratedQuestReward(card.dbfID)) return false;
         if (card.dbfID == 104673 &&
             (hand.IsFull() || SupportedBattlecryMinions(activeTribes).empty()))
@@ -7841,6 +7856,62 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
     season14.pendingHandLock = false;
     season14.pendingHandLockTurns = 0;
     return selected;
+}
+
+bool Player::ApplyTransformChoice(std::size_t offeringIdx)
+{
+    if (season14.transformModal.stage != Season14TransformStage::CANDIDATE ||
+        offeringIdx >= season14.pendingOfferings.size())
+        return false;
+    const auto modal = season14.transformModal;
+    if (modal.targetIndex < 0 || modal.targetIndex >= recruitField.GetCount())
+        return false;
+    auto& target = recruitField[static_cast<std::size_t>(modal.targetIndex)];
+    if (target.IsDestroyed() || target.GetHealth() <= 0 ||
+        static_cast<std::uint64_t>(target.GetIndex()) != modal.targetEntityID)
+        return false;
+    const auto card = Cards::FindCardByDbfID(
+        season14.pendingOfferings[offeringIdx].dbfID);
+    if (card.dbfID == 0 || card.normalDbfID != 0 ||
+        card.GetCardType() != CardType::MINION ||
+        card.GetTier() != modal.targetTier + 1)
+        return false;
+    if (!target.TransformTo(card)) return false;
+
+    // Every committed transform is one successful targeted Tavern spell.
+    // Replays are direct modal transactions and therefore cannot recursively
+    // arm another Locket or re-enter PlaySpell with a stale hand/entity ID.
+    season14.OnTavernSpellResolved(true, modal.sourceCardDbfID, true);
+    ResolveSpellCountTrinkets();
+    IncrementStartCombatSpellImprovements();
+    ApplyTavernSpellTrinkets();
+    AdvanceDarkGiftCounters(3);
+
+    if (modal.locketReplay && modal.locketReplayRemaining > 0) {
+        const auto remaining = static_cast<std::uint8_t>(
+            modal.locketReplayRemaining - 1);
+        if (remaining > 0) {
+            bool hasReplayTarget = false;
+            recruitField.ForEachAlive([&](const MinionData& data) {
+                if (static_cast<std::uint64_t>(data.value().GetIndex()) !=
+                    modal.locketReplayExcludedEntityID)
+                    hasReplayTarget = true;
+            });
+            if (hasReplayTarget) {
+                // The completed candidate still owns the public CHOOSE_ONE
+                // decision. Clear it before opening the next transaction so
+                // BeginTransformReplayDecision cannot accidentally nest
+                // modals or retain the prior offerings.
+                season14.CancelTransformDecision();
+                if (season14.BeginTransformReplayDecision(
+                        modal.sourceCardDbfID,
+                        modal.locketReplayExcludedEntityID, remaining))
+                    return true;
+            }
+        }
+    }
+    season14.CancelTransformDecision();
+    return true;
 }
 
 bool Player::ResolveFlightpathCompletion()
@@ -11429,6 +11500,7 @@ std::vector<Card> SupportedBattlecryMinions(const ActiveTribeSet& activeTribes)
         for (const auto& card : cards)
             if (card.hasBehavior && card.normalDbfID == 0 &&
                 card.GetCardType() == CardType::MINION &&
+                card.isBattlegroundsPoolMinion &&
                 HasActiveTribe(activeTribes, card) &&
                 CardDefs::FindCardDefByID(card.id).HasBattlecry())
                 result.push_back(card);
@@ -13653,9 +13725,10 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         const auto& target = recruitField[static_cast<std::size_t>(targetIdx)];
         if (target.GetTier() >= 6) return false;
         return std::any_of(Cards::GetAllCards().begin(), Cards::GetAllCards().end(),
-            [&target](const Card& candidate) {
+            [&target, this](const Card& candidate) {
                 return candidate.isBattlegroundsPoolMinion && candidate.hasBehavior &&
                        candidate.GetCardType() == CardType::MINION && candidate.normalDbfID == 0 &&
+                       HasActiveTribe(activeTribes, candidate) &&
                        candidate.GetTier() == target.GetTier() + 1;
             });
     }
@@ -14034,14 +14107,21 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     {
         auto& target = recruitField[static_cast<std::size_t>(targetIdx)];
         // This spell opens a target modal and then a second candidate modal.
-        // Lovely Locket is deliberately not armed here: replaying only the
-        // first target would either transform the original twice or lose the
-        // selected higher-tier payload.  Keep the combination fail-closed
-        // until TransformState carries a complete replay transaction.
         if (!season14.BeginTransformDecision(0, spell.GetDbfID(),
                                              static_cast<std::uint64_t>(target.GetIndex()),
                                              targetIdx, target.GetTier()))
             return false;
+        std::uint8_t locketCopies = 0;
+        for (const auto& trinket : season14.trinkets) {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto behavior = FindTrinketBehavior(
+                Cards::FindCardByDbfID(trinket.dbfID).id);
+            if (behavior.effect == TrinketEffect::AFTER_FRIENDLY_SPELL_REPEAT &&
+                locketCopies < 255)
+                ++locketCopies;
+        }
+        season14.ArmTransformReplay(locketCopies,
+                                     static_cast<std::uint64_t>(target.GetIndex()));
         hand.Remove(card);
         return true;
     }
@@ -14536,23 +14616,10 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
         }
     }
     // Lovely Locket is armed per successful targeted spell, not per turn.
-    // Count owned copies here, after payment/target validation, and resolve
-    // each replay through the ordinary board-effect path below.
-    // Token of the Old Gods is a two-stage transform modal (target, then a
-    // higher-tier candidate).  A Lovely Locket replay would need to preserve
-    // both choices and reopen the target/candidate flow; arming the ordinary
-    // one-stage spell replay here would either recurse through the modal or
-    // silently reuse the first target.  Keep this unsupported combination
-    // fail-closed until a typed transform-replay state exists.
-    // A replay must not overwrite an asynchronous public modal opened by the
-    // first cast.  Token of the Old Gods has a typed two-stage transform;
-    // Chef's Choice opens a public Discover; Lost Staff of Hamuul performs a
-    // target-dependent refresh before the ordinary resolution loop.  None of
-    // these paths has a complete Locket transaction yet, so leave the first
-    // cast intact and fail closed for its replay rather than reusing stale
-    // target/modal state.
+    // Token of the Old Gods is handled by its typed two-stage transform
+    // transaction above; all other supported targeted effects use this
+    // direct, live-target replay path.
     const bool locketReplaySupported =
-        spell.GetID() != "BG30_MagicItem_416t" &&
         effect.effect != TavernSpellEffect::DISCOVER_DIFFERENT_RACE &&
         effect.effect != TavernSpellEffect::REFRESH_RACE;
     if (locketReplaySupported && targetIdx >= 0 &&

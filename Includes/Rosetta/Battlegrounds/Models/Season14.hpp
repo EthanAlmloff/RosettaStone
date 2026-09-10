@@ -23,6 +23,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
+#include <limits>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -169,6 +171,12 @@ struct Season14TransformState {
     std::uint64_t targetEntityID = 0;
     std::int32_t targetIndex = -1;
     std::int32_t targetTier = 0;
+    // A Lovely Locket replay is a complete transaction, not a re-entry into
+    // PlaySpell.  Keep the remaining copies and the original entity outside
+    // the public modal fields so replay targets can be re-selected safely.
+    bool locketReplay = false;
+    std::uint8_t locketReplayRemaining = 0;
+    std::uint64_t locketReplayExcludedEntityID = 0;
 };
 struct Season14PendingCombatBuff
 {
@@ -417,7 +425,9 @@ class Season14State
     //! its exact two DBF offerings rather than a random host-side choice.
     bool generatedRewardEtherealEvidence = false;
     //! Yogg-tastic Tasties reuses Player's canonical seeded Yogg wheel.
-    bool generatedRewardYoggTasties = false;
+    std::uint32_t generatedRewardYoggTasties = 0;
+    //! Seeded wheel rolls, retained as replay-auditable canonical outcomes.
+    std::vector<std::uint8_t> generatedRewardYoggOutcomes;
     bool generatedRewardGhastlyMask = false;
     //! Exact pinned minion selected for Ghastly Mask's {0} card.  The DBF is
     //! retained after delivery so replay cannot reroll the linked entity.
@@ -425,7 +435,7 @@ class Season14State
     bool generatedRewardGhastlyCardDelivered = false;
     //! The concrete Battlecry minion selected for Gilnean War Horn's {0}.
     //! Persisting the DBF prevents replayed acquisition from rerolling it.
-    std::int32_t generatedRewardBattlecryMinionDbfID = 0;
+    std::vector<std::int32_t> generatedRewardBattlecryMinionDbfIDs;
     bool generatedRewardUnmurloc = false;
     //! Pinned hero DBF selected by Un-Murloc Your Potential.  The paired
     //! hero-power DBF is validated against the same manifest pair at apply.
@@ -469,7 +479,7 @@ class Season14State
     bool generatedRewardTotemicTavern = false;
     bool generatedRewardPurifiedShard = false;
     bool generatedRewardTheWall = false;
-    bool generatedRewardBattlecryRepeat = false;
+    std::uint32_t generatedRewardBattlecryRepeat = 0;
     bool generatedRewardAvengeRefresh = false;
     bool generatedRewardStartTurnRandomSpells = false;
     bool generatedRewardScepterOfGuidance = false;
@@ -539,14 +549,25 @@ class Season14State
     bool HasGeneratedRewardKidnapSack() const noexcept { return generatedRewardKidnapSack; }
     bool HasGeneratedRewardAnotherHiddenBody() const noexcept { return generatedRewardAnotherHiddenBody; }
     bool HasGeneratedRewardEtherealEvidence() const noexcept { return generatedRewardEtherealEvidence; }
-    bool HasGeneratedRewardYoggTasties() const noexcept { return generatedRewardYoggTasties; }
+    bool HasGeneratedRewardYoggTasties() const noexcept { return generatedRewardYoggTasties != 0; }
+    std::uint32_t GeneratedRewardYoggTastiesCount() const noexcept { return generatedRewardYoggTasties; }
+    const std::vector<std::uint8_t>& GeneratedRewardYoggOutcomes() const noexcept { return generatedRewardYoggOutcomes; }
+    bool RecordGeneratedRewardYoggOutcome(std::uint8_t outcome) {
+        if (generatedRewardYoggOutcomes.size() == std::numeric_limits<std::uint16_t>::max()) return false;
+        generatedRewardYoggOutcomes.push_back(outcome);
+        return true;
+    }
     bool HasGeneratedRewardGhastlyMask() const noexcept { return generatedRewardGhastlyMask; }
     std::int32_t GeneratedRewardGhastlyCardDbfID() const noexcept { return generatedRewardGhastlyCardDbfID; }
     void SetGeneratedRewardGhastlyCardDbfID(std::int32_t dbfID) noexcept { generatedRewardGhastlyCardDbfID = dbfID; }
     bool GhastlyCardDelivered() const noexcept { return generatedRewardGhastlyCardDelivered; }
     void MarkGhastlyCardDelivered() noexcept { generatedRewardGhastlyCardDelivered = true; }
-    std::int32_t GeneratedRewardBattlecryMinionDbfID() const noexcept { return generatedRewardBattlecryMinionDbfID; }
-    void SetGeneratedRewardBattlecryMinionDbfID(std::int32_t dbfID) noexcept { generatedRewardBattlecryMinionDbfID = dbfID; }
+    const std::vector<std::int32_t>& GeneratedRewardBattlecryMinionDbfIDs() const noexcept { return generatedRewardBattlecryMinionDbfIDs; }
+    bool RecordGeneratedRewardBattlecryMinionDbfID(std::int32_t dbfID) {
+        if (generatedRewardBattlecryMinionDbfIDs.size() == std::numeric_limits<std::uint16_t>::max()) return false;
+        generatedRewardBattlecryMinionDbfIDs.push_back(dbfID);
+        return true;
+    }
     bool HasGeneratedRewardUnmurloc() const noexcept { return generatedRewardUnmurloc; }
     std::int32_t GeneratedRewardUnmurlocHeroDbfID() const noexcept { return generatedRewardUnmurlocHeroDbfID; }
     void SetGeneratedRewardUnmurloc(std::int32_t heroDbfID) noexcept {
@@ -594,7 +615,8 @@ class Season14State
     bool HasGeneratedRewardTotemicTavern() const noexcept { return generatedRewardTotemicTavern; }
     bool HasGeneratedRewardPurifiedShard() const noexcept { return generatedRewardPurifiedShard; }
     bool HasGeneratedRewardTheWall() const noexcept { return generatedRewardTheWall; }
-    bool HasGeneratedRewardBattlecryRepeat() const noexcept { return generatedRewardBattlecryRepeat; }
+    bool HasGeneratedRewardBattlecryRepeat() const noexcept { return generatedRewardBattlecryRepeat != 0; }
+    std::uint32_t GeneratedRewardBattlecryRepeatCount() const noexcept { return generatedRewardBattlecryRepeat; }
     bool HasGeneratedRewardAvengeRefresh() const noexcept { return generatedRewardAvengeRefresh; }
     bool HasGeneratedRewardStartTurnRandomSpells() const noexcept { return generatedRewardStartTurnRandomSpells; }
     bool HasGeneratedRewardScepterOfGuidance() const noexcept { return generatedRewardScepterOfGuidance; }
@@ -1143,6 +1165,11 @@ class Season14State
                                 std::uint64_t targetEntityID,
                                 std::int32_t targetIndex,
                                 std::int32_t targetTier);
+    bool BeginTransformReplayDecision(std::int32_t sourceCardDbfID,
+                                      std::uint64_t excludedEntityID,
+                                      std::uint8_t remaining);
+    void ArmTransformReplay(std::uint8_t count,
+                            std::uint64_t excludedEntityID) noexcept;
     void CancelTransformDecision() noexcept;
     void BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t targetMask, std::int32_t sourceCardDbfID, std::vector<Season14Offering> offerings);
     void BeginSpellTargetChoice(std::int32_t sourceCardDbfID, std::int32_t targetIndex,
