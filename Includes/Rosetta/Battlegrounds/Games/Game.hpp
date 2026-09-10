@@ -101,7 +101,6 @@ class Game
     std::vector<std::string> m_supportedCardIDs;
     GameState m_gameState{};
 
-    Race m_excludeRace = Race::INVALID;
     std::vector<std::tuple<std::size_t, std::size_t>> m_playerFightPair;
     std::atomic<int> m_playerCount = 0;
     std::atomic<int> m_cardIndex = 0;

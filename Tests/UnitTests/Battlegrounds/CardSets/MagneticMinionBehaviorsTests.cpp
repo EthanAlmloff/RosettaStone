@@ -4,6 +4,7 @@
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 #include <map>
 using namespace RosettaStone::Battlegrounds;
 TEST_CASE("[Magnetic] - Prosthetic Hand pair is magnetic and exact")
@@ -46,12 +47,12 @@ TEST_CASE("[Magnetic] - fixed Mech pairs and deathrattle merge")
         CHECK_EQ(target.GetAttack(), attack);
         CHECK_EQ(target.GetHealth(), health);
     }
-    REQUIRE(std::holds_alternative<SimpleTasks::SummonTask>(
+    REQUIRE(std::holds_alternative<SimpleTasks::AddEnchantmentTask>(
         cards.at("BG_BOT_312").power.GetDeathrattleTask().front()));
-    const auto& normal = std::get<SimpleTasks::SummonTask>(
+    const auto& normal = std::get<SimpleTasks::AddEnchantmentTask>(
         cards.at("BG_BOT_312").power.GetDeathrattleTask().front());
-    CHECK(normal.m_cardID == "BG_BOT_312t");
-    CHECK_EQ(normal.m_amount, 3);
+    CHECK(normal.CardID() == "BG_BOT_312e");
+    CHECK(normal.Entity() == EntityType::SOURCE);
     const auto& golden = std::get<SimpleTasks::SummonTask>(
         cards.at("TB_BaconUps_032").power.GetDeathrattleTask().front());
     CHECK(golden.m_cardID == "TB_BaconUps_032t");

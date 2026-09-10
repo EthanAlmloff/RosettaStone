@@ -1,5 +1,6 @@
 #include <Rosetta/Battlegrounds/CardSets/MagneticMinionBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 
 #include <utility>
 namespace RosettaStone::Battlegrounds
@@ -12,6 +13,18 @@ void AddDeathrattleSummon(std::map<std::string, CardDef>& cards,
     Power power;
     power.AddDeathrattleTask(
         SimpleTasks::SummonTask{ tokenID, amount });
+    cards.emplace(id, CardDef{ std::move(power) });
+}
+
+void AddDeathrattleChild(std::map<std::string, CardDef>& cards,
+                         const char* id, const char* childID)
+{
+    Power power;
+    // The parent owns the deathrattle boundary.  The exact child task list is
+    // installed by LifecycleEnchantment, which preserves one executable
+    // source of truth and rejects sibling child IDs.
+    power.AddDeathrattleTask(
+        SimpleTasks::AddEnchantmentTask{ childID, EntityType::SOURCE });
     cards.emplace(id, CardDef{ std::move(power) });
 }
 }
@@ -31,7 +44,7 @@ void MagneticMinionBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG31_170_G", CardDef{});
     cards.emplace("BG_BOT_563", CardDef{});     // Wargear
     cards.emplace("BG_BOT_563_G", CardDef{});
-    AddDeathrattleSummon(cards, "BG_BOT_312", "BG_BOT_312t", 3);
+    AddDeathrattleChild(cards, "BG_BOT_312", "BG_BOT_312e");
     AddDeathrattleSummon(cards, "TB_BaconUps_032", "TB_BaconUps_032t", 3);
 }
 }

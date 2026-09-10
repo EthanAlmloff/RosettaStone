@@ -8,6 +8,7 @@
 #define ROSETTASTONE_BATTLEGROUNDS_GAME_STATE_HPP
 
 #include <Rosetta/Battlegrounds/Models/MinionPool.hpp>
+#include <Rosetta/Battlegrounds/Models/ActiveTribes.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Common/Enums/GameEnums.hpp>
 
@@ -27,6 +28,10 @@ struct GameState
     Phase nextPhase = Phase::INVALID;
 
     MinionPool minionPool;
+
+    // Pinned once per lobby and copied into every pool/generation path.  This
+    // is deliberately state, not a process-global random exclusion.
+    ActiveTribeSet activeTribes = PINNED_ACTIVE_TRIBES;
 
     std::array<Player, NUM_BATTLEGROUNDS_PLAYERS> players;
     std::size_t numRemainPlayer = NUM_BATTLEGROUNDS_PLAYERS;

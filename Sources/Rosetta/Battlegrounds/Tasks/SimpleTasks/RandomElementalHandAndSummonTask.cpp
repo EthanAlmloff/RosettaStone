@@ -12,6 +12,7 @@ TaskStatus RandomElementalHandAndSummonTask::Run(Player& p, Minion&) {
   std::vector<const Card*> pool;
   for (const auto& card : Cards::GetAllCards())
     if (card.isBattlegroundsPoolMinion && card.hasBehavior && card.normalDbfID == 0 &&
+        HasActiveTribe(p.activeTribes, card) &&
         card.GetCardType() == CardType::MINION && card.HasRace(Race::ELEMENTAL)) pool.push_back(&card);
   if (pool.empty()) return TaskStatus::STOP;
   // Each roll has two independent effects: add the chosen Elemental to hand

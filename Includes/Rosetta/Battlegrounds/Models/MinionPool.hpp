@@ -8,6 +8,7 @@
 #define ROSETTASTONE_BATTLEGROUNDS_MINION_POOL_HPP
 
 #include <Rosetta/Battlegrounds/Models/Minion.hpp>
+#include <Rosetta/Battlegrounds/Models/ActiveTribes.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Models/Tavern.hpp>
 #include <Rosetta/Common/Constants.hpp>
@@ -29,13 +30,15 @@ class MinionPool
 {
  public:
     //! Initializes the pool to add a list of minions.
-    //! \param excludeRace The race to exclude from the pool.
-    void Initialize(Race excludeRace);
+    //! Initializes the pool using the lobby's pinned active tribes.
+    void Initialize(const ActiveTribeSet& activeTribes = PINNED_ACTIVE_TRIBES);
 
     //! Initializes a deterministic experimental pool containing only the
     //! supplied card IDs. Copies are repeated to pool capacity.
     //! \param cardIDs The supported minion card IDs.
-    void InitializeSupported(const std::vector<std::string>& cardIDs);
+    void InitializeSupported(const std::vector<std::string>& cardIDs,
+                             const ActiveTribeSet& activeTribes =
+                                 PINNED_ACTIVE_TRIBES);
 
     //! Returns the count of minions in the pool.
     //! \return The count of minions in the pool.

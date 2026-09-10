@@ -16,6 +16,7 @@ TaskStatus RandomCardToHandTask::Run(Player& player, Minion&) {
     if (!card.isBattlegroundsPoolMinion || !card.hasBehavior ||
         card.GetCardType() != CardType::MINION)
         continue;
+    if (!HasActiveTribe(player.activeTribes, card)) continue;
     // Generated cards come from the normal Battlegrounds pool.  Keep golden
     // entities out even if a future pool loader marks them as pool members;
     // golden creation is handled by the simulator's normal triple path.
@@ -53,6 +54,7 @@ TaskStatus RandomCardToHandTask::Run(Player& player) {
     if (!card.isBattlegroundsPoolMinion || !card.hasBehavior ||
         card.GetCardType() != CardType::MINION || card.normalDbfID != 0)
         continue;
+    if (!HasActiveTribe(player.activeTribes, card)) continue;
     if (m_race != Race::INVALID && m_race != Race::ALL && !card.HasRace(m_race)) continue;
     if (m_tier > 0 && card.GetTier() != m_tier) continue;
     if (m_magneticOnly &&

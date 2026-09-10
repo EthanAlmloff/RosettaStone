@@ -18,7 +18,7 @@ using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds
 {
-void MinionPool::Initialize(Race excludeRace)
+void MinionPool::Initialize(const ActiveTribeSet& activeTribes)
 {
     std::size_t idx = 0;
 
@@ -33,7 +33,7 @@ void MinionPool::Initialize(Race excludeRace)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
         }
-        if (card.GetRace() == excludeRace)
+        if (!HasActiveTribe(activeTribes, card))
         {
             continue;
         }
@@ -56,7 +56,7 @@ void MinionPool::Initialize(Race excludeRace)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
         }
-        if (card.GetRace() == excludeRace)
+        if (!HasActiveTribe(activeTribes, card))
         {
             continue;
         }
@@ -79,7 +79,7 @@ void MinionPool::Initialize(Race excludeRace)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
         }
-        if (card.GetRace() == excludeRace)
+        if (!HasActiveTribe(activeTribes, card))
         {
             continue;
         }
@@ -102,7 +102,7 @@ void MinionPool::Initialize(Race excludeRace)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
         }
-        if (card.GetRace() == excludeRace)
+        if (!HasActiveTribe(activeTribes, card))
         {
             continue;
         }
@@ -125,7 +125,7 @@ void MinionPool::Initialize(Race excludeRace)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
         }
-        if (card.GetRace() == excludeRace)
+        if (!HasActiveTribe(activeTribes, card))
         {
             continue;
         }
@@ -148,7 +148,7 @@ void MinionPool::Initialize(Race excludeRace)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
         }
-        if (card.GetRace() == excludeRace)
+        if (!HasActiveTribe(activeTribes, card))
         {
             continue;
         }
@@ -171,7 +171,7 @@ void MinionPool::Initialize(Race excludeRace)
         {
             throw std::invalid_argument("missing Battlegrounds behavior for pool card: " + card.id);
         }
-        if (card.GetRace() == excludeRace)
+        if (!HasActiveTribe(activeTribes, card))
         {
             continue;
         }
@@ -186,7 +186,8 @@ void MinionPool::Initialize(Race excludeRace)
     m_count = idx;
 }
 
-void MinionPool::InitializeSupported(const std::vector<std::string>& cardIDs)
+void MinionPool::InitializeSupported(const std::vector<std::string>& cardIDs,
+                                     const ActiveTribeSet& activeTribes)
 {
     if (cardIDs.empty())
     {
@@ -199,7 +200,7 @@ void MinionPool::InitializeSupported(const std::vector<std::string>& cardIDs)
     {
         Card card = Cards::FindCardByID(id);
         if (card.id.empty() || card.GetCardType() != CardType::MINION ||
-            card.GetTier() < 1)
+            card.GetTier() < 1 || !HasActiveTribe(activeTribes, card))
         {
             throw std::invalid_argument("unsupported minion pool card ID: " +
                                         id);

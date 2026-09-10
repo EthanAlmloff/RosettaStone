@@ -104,9 +104,13 @@ inline constexpr std::array<std::int32_t, 15> BUILD_AN_UNDEAD_POOL_2 = {{
 constexpr bool IsBuildAnUndeadPoolDbfID(std::int32_t dbfID,
                                         bool secondPool) noexcept
 {
-    const auto& pool = secondPool ? BUILD_AN_UNDEAD_POOL_2
-                                  : BUILD_AN_UNDEAD_POOL_1;
-    return std::find(pool.begin(), pool.end(), dbfID) != pool.end();
+    if (secondPool)
+        return std::find(BUILD_AN_UNDEAD_POOL_2.begin(),
+                         BUILD_AN_UNDEAD_POOL_2.end(), dbfID) !=
+               BUILD_AN_UNDEAD_POOL_2.end();
+    return std::find(BUILD_AN_UNDEAD_POOL_1.begin(),
+                     BUILD_AN_UNDEAD_POOL_1.end(), dbfID) !=
+           BUILD_AN_UNDEAD_POOL_1.end();
 }
 
 enum class Season14HeroPowerBatch9Event : std::uint8_t

@@ -7,7 +7,7 @@ namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus ConsumeUndeadBattlecryTask::Run(Player& p, Minion& source, Minion& target) {
  if(!target.HasRace(Race::UNDEAD) || target.IsDestroyed() || p.hand.IsFull()) return TaskStatus::STOP;
  if(m_discover){
-  std::vector<Card> candidates; for(const auto& c:Cards::GetAllCards()) if(c.isBattlegroundsPoolMinion&&c.normalDbfID==0&&c.HasRace(Race::UNDEAD)) candidates.push_back(c);
+  std::vector<Card> candidates; for(const auto& c:Cards::GetAllCards()) if(c.isBattlegroundsPoolMinion&&c.normalDbfID==0&&HasActiveTribe(p.activeTribes,c)&&c.HasRace(Race::UNDEAD)) candidates.push_back(c);
   if(candidates.empty()) return TaskStatus::STOP; effolkronium::random_thread_local::shuffle(candidates.begin(),candidates.end());
   p.recruitField.Remove(target);
   std::vector<Season14Offering> offers; for(std::size_t i=0;i<std::min<std::size_t>(3,candidates.size());++i) offers.push_back({candidates[i].dbfID,0});

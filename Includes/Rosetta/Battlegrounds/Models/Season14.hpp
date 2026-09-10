@@ -59,6 +59,10 @@ struct Season14Offering
     std::int32_t dbfID = 0;
     std::uint64_t entityID = 0;
     std::int32_t darkGiftDbfID = 0;
+    // For Trinket offers this is the public pivot discount in Gold.  It is
+    // metadata on the offer (never hidden player state), so replay and the
+    // Rust observation can reproduce the exact selected action price.
+    std::int32_t discount = 0;
 };
 
 // Synthetic, player-visible option IDs for Conviction's improvement modal.

@@ -12,7 +12,8 @@ TaskStatus RandomGoldenTierMinionToHandTask::Run(Player& p, Minion&) {
  std::vector<const Card*> candidates;
  for(const auto& card: Cards::GetAllCards())
    if(card.isBattlegroundsPoolMinion && card.GetCardType()==CardType::MINION &&
-      card.normalDbfID==0 && card.premiumDbfID!=0 && card.GetTier()==4) candidates.push_back(&card);
+      card.normalDbfID==0 && HasActiveTribe(p.activeTribes, card) &&
+      card.premiumDbfID!=0 && card.GetTier()==4) candidates.push_back(&card);
  if(candidates.empty()) return TaskStatus::STOP;
  for(int i=0;i<m_amount && !p.hand.IsFull() && !candidates.empty();++i){
    const auto index=Random::get<std::size_t>(0,candidates.size()-1);

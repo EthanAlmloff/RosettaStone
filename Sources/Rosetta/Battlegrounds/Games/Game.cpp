@@ -106,19 +106,22 @@ void Game::Start()
     // rely on another test or game having initialized the singleton first.
     static_cast<void>(Cards::GetInstance());
 
-    // Choose a race to exclude from the minion pool at random
-    const auto raceIdx =
-        Random::get<std::size_t>(0, RACES_IN_BATTLEGROUNDS.size() - 1);
-    m_excludeRace = RACES_IN_BATTLEGROUNDS.at(raceIdx);
+    // Select the five active tribes once per seeded lobby.  The manifest's
+    // ten tribes are the eligible universe, not the contents of every lobby;
+    // every pool/generation/Discover path must use this same immutable set.
+    m_gameState.activeTribes = SelectActiveTribes(m_seed.value_or(0));
+    for (auto& player : m_gameState.players)
+        player.activeTribes = m_gameState.activeTribes;
 
-    // Initialize the minion pool
+    // Initialize the minion pool from the pinned active set.
     if (m_supportedCardIDs.empty())
     {
-        m_gameState.minionPool.Initialize(m_excludeRace);
+        m_gameState.minionPool.Initialize(m_gameState.activeTribes);
     }
     else
     {
-        m_gameState.minionPool.InitializeSupported(m_supportedCardIDs);
+        m_gameState.minionPool.InitializeSupported(m_supportedCardIDs,
+                                                   m_gameState.activeTribes);
     }
     m_playerFightPair.reserve(NUM_BATTLEGROUNDS_PLAYERS / 2);
 
@@ -358,6 +361,12 @@ void Game::Start()
         player.season14 = Season14State{};
         player.playState = PlayState::PLAYING;
         player.idx = playerIdx;
+        // Trinket affinity and the minion pool must agree on the lobby's
+        // excluded type.  Copy the immutable lobby selection into each player
+        // snapshot so generated/replacement offers use the same eligibility.
+        // Legacy single-excluded-tribe consumers must not invent a different
+        // lobby rule.  The authoritative eligibility is player.activeTribes.
+        player.excludedLobbyRace = Race::INVALID;
 
         player.remainCoin = 0;
         player.totalCoin = 2;
@@ -553,6 +562,11 @@ void Game::Recruit()
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
         player.RefreshSousChefHeroPowerUses();
         player.remainCoin += heroPowerResult.goldDelta;
+        // The canonical Season 14 Trinket offers are public four-choice
+        // modals on recruit turns 6 and 9.  Open them before other start-turn
+        // effects so those effects cannot replace or reorder the scheduled
+        // offer; their existing retry/defer paths handle the occupied modal.
+        player.BeginScheduledTrinketOffer();
         // Nether Portal is a passive start-of-turn reward.  Use the shared
         // seeded pool task so hand capacity, executable-pool filtering, and
         // replay RNG semantics remain identical to other random acquisitions.

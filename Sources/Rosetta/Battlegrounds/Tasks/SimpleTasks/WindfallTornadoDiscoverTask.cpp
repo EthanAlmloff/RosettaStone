@@ -16,6 +16,7 @@ std::vector<Card> ElementalPool() {
   for (const auto& card : Cards::GetAllCards()) {
     if (card.isBattlegroundsPoolMinion && card.hasBehavior &&
         card.normalDbfID == 0 && card.GetCardType() == CardType::MINION &&
+        HasActiveTribe(player.activeTribes, card) &&
         card.HasRace(Race::ELEMENTAL))
       result.push_back(card);
   }

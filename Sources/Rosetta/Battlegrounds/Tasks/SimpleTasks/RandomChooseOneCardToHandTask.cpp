@@ -12,6 +12,7 @@ TaskStatus RandomChooseOneCardToHandTask::Run(Player& player, Minion&) {
     for (const auto& card : Cards::GetAllCards()) {
         if (!card.isBattlegroundsPoolMinion || card.normalDbfID != 0 ||
             !card.hasBehavior || card.GetCardType() != CardType::MINION ||
+            !HasActiveTribe(player.activeTribes, card) ||
             !card.gameTags.contains(GameTag::CHOOSE_ONE) ||
             card.gameTags.at(GameTag::CHOOSE_ONE) == 0 ||
             CardDefs::FindCardDefByID(card.id).lifecycle !=

@@ -14,6 +14,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomHandMinionBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomCardToHandTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddCardTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/LeapfroggerDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSummonFromPoolTask.hpp>
@@ -296,8 +297,14 @@ TEST_CASE("[Generated mappings] - migrated deathrattles keep token and hand payl
     checkSummon("BG28_300_G", "BG_ICC_026t_G", 4);
     checkSummon("BG29_611", "BG_BOT_312t", 1);
     checkSummon("BG29_611_G", "TB_BaconUps_032t", 1);
-    checkSummon("BG31_803", "BG28_603t", 1);
-    checkSummon("BG31_803_G", "BG28_603t_G", 2);
+    REQUIRE(cards.contains("BG31_803"));
+    REQUIRE(cards.at("BG31_803").power.GetDeathrattleTask().size() == 1);
+    const auto* beetleChild = std::get_if<SimpleTasks::AddEnchantmentTask>(
+        &cards.at("BG31_803").power.GetDeathrattleTask().front());
+    REQUIRE(beetleChild != nullptr);
+    CHECK(beetleChild->CardID() == "BG28_603e");
+    CHECK(beetleChild->Entity() == EntityType::SOURCE);
+    checkSummon("BG31_803_G", "BG28_603t", 2);
     const auto checkCard = [&cards](const char* id, const char* card, int amount, bool battlecry) {
         REQUIRE(cards.contains(id));
         const auto& tasks = cards.at(id).power.GetDeathrattleTask();

@@ -12,6 +12,7 @@ TaskStatus RandomMagneticMechToTargetTask::Run(Player& player, Minion&, Minion& 
   for (const auto& card : Cards::GetAllCards()) {
     if (!card.isBattlegroundsPoolMinion || !card.hasBehavior ||
         card.GetCardType() != CardType::MINION || card.normalDbfID != 0 ||
+        !HasActiveTribe(player.activeTribes, card) ||
         !card.HasRace(Race::MECHANICAL) ||
         !card.gameTags.contains(GameTag::MAGNETIC) ||
         card.gameTags.at(GameTag::MAGNETIC) == 0) continue;

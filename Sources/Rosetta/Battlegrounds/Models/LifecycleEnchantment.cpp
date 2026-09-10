@@ -39,6 +39,12 @@ struct ReviewedTemporaryChildSpec
     Minion::TemporaryEnchantment payload;
 };
 
+struct ReviewedExternalLifecycleSpec
+{
+    std::string_view parent;
+    std::string_view child;
+};
+
 constexpr LifecycleSpec SPELLCRAFT_LIFECYCLES[] = {
     { "BG23_000t", "BG23_000e", Minion::TemporaryEnchantment::Stats },
     { "BG23_000_Gt", "BG23_000e", Minion::TemporaryEnchantment::Stats },
@@ -78,6 +84,35 @@ constexpr ReviewedLifecycleSpec REVIEWED_LIFECYCLES[] = {
     { "BG36_883", "BG36_883e", Minion::TemporaryEnchantment::Stats },
 };
 
+// Lift Off's upgrade spells own their payload in Season14State/Battle.  The
+// child records below are provenance markers only; keeping the exact spell
+// IDs here prevents a similarly-prefixed generated upgrade from being
+// promoted accidentally.  Level variants intentionally share the printed
+// child identity, as in the card data.
+constexpr ReviewedExternalLifecycleSpec REVIEWED_EXTERNAL_LIFECYCLES[] = {
+    { "BG31_HERO_801ptc", "BG31_HERO_801ptce" },
+    { "BG31_HERO_801ptc2", "BG31_HERO_801ptce" },
+    { "BG31_HERO_801ptc3", "BG31_HERO_801ptce" },
+    { "BG31_HERO_801ptc4", "BG31_HERO_801ptce" },
+    { "BG31_HERO_801ptc5", "BG31_HERO_801ptce" },
+    { "BG31_HERO_801ptc6", "BG31_HERO_801ptce" },
+    { "BG31_HERO_801ptc7", "BG31_HERO_801ptce" },
+    { "BG31_HERO_801pte", "BG31_HERO_801ptee" },
+    { "BG31_HERO_801pte2", "BG31_HERO_801ptee" },
+    { "BG31_HERO_801pte3", "BG31_HERO_801ptee" },
+    { "BG31_HERO_801pte4", "BG31_HERO_801ptee" },
+    { "BG31_HERO_801pte5", "BG31_HERO_801ptee" },
+    { "BG31_HERO_801pte6", "BG31_HERO_801ptee" },
+    { "BG31_HERO_801pte7", "BG31_HERO_801ptee" },
+    { "BG31_HERO_801pth", "BG31_HERO_801pthe" },
+    { "BG31_HERO_801pth2", "BG31_HERO_801pthe" },
+    { "BG31_HERO_801pth3", "BG31_HERO_801pthe" },
+    { "BG31_HERO_801pth4", "BG31_HERO_801pthe" },
+    { "BG31_HERO_801pth5", "BG31_HERO_801pthe" },
+    { "BG31_HERO_801pth6", "BG31_HERO_801pthe" },
+    { "BG31_HERO_801pth7", "BG31_HERO_801pthe" },
+};
+
 // Daggerspine Thrasher chooses one of these children after each successful
 // Tavern-spell cast.  Keep normal and golden identities explicit: the parent
 // owns the random choice, while this table owns the canonical child and typed
@@ -115,6 +150,9 @@ constexpr ReviewedChildLifecycleSpec REVIEWED_CHILD_LIFECYCLES[] = {
     // Haunted Carapace owns the +3/+1 parent payload.  The child is a
     // provenance/expiry marker, not a second stat application.
     { "BG33_112", "BG33_112e", Minion::TemporaryEnchantment::Stats },
+    // Volatile Venom's generated reward owns the attack-death boundary; the
+    // child records the exact +7/+7 combat payload and replay identity.
+    { "BG24_Reward_364", "BG24_Reward_364e", Minion::TemporaryEnchantment::Stats },
     // Tough Tusk's first Blood Gem trigger has separate normal and golden
     // children.  The normal child expires at the next recruit turn; the
     // golden child is a permanent Divine Shield, as printed.
@@ -145,6 +183,10 @@ constexpr std::string_view REVIEWED_PERSISTENT_CHILDREN[] = {
     // child on the generated Shredder instance.  The parent resolver owns
     // the tier-lower pool selection; this child owns the canonical task.
     "BG21_HERO_030pe",
+    // Exact active lifecycle children whose parent minion deathrattle is
+    // installed through AddEnchantmentTask.  These are not generic child
+    // admissions: their parent-qualified gates below are mandatory.
+    "BG28_603e", "BG_BOT_312e",
 };
 
 struct ReviewedPersistentChildParent
@@ -155,6 +197,8 @@ struct ReviewedPersistentChildParent
 
 constexpr ReviewedPersistentChildParent REVIEWED_PERSISTENT_CHILD_PARENTS[] = {
     { "BG21_HERO_030p", "BG21_HERO_030pe" },
+    { "BG31_803", "BG28_603e" },
+    { "BG_BOT_312", "BG_BOT_312e" },
 };
 }
 
@@ -272,6 +316,18 @@ bool RecordReviewedLifecycleEnchantment(Minion& target,
     {
         if (spec.parent != parentID) continue;
         target.RecordTemporaryEnchantment(spec.enchantment);
+        return true;
+    }
+    return false;
+}
+
+bool RecordReviewedExternalLifecycleEnchantment(
+    Minion& target, std::string_view parentID, std::string_view childID)
+{
+    for (const auto& spec : REVIEWED_EXTERNAL_LIFECYCLES)
+    {
+        if (spec.parent != parentID || spec.child != childID) continue;
+        target.RecordTemporaryEnchantment(childID);
         return true;
     }
     return false;

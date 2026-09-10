@@ -10,6 +10,7 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch9.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
+#include <Rosetta/Battlegrounds/Models/ActiveTribes.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ElementalStatGiverTask.hpp>
 #include <Rosetta/Battlegrounds/Models/LifecycleEnchantment.hpp>
 #include <Rosetta/Battlegrounds/CardSets/EventCounterBehaviors.hpp>
@@ -32,8 +33,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -42,6 +45,8 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+using Random = effolkronium::random_thread_local;
 
 namespace RosettaStone::Battlegrounds
 {
@@ -274,7 +279,77 @@ void Player::OnCardAcquired(const CardData& card)
 
 namespace
 {
-using Random = effolkronium::random_thread_local;
+namespace
+{
+bool TrinketTypeEquals(const std::string& value, const char* expected)
+{
+    if (value.size() != std::char_traits<char>::length(expected)) return false;
+    for (std::size_t i = 0; i < value.size(); ++i)
+        if (std::toupper(static_cast<unsigned char>(value[i])) != expected[i])
+            return false;
+    return true;
+}
+
+bool TrinketTypeIsExcluded(const std::string& type, Race excluded)
+{
+    static constexpr std::pair<const char*, Race> types[] = {
+        {"BEAST", Race::BEAST}, {"DEMON", Race::DEMON},
+        {"DRAGON", Race::DRAGON}, {"ELEMENTAL", Race::ELEMENTAL},
+        {"MECHANICAL", Race::MECHANICAL}, {"MURLOC", Race::MURLOC},
+        {"NAGA", Race::NAGA}, {"PIRATE", Race::PIRATE},
+        {"QUILBOAR", Race::QUILBOAR}, {"UNDEAD", Race::UNDEAD},
+    };
+    for (const auto& [name, race] : types)
+        if (TrinketTypeEquals(type, name) && race == excluded) return true;
+    return false;
+}
+
+std::optional<Race> TrinketTypeRace(const std::string& type);
+
+bool TrinketTypeIsUnavailable(const std::string& type,
+                              const ActiveTribeSet& activeTribes)
+{
+    const auto race = TrinketTypeRace(type);
+    return race.has_value() && !IsActiveTribe(activeTribes, *race);
+}
+
+// Trinket association metadata is string-based, while lobby eligibility is
+// the immutable ActiveTribeSet.  Keep the conversion in one place so a
+// generated offer cannot accidentally treat the ten-tribe universe as the
+// current lobby pool.
+std::optional<Race> TrinketTypeRace(const std::string& type)
+{
+    static constexpr std::pair<const char*, Race> types[] = {
+        {"BEAST", Race::BEAST}, {"DEMON", Race::DEMON},
+        {"DRAGON", Race::DRAGON}, {"ELEMENTAL", Race::ELEMENTAL},
+        {"MECHANICAL", Race::MECHANICAL}, {"MURLOC", Race::MURLOC},
+        {"NAGA", Race::NAGA}, {"PIRATE", Race::PIRATE},
+        {"QUILBOAR", Race::QUILBOAR}, {"UNDEAD", Race::UNDEAD},
+    };
+    for (const auto& [name, race] : types)
+        if (TrinketTypeEquals(type, name)) return race;
+    return std::nullopt;
+}
+
+bool TrinketIsInLobby(const Card& card, const ActiveTribeSet& active,
+                      Race excluded)
+{
+    if (card.associatedRaces.empty()) return true;
+    for (const auto& type : card.associatedRaces) {
+        if (type == "MENAGERIE") return true;
+        const auto race = TrinketTypeRace(type);
+        if (race.has_value() && IsActiveTribe(active, *race) &&
+            !TrinketTypeIsUnavailable(type, active))
+            return true;
+    }
+    return false;
+}
+}
+
+bool IsMenagerieTypeName(const std::string& value)
+{
+    return value == "MENAGERIE";
+}
 
 // Maxwell Sticker must resolve from the active Hero Power, not from an
 // untyped hero-card relatedDbfID.  Keep the result typed and validate both
@@ -323,11 +398,16 @@ std::optional<HeroPowerBuddyReward> FindHeroPowerBuddyReward(
 std::vector<Card> SupportedTierMinions(const Player& player);
 template <std::size_t N>
 void AppendSupportedNormalMinions(const std::array<Card, N>& cards,
-                                  std::vector<Card>& result, Race race);
-std::vector<Card> SupportedMinionsForRace(Race race);
-std::vector<Card> SupportedDeathrattleMinions();
-std::vector<Card> SupportedBattlecryMinions();
-std::vector<Card> SupportedEndTurnMinions();
+                                  std::vector<Card>& result, Race race,
+                                  const ActiveTribeSet& activeTribes);
+std::vector<Card> SupportedMinionsForRace(
+    Race race, const ActiveTribeSet& activeTribes);
+std::vector<Card> SupportedDeathrattleMinions(
+    const ActiveTribeSet& activeTribes);
+std::vector<Card> SupportedBattlecryMinions(
+    const ActiveTribeSet& activeTribes);
+std::vector<Card> SupportedEndTurnMinions(
+    const ActiveTribeSet& activeTribes);
 struct SupportedMurlocHeroPair {
     std::int32_t heroDbfID;
     std::int32_t heroPowerDbfID;
@@ -1088,7 +1168,8 @@ bool Player::ApplyGeneratedQuestReward(std::int32_t dbfID)
         for (const auto& candidate : Cards::GetTier7Minions())
             if (candidate.GetCardType() == CardType::MINION &&
                 candidate.isBattlegroundsPoolMinion &&
-                candidate.normalDbfID == 0 && candidate.hasBehavior)
+                candidate.normalDbfID == 0 && candidate.hasBehavior &&
+                HasActiveTribe(activeTribes, candidate))
                 candidates.push_back(candidate);
         if (candidates.empty()) return false;
         const auto& selected = candidates[
@@ -1123,7 +1204,7 @@ bool Player::ApplyGeneratedQuestReward(std::int32_t dbfID)
         // the replacement from executable normal minions whose pinned
         // CardDef has an actual TURN_END trigger; never use arbitrary text or
         // metadata-only rows.
-        const auto candidates = SupportedEndTurnMinions();
+        const auto candidates = SupportedEndTurnMinions(activeTribes);
         if (candidates.empty()) return false;
         const auto& selected =
             candidates[Random::get<std::size_t>(0, candidates.size() - 1)];
@@ -1138,7 +1219,7 @@ bool Player::ApplyGeneratedQuestReward(std::int32_t dbfID)
         // normal Battlegrounds minions.
         std::vector<Race> races;
         for (const auto race : RACES_IN_BATTLEGROUNDS)
-            if (!SupportedMinionsForRace(race).empty()) races.push_back(race);
+            if (!SupportedMinionsForRace(race, activeTribes).empty()) races.push_back(race);
         if (races.empty()) return false;
         season14.SetGeneratedRewardFriendsRace(
             races[Random::get<std::size_t>(0, races.size() - 1)]);
@@ -1200,7 +1281,8 @@ bool Player::ApplyGeneratedQuestReward(std::int32_t dbfID)
         std::vector<Card> candidates;
         for (const auto& card : Cards::GetAllCards())
             if (card.isBattlegroundsPoolMinion && card.normalDbfID == 0 &&
-                card.hasBehavior && card.GetTier() == currentTier)
+                card.hasBehavior && card.GetTier() == currentTier &&
+                HasActiveTribe(activeTribes, card))
                 candidates.push_back(card);
         if (!candidates.empty()) {
             std::vector<Season14Offering> offerings;
@@ -1497,7 +1579,7 @@ void Player::ResolveTrinketEndTurn()
         for (const auto race : RACES_IN_BATTLEGROUNDS)
         {
             if (!seen.contains(race) || hand.IsFull()) continue;
-            (void)AddRandomMinionToHand(*this, SupportedMinionsForRace(race));
+            (void)AddRandomMinionToHand(*this, SupportedMinionsForRace(race, activeTribes));
         }
     }
 }
@@ -1513,8 +1595,16 @@ void Player::ResolveGeneratedQuestRewardStartCombat(FieldZone& combatField)
     }
     if (season14.HasGeneratedRewardVolatileVenom()) {
         combatField.ForEachAlive([](MinionData& data) {
-            data.value().SetAttack(data.value().GetAttack() + 7);
-            data.value().SetHealth(data.value().GetHealth() + 7);
+            auto& minion = data.value();
+            // Volatile's +7/+7 and attack-death payload are owned by the
+            // generated reward state machine.  Keep the exact child marker
+            // on the combat copy while applying the authoritative stats.
+            if (!ApplyReviewedLifecycleEnchantment(
+                    minion, "BG24_Reward_364", "BG24_Reward_364e",
+                    Minion::TemporaryEnchantment::Stats, 7, 7)) {
+                minion.SetAttack(minion.GetAttack() + 7);
+                minion.SetHealth(minion.GetHealth() + 7);
+            }
         });
     }
     if (season14.HasGeneratedRewardStaffOfOrigination())
@@ -1686,24 +1776,13 @@ void Player::ResolveGeneratedQuestRewardStartTurn()
                                                     bool& armed) {
         if (!armed || season14.pendingDecision != Season14Decision::NONE ||
             !season14.CanAddTrinket() || remainCoin < 4) return;
-        std::vector<Card> candidates;
-        for (const auto& candidate : Cards::GetAllCards())
-            if (candidate.trinketType == (greater ? "GREATER_TRINKET" : "LESSER_TRINKET") &&
-                candidate.normalDbfID == 0 && candidate.dbfID > 0 &&
-                candidate.GetCardType() == CardType::BATTLEGROUND_TRINKET &&
-                std::none_of(season14.trinkets.begin(), season14.trinkets.end(),
-                    [&candidate](const Season14PersistentEffect& existing) {
-                        return existing.dbfID == candidate.dbfID;
-                    }))
-                candidates.push_back(candidate);
+        const auto candidates = BuildTrinketOfferings(greater, 3, true, true);
         if (candidates.size() < 3) return;
-        Random::shuffle(candidates.begin(), candidates.end());
         remainCoin -= 4;
         RecordGoldSpent(4);
         season14.BeginOfferingDecision(
             Season14Decision::TRINKET_SELECTION, 0, sourceDbfID,
-            {{candidates[0].dbfID, 0}, {candidates[1].dbfID, 0},
-             {candidates[2].dbfID, 0}});
+            candidates);
         armed = false;
     };
     beginGeneratedTrinketOffer(false, 122013,
@@ -1823,7 +1902,7 @@ void Player::ResolveGeneratedQuestRewardStartTurn()
     for (const auto& card : Cards::GetAllCards())
         if (card.id != "BGS_029" && card.isBattlegroundsPoolMinion &&
             card.GetCardType() == CardType::MINION && card.normalDbfID == 0 &&
-            card.hasBehavior)
+            card.hasBehavior && HasActiveTribe(activeTribes, card))
             zerusCandidates.push_back(card);
     if (!zerusCandidates.empty()) {
         hand.ForEach([&zerusCandidates](std::optional<CardData>& data) {
@@ -1910,7 +1989,7 @@ void Player::ResolveGeneratedQuestRewardStartTurn()
     }
     if (season14.GeneratedRewardFriendsRace() != Race::INVALID) {
         const auto friends =
-            SupportedMinionsForRace(season14.GeneratedRewardFriendsRace());
+            SupportedMinionsForRace(season14.GeneratedRewardFriendsRace(), activeTribes);
         // Each grant is an independent random draw from the pinned race
         // pool.  A full hand consumes no draw, matching normal generated-card
         // delivery semantics while remaining deterministic under replay.
@@ -2422,7 +2501,8 @@ void Player::SelectHero(std::size_t idx)
         std::vector<Card> tierSeven;
         for (const auto& card : Cards::GetAllCards())
             if (card.isBattlegroundsPoolMinion && card.GetCardType() == CardType::MINION &&
-                card.normalDbfID == 0 && card.hasBehavior && card.GetTier() == 7)
+                card.normalDbfID == 0 && card.hasBehavior && card.GetTier() == 7 &&
+                HasActiveTribe(activeTribes, card))
                 tierSeven.push_back(card);
         Random::shuffle(tierSeven.begin(), tierSeven.end());
         std::vector<Season14Offering> offerings;
@@ -2497,7 +2577,8 @@ void Player::BeginExpeditionDiscoveryForTier(int tier)
     std::vector<Card> candidates;
     for (const auto& card : Cards::GetAllCards())
         if (card.GetCardType() == CardType::MINION && card.isBattlegroundsPoolMinion &&
-            card.normalDbfID == 0 && card.hasBehavior && card.GetTier() == tier)
+            card.normalDbfID == 0 && card.hasBehavior && card.GetTier() == tier &&
+            HasActiveTribe(activeTribes, card))
             candidates.push_back(card);
     if (candidates.size() < 3) return;
     Random::shuffle(candidates.begin(), candidates.end());
@@ -3950,23 +4031,366 @@ bool Player::TryResolveSoulFermenterIfSpace(FieldZone& field)
     return resolved;
 }
 
+std::vector<Season14Offering> Player::BuildTrinketOfferings(
+    bool greater, std::size_t count, bool requireCheap, bool requireTypeless) const
+{
+    // Patch 36.4: a player is "in" a type at the Lesser/Greater offer when
+    // they have 2/3 minions of that type.  Count the public warband and hand;
+    // multi-tribe and ALL minions contribute to every matching type.
+    const int threshold = greater ? 3 : 2;
+    std::map<std::string, int> typeCounts;
+    auto countMinion = [&typeCounts](const Minion& minion) {
+        for (const Race race : RACES_IN_BATTLEGROUNDS)
+            if (minion.HasRace(race)) {
+                // Race names are stable in the pinned source metadata and
+                // are the same strings used by battlegroundsAssociatedRaces.
+                static constexpr std::pair<Race, const char*> names[] = {
+                    {Race::BEAST, "BEAST"}, {Race::DEMON, "DEMON"},
+                    {Race::DRAGON, "DRAGON"}, {Race::ELEMENTAL, "ELEMENTAL"},
+                    {Race::MECHANICAL, "MECHANICAL"}, {Race::MURLOC, "MURLOC"},
+                    {Race::NAGA, "NAGA"}, {Race::PIRATE, "PIRATE"},
+                    {Race::QUILBOAR, "QUILBOAR"}, {Race::UNDEAD, "UNDEAD"},
+                };
+                for (const auto& [known, name] : names)
+                    if (race == known) ++typeCounts[name];
+            }
+    };
+    recruitField.ForEachAlive([&countMinion](const MinionData& data) {
+        countMinion(data.value());
+    });
+    hand.ForEach([&countMinion](const std::optional<CardData>& entry) {
+        if (entry && std::holds_alternative<Minion>(*entry))
+            countMinion(std::get<Minion>(*entry));
+    });
+
+    std::set<std::string> inTypes;
+    for (const auto& [type, amount] : typeCounts)
+        if (amount >= threshold && !TrinketTypeIsUnavailable(type, activeTribes))
+            inTypes.insert(type);
+    if (inTypes.size() >= 3) inTypes.insert("MENAGERIE");
+    // Queen Azshara's passive is an explicit hero affinity, even before the
+    // warband reaches the normal Naga threshold.  Keep this override data
+    // pinned to the ruleset rather than inferring it from card text.
+    if ((hero.card.dbfID == 79618 || season14.heroPowerDbfID == 79619) &&
+        IsActiveTribe(activeTribes, Race::NAGA))
+        inTypes.insert("NAGA");
+
+    std::size_t controlledMinions = 0;
+    recruitField.ForEachAlive([&controlledMinions](const MinionData&) {
+        ++controlledMinions;
+    });
+    hand.ForEach([&controlledMinions](const std::optional<CardData>& entry) {
+        if (entry && std::holds_alternative<Minion>(*entry)) ++controlledMinions;
+    });
+    const auto controlsTier = [this](int tier) {
+        bool found = false;
+        recruitField.ForEachAlive([&found, tier](const MinionData& data) {
+            found = found || data.value().GetTier() == tier;
+        });
+        hand.ForEach([&found, tier](const std::optional<CardData>& entry) {
+            if (entry && std::holds_alternative<Minion>(*entry))
+                found = found || std::get<Minion>(*entry).GetTier() == tier;
+        });
+        return found;
+    };
+    int bestCount = -1;
+    std::string bestType;
+    for (const auto& type : inTypes) {
+        if (type == "MENAGERIE") continue;
+        if (typeCounts[type] > bestCount) {
+            bestCount = typeCounts[type];
+            bestType = type;
+        }
+    }
+    // Keep affinity classification beside each candidate.  Cards for a type
+    // the player is not "in" remain eligible, but the 36.4 pivot rule permits
+    // at most one such typed card and marks it down by two Gold.
+    struct TrinketCandidate {
+        Card card;
+        bool typed = false;
+        bool inAffinity = false;
+        bool mostCommon = false;
+        std::string offerGroup;
+    };
+    std::vector<TrinketCandidate> candidates;
+    for (const auto& candidate : Cards::GetAllCards()) {
+        if (candidate.trinketType != (greater ? "GREATER_TRINKET" : "LESSER_TRINKET") ||
+            candidate.normalDbfID != 0 || candidate.dbfID <= 0 ||
+            candidate.GetCardType() != CardType::BATTLEGROUND_TRINKET ||
+            FindTrinketBehavior(candidate.id).effect == TrinketEffect::NONE ||
+            std::any_of(season14.trinkets.begin(), season14.trinkets.end(),
+                [&candidate](const Season14PersistentEffect& owned) {
+                    return owned.dbfID == candidate.dbfID;
+                }))
+            continue;
+        // Special source-level restrictions are part of the offer pool, not
+        // merely acquisition validation.  Murky Sticker requires multiple
+        // Battlecries; cards requiring hand room cannot be offered while full.
+        if (candidate.id == "BG36_MagicItem_330" &&
+            season14.battlecriesTriggered < 2)
+            continue;
+        if (candidate.id == "BG36_MagicItem_309" && hand.IsFull()) continue;
+        if ((candidate.id == "BG32_MagicItem_400" ||
+             candidate.id == "BG32_MagicItem_844") && controlledMinions < 6)
+            continue;
+        if (candidate.id == "BG35_MagicItem_815" && controlledMinions >= 5)
+            continue;
+        if (candidate.id == "BG35_MagicItem_817" && !controlsTier(3))
+            continue;
+        if (candidate.id == "BG30_MagicItem_998" &&
+            excludedLobbyRace == Race::DEMON)
+            continue;
+        if (candidate.id == "BG35_MagicItem_820" &&
+            hero.health + armor >= 16)
+            continue;
+
+        // Source-level predicates from the pinned 36.4 offering contract.
+        // These are evaluated at offer construction time, not only when a
+        // card is selected, so the public four-card modal is never padded by
+        // an option the player cannot actually use.
+        bool hasDeathrattle = false;
+        bool hasDivineShield = false;
+        bool hasGolden = false;
+        bool hasStartOfCombat = false;
+        bool hasEndOfTurn = false;
+        bool hasThaumaturgist = false;
+        bool hasDramalocAttack = false;
+        bool hasHealthRewinder = false;
+        bool hasBuffedBloodGems = season14.bloodGemAttackBonus > 0 ||
+                                  season14.bloodGemHealthBonus > 0;
+        recruitField.ForEachAlive([&](const MinionData& data) {
+            const auto& minion = data.value();
+            hasDeathrattle = hasDeathrattle || minion.HasDeathrattle();
+            hasDivineShield = hasDivineShield || minion.HasDivineShield();
+            hasGolden = hasGolden || minion.IsGolden();
+            hasStartOfCombat = hasStartOfCombat ||
+                !minion.GetTasks(PowerType::START_OF_COMBAT).empty();
+            auto def = CardDefs::FindCardDefByID(minion.GetCardID());
+            const auto& trigger = def.power.GetTrigger();
+            hasEndOfTurn = hasEndOfTurn ||
+                (trigger.has_value() &&
+                 trigger->GetTriggerType() == TriggerType::TURN_END);
+            hasThaumaturgist = hasThaumaturgist ||
+                minion.GetCardID() == "BG32_181" ||
+                minion.GetCardID() == "BG32_181_G";
+            hasDramalocAttack = hasDramalocAttack || minion.GetAttack() >= 3;
+            hasHealthRewinder = hasHealthRewinder ||
+                minion.GetCardID() == "BG26_174" ||
+                minion.GetCardID() == "BG26_174_G";
+        });
+        hand.ForEach([&](const std::optional<CardData>& entry) {
+            if (!entry || !std::holds_alternative<Minion>(*entry)) return;
+            const auto& minion = std::get<Minion>(*entry);
+            hasDeathrattle = hasDeathrattle || minion.HasDeathrattle();
+            hasDivineShield = hasDivineShield || minion.HasDivineShield();
+            hasGolden = hasGolden || minion.IsGolden();
+            hasStartOfCombat = hasStartOfCombat ||
+                !minion.GetTasks(PowerType::START_OF_COMBAT).empty();
+            auto def = CardDefs::FindCardDefByID(minion.GetCardID());
+            const auto& trigger = def.power.GetTrigger();
+            hasEndOfTurn = hasEndOfTurn ||
+                (trigger.has_value() &&
+                 trigger->GetTriggerType() == TriggerType::TURN_END);
+            hasThaumaturgist = hasThaumaturgist ||
+                minion.GetCardID() == "BG32_181" ||
+                minion.GetCardID() == "BG32_181_G";
+            hasDramalocAttack = hasDramalocAttack || minion.GetAttack() >= 3;
+            hasHealthRewinder = hasHealthRewinder ||
+                minion.GetCardID() == "BG26_174" ||
+                minion.GetCardID() == "BG26_174_G";
+        });
+        if ((candidate.id == "BG32_MagicItem_862" ||
+             candidate.id == "BG32_MagicItem_862t") && !hasDeathrattle)
+            continue;
+        if (candidate.id == "BG32_MagicItem_171" && !hasDivineShield)
+            continue;
+        if ((candidate.id == "BG32_MagicItem_231" ||
+             candidate.id == "BG32_MagicItem_231t" ||
+             candidate.id == "BG30_MagicItem_954") && !hasGolden)
+            continue;
+        if ((candidate.id == "BG32_MagicItem_282" ||
+             candidate.id == "BG32_MagicItem_304") && hand.IsFull())
+            continue;
+        if (candidate.id == "BG32_MagicItem_365" && !hasStartOfCombat)
+            continue;
+        if (candidate.id == "BG32_MagicItem_904" && !hasBuffedBloodGems)
+            continue;
+        if (candidate.id == "BG32_MagicItem_367" && !hasEndOfTurn)
+            continue;
+        if ((candidate.id == "BG30_MagicItem_701" ||
+             candidate.id == "BG30_MagicItem_541") &&
+            !hasHealthRewinder)
+            continue;
+        if ((candidate.id == "BG30_MagicItem_828" ||
+             candidate.id == "BG30_MagicItem_920") && !hasThaumaturgist)
+            continue;
+        if (candidate.id == "BG35_MagicItem_754" && !hasDramalocAttack)
+            continue;
+        if (candidate.id == "BG35_MagicItem_861" &&
+            season14.futureBallerAttack <= 0 && season14.futureBallerHealth <= 0)
+            continue;
+
+        bool typed = false;
+        bool affinity = false;
+        for (const auto& type : candidate.associatedRaces) {
+            typed = true;
+            const auto race = TrinketTypeRace(type);
+            // A typed Trinket is not in the offer pool when its associated
+            // tribe is absent from this lobby.  Multi-affinity Trinkets stay
+            // eligible when at least one of their listed active tribes is a
+            // qualifying type; this mirrors how multi-tribe minions count.
+            if ((!race.has_value() && !IsMenagerieTypeName(type)) ||
+                (race.has_value() &&
+                 (!IsActiveTribe(activeTribes, *race) ||
+                  TrinketTypeIsUnavailable(type, activeTribes))))
+                continue;
+            if (IsMenagerieTypeName(type) ? inTypes.count("MENAGERIE") != 0
+                                          : inTypes.count(type) != 0)
+                affinity = true;
+        }
+        // Typeless cards are always in the neutral pool.  Typed cards need an
+        // active lobby tribe, but need not be a qualifying warband type: one
+        // such pivot offer is legal and receives the two-Gold discount.
+        // The lobby filter is deliberately separate from affinity: an
+        // active tribe can be pivoted into even when the warband is not yet
+        // in that type.  Only absent/excluded tribes are removed here.
+        if (typed && !TrinketIsInLobby(candidate, activeTribes,
+                                       excludedLobbyRace))
+            continue;
+        const bool mostCommon = std::any_of(
+            candidate.associatedRaces.begin(), candidate.associatedRaces.end(),
+            [&bestType](const std::string& type) { return type == bestType; });
+        // Menagerie is a player-affinity group, not a generic active-lobby
+        // type. Without this check it could leak as the single discounted
+        // pivot before three distinct qualifying types exist.
+        if (std::find(candidate.associatedRaces.begin(),
+                      candidate.associatedRaces.end(), "MENAGERIE") !=
+                candidate.associatedRaces.end() &&
+            !inTypes.contains("MENAGERIE"))
+            continue;
+        std::string offerGroup;
+        if (candidate.id == "BG32_MagicItem_400" ||
+            candidate.id == "BG32_MagicItem_844")
+            offerGroup = "MENAGERIE";
+        else if (candidate.id == "BG30_MagicItem_888" ||
+                 candidate.id == "BG30_MagicItem_891" ||
+                 candidate.id == "BG32_MagicItem_271")
+            offerGroup = candidate.id;
+        candidates.push_back({candidate, typed, affinity, mostCommon,
+                              std::move(offerGroup)});
+    }
+    if (candidates.empty() || count == 0) return {};
+
+    std::vector<TrinketCandidate> selected;
+    std::set<int> selectedIDs;
+    std::set<std::string> selectedGroups;
+    std::size_t outsideTyped = 0;
+    auto addOne = [&selected, &selectedIDs, &selectedGroups, &outsideTyped,
+                   &bestType](const TrinketCandidate& candidate) {
+        if (selectedIDs.contains(candidate.card.dbfID)) return false;
+        if (!candidate.offerGroup.empty() &&
+            !selectedGroups.insert(candidate.offerGroup).second) return false;
+        if (candidate.typed && !candidate.inAffinity && outsideTyped >= 1)
+            return false;
+        selectedIDs.insert(candidate.card.dbfID);
+        if (candidate.typed && !candidate.inAffinity)
+            ++outsideTyped;
+        selected.push_back(candidate);
+        return true;
+    };
+    auto isTypeless = [](const TrinketCandidate& c) {
+        return c.card.associatedRaces.empty();
+    };
+    auto isCheap = [](const TrinketCandidate& c) {
+        return c.card.gameTags.contains(GameTag::COST) &&
+               c.card.gameTags.at(GameTag::COST) <= 2;
+    };
+    // Always reserve the most-common qualifying type.  Ties follow the
+    // source card order before the final seeded shuffle, making replay stable.
+    if (!bestType.empty()) {
+        auto it = std::find_if(candidates.begin(), candidates.end(),
+            [&bestType](const TrinketCandidate& candidate) {
+                return std::find(candidate.card.associatedRaces.begin(),
+                                 candidate.card.associatedRaces.end(), bestType) !=
+                       candidate.card.associatedRaces.end();
+            });
+        if (it != candidates.end()) addOne(*it);
+    }
+    if (requireTypeless) {
+        auto it = std::find_if(candidates.begin(), candidates.end(), isTypeless);
+        if (it != candidates.end()) addOne(*it);
+    }
+    if (requireCheap) {
+        auto it = std::find_if(candidates.begin(), candidates.end(), isCheap);
+        if (it != candidates.end()) addOne(*it);
+    }
+    // Increased-frequency neutral cards are represented by repeated entries
+    // in the seeded draw list.  `selectedIDs` still guarantees unique cards.
+    std::vector<TrinketCandidate> weighted = candidates;
+    for (const auto& candidate : candidates) {
+        if (candidate.card.associatedRaces.empty() &&
+            (candidate.card.id == "BG35_MagicItem_931" ||
+             candidate.card.id == "BG35_MagicItem_931t" ||
+             candidate.card.id == "BG30_MagicItem_435" ||
+             candidate.card.id == "BG30_MagicItem_706" ||
+             candidate.card.id == "BG30_MagicItem_888" ||
+             candidate.card.id == "BG30_MagicItem_891" ||
+             candidate.card.id == "BG30_MagicItem_426" ||
+             candidate.card.id == "BG30_MagicItem_426t" ||
+             candidate.card.id == "BG35_MagicItem_930" ||
+             candidate.card.id == "BG30_MagicItem_876" ||
+             candidate.card.id == "BG32_MagicItem_901")) {
+            weighted.push_back(candidate);
+            weighted.push_back(candidate);
+        }
+    }
+    Random::shuffle(weighted.begin(), weighted.end());
+    for (const auto& candidate : weighted) {
+        if (selected.size() >= count) break;
+        addOne(candidate);
+    }
+    if (selected.size() > count) selected.resize(count);
+    std::vector<Season14Offering> result;
+    result.reserve(selected.size());
+    for (const auto& candidate : selected) {
+        // Pivot offers are discounted by exactly two Gold.  Keep the value on
+        // the public option; selection validation below checks the same
+        // metadata, preventing replay from changing an offer's price.
+        const auto discount = candidate.typed && !candidate.mostCommon &&
+                              !candidate.inAffinity ? 2 : 0;
+        result.push_back({candidate.card.dbfID, 0, 0, discount});
+    }
+    return result;
+}
+
 bool Player::BeginFantasticTreasureOffer()
 {
     if (season14.heroPowerDbfID != 113311 || season14.recruitTurnNumber != 5 ||
         season14.pendingDecision != Season14Decision::NONE)
         return false;
-    std::vector<Card> candidates;
-    for (const auto& card : Cards::GetAllCards())
-        if (card.trinketType == "LESSER_TRINKET" && card.normalDbfID == 0 &&
-            card.dbfID > 0 && card.GetCardType() == CardType::BATTLEGROUND_TRINKET)
-            candidates.push_back(card);
-    if (candidates.size() < 4) return false;
-    Random::shuffle(candidates.begin(), candidates.end());
-    std::vector<Season14Offering> offerings;
-    for (std::size_t i = 0; i < 4; ++i)
-        offerings.push_back({candidates[i].dbfID, 2});
+    auto offerings = BuildTrinketOfferings(false, 4, true, true);
+    if (offerings.size() < 4) return false;
+    for (auto& offering : offerings) offering.darkGiftDbfID = 2;
     season14.BeginOfferingDecision(Season14Decision::TRINKET_SELECTION, 0,
                                    113311, std::move(offerings));
+    return true;
+}
+
+bool Player::BeginScheduledTrinketOffer()
+{
+    if (season14.pendingDecision != Season14Decision::NONE ||
+        !season14.CanAddTrinket())
+        return false;
+    const bool greater = season14.recruitTurnNumber == 9;
+    if (!greater && season14.recruitTurnNumber != 6) return false;
+
+    // The ordinary Season 14 modal is four choices.  Special replacement
+    // and generated-reward modals intentionally use their own smaller
+    // cardinalities and must continue calling BuildTrinketOfferings directly.
+    const auto offerings = BuildTrinketOfferings(greater, 4, true, true);
+    if (offerings.size() != 4) return false;
+    season14.BeginOfferingDecision(
+        Season14Decision::TRINKET_SELECTION, 0, 0, offerings);
     return true;
 }
 
@@ -3983,28 +4407,15 @@ bool Player::BeginOrnateClockOffer()
     // Canonical offer selection is equivalent to:
     // candidate.trinketType == (lesser ? "LESSER_TRINKET" : "GREATER_TRINKET").
 
-    std::vector<Card> candidates;
-    for (const auto& candidate : Cards::GetAllCards())
-        if (((lesser && candidate.trinketType == "LESSER_TRINKET") ||
-             (greater && candidate.trinketType == "GREATER_TRINKET")) &&
-            candidate.normalDbfID == 0 && candidate.dbfID > 0 &&
-            candidate.GetCardType() == CardType::BATTLEGROUND_TRINKET &&
-            std::none_of(season14.trinkets.begin(), season14.trinkets.end(),
-                         [&candidate](const Season14PersistentEffect& existing) {
-                             return existing.dbfID == candidate.dbfID;
-                         }))
-            candidates.push_back(candidate);
+    auto candidates = BuildTrinketOfferings(greater, 3, true, true);
     if (candidates.size() < 3) return false;
-
-    Random::shuffle(candidates.begin(), candidates.end());
     // These effects replace the scheduled Trinket purchase, not a second
     // paid purchase. In particular, do not charge Gold or feed this modal
     // back into spend-gold triggers. Consume only after a valid modal exists.
     season14.BeginOfferingDecision(
         Season14Decision::TRINKET_SELECTION, 0,
         lesser ? 130836 : 121120,
-        {{candidates[0].dbfID, 0}, {candidates[1].dbfID, 0},
-         {candidates[2].dbfID, 0}});
+        std::move(candidates));
     // Consume only the schedule represented by this modal.  Both effects
     // can be owned at once; clearing the unrelated schedule would silently
     // lose the second promised Trinket offer.
@@ -4044,6 +4455,7 @@ bool Player::BeginMysteryCubeOffer()
         if (candidate.trinketType == "LESSER_TRINKET" &&
             candidate.normalDbfID == 0 && candidate.dbfID > 0 &&
             candidate.GetCardType() == CardType::BATTLEGROUND_TRINKET &&
+            TrinketIsInLobby(candidate, activeTribes, excludedLobbyRace) &&
             // A replacement must terminate the Cube lifecycle.  Offering a
             // second Cube would recursively open another replacement modal
             // and violate the one-Cube-per-player invariant.
@@ -4092,6 +4504,7 @@ bool Player::BeginTripVouchersOffer()
         if (candidate.trinketType == "GREATER_TRINKET" &&
             candidate.normalDbfID == 0 && candidate.dbfID > 0 &&
             candidate.GetCardType() == CardType::BATTLEGROUND_TRINKET &&
+            TrinketIsInLobby(candidate, activeTribes, excludedLobbyRace) &&
             candidate.id != "BG30_MagicItem_891" &&
             FindTrinketBehavior(candidate.id).effect != TrinketEffect::NONE &&
             // Keep the public replacement modal closed over candidates that
@@ -4107,7 +4520,8 @@ bool Player::BeginTripVouchersOffer()
                 if (behavior.effect == TrinketEffect::TRANSFORM_WARBAND_TIER) {
                     std::vector<Card> tier4;
                     AppendSupportedNormalMinions(Cards::GetTier4Minions(),
-                                                 tier4, Race::INVALID);
+                                                 tier4, Race::INVALID,
+                                                 activeTribes);
                     if (tier4.empty()) return false;
                 }
                 if (behavior.effect == TrinketEffect::AFTER_SELL_HERO_POWER_BUDDY &&
@@ -4237,7 +4651,7 @@ bool Player::BeginSpawningPoolMorphChoice()
         if (card.dbfID != 0 &&
             card.GetTier() == SpawningPoolZergTier(card.dbfID) &&
             card.GetTier() <= SPAWNING_POOL_UNLOCK_TIER &&
-            card.hasBehavior &&
+            card.hasBehavior && HasActiveTribe(activeTribes, card) &&
             IsExecutableSpawningPoolZergDbfID(card.dbfID))
             candidates.push_back(card);
     }
@@ -5530,26 +5944,26 @@ bool Player::BeginTavernSpellDiscoverReplay(
     {
     case TavernSpellEffect::DISCOVER_MINION:
         if (behavior.value == 1)
-            AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID);
+            AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID, activeTribes);
         else if (behavior.value == 7)
-            AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID);
+            AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID, activeTribes);
         else if (behavior.value == 8)
-            candidates = SupportedDeathrattleMinions();
+            candidates = SupportedDeathrattleMinions(activeTribes);
         else if (behavior.lockHand) {
             const auto tier = currentTier;
-            if (tier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID);
-            else if (tier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), candidates, Race::INVALID);
-            else if (tier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), candidates, Race::INVALID);
-            else if (tier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, Race::INVALID);
-            else if (tier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), candidates, Race::INVALID);
-            else if (tier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), candidates, Race::INVALID);
-            else if (tier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID);
+            if (tier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID, activeTribes);
+            else if (tier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), candidates, Race::INVALID, activeTribes);
+            else if (tier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), candidates, Race::INVALID, activeTribes);
+            else if (tier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, Race::INVALID, activeTribes);
+            else if (tier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), candidates, Race::INVALID, activeTribes);
+            else if (tier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), candidates, Race::INVALID, activeTribes);
+            else if (tier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID, activeTribes);
         } else
-            candidates = SupportedMinionsForRace(MostCommonFriendlyRace(*this));
+            candidates = SupportedMinionsForRace(MostCommonFriendlyRace(*this), activeTribes);
         return BeginMinionDiscover(*this, std::move(candidates), sourceSpellDbfID,
                                    behavior.lockHand);
     case TavernSpellEffect::DISCOVER_BATTLECRY_MINION:
-        return BeginMinionDiscover(*this, SupportedBattlecryMinions(), sourceSpellDbfID, false);
+        return BeginMinionDiscover(*this, SupportedBattlecryMinions(activeTribes), sourceSpellDbfID, false);
     case TavernSpellEffect::DISCOVER_DIFFERENT_RACE:
     {
         Minion* target = nullptr;
@@ -5558,7 +5972,7 @@ bool Player::BeginTavernSpellDiscoverReplay(
                 target = &data.value();
         });
         if (target == nullptr) return false;
-        candidates = SupportedMinionsForRace(target->GetRace());
+        candidates = SupportedMinionsForRace(target->GetRace(), activeTribes);
         candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
             [target](const Card& card) { return card.id == target->GetCardID(); }),
             candidates.end());
@@ -5602,7 +6016,7 @@ bool Player::BeginTavernSpellDiscoverReplay(
             return true;
         }
     case TavernSpellEffect::DISCOVER_UNDEAD_DIES_THIS_TURN:
-        return BeginMinionDiscover(*this, SupportedMinionsForRace(Race::UNDEAD),
+        return BeginMinionDiscover(*this, SupportedMinionsForRace(Race::UNDEAD, activeTribes),
                                    sourceSpellDbfID, false);
     case TavernSpellEffect::DISCOVER_TIER_DARKMOON_PRIZE:
         for (const auto& card : Cards::GetAllCards())
@@ -5717,11 +6131,13 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
                 (void)BeginOrnateClockOffer();
             return true;
         }
-        const bool greater = source == 122014 || source == 121120;
+        const bool scheduled = source == 0;
+        bool greater = source == 122014 || source == 121120;
         const bool orbLesser = source == 130836;
-        if ((!greater && !orbLesser && source != 122013) ||
+        if ((!greater && !orbLesser && source != 122013 && !scheduled) ||
             offeringIdx >= season14.pendingOfferings.size() ||
-            season14.pendingOfferings.size() != 3 || !season14.CanAddTrinket())
+            season14.pendingOfferings.size() != (scheduled ? 4u : 3u) ||
+            !season14.CanAddTrinket())
             return false;
         const auto selected = season14.pendingOfferings[offeringIdx].dbfID;
         const auto card = Cards::FindCardByDbfID(selected);
@@ -5733,13 +6149,50 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
         if (card.dbfID == 0 || !offered ||
             card.GetCardType() != CardType::BATTLEGROUND_TRINKET ||
             card.normalDbfID != 0 ||
-            card.trinketType != (greater ? "GREATER_TRINKET" : "LESSER_TRINKET") ||
+            !TrinketIsInLobby(card, activeTribes, excludedLobbyRace) ||
             (card.id == "BG36_MagicItem_309" && hand.IsFull()) ||
             std::any_of(season14.trinkets.begin(), season14.trinkets.end(),
                 [selected](const Season14PersistentEffect& existing) {
                     return existing.dbfID == selected;
                 }))
             return false;
+        // Validate the complete public snapshot before mutating ownership.
+        // This closes replay paths that replace one option or inject a second
+        // copy after the modal was opened.  The discount is public metadata;
+        // only the pinned pivot values are valid on a Trinket option.
+        std::set<std::int32_t> pendingIDs;
+        for (const auto& pending : season14.pendingOfferings) {
+            const auto pendingCard = Cards::FindCardByDbfID(pending.dbfID);
+            if (pending.dbfID <= 0 || !pendingIDs.insert(pending.dbfID).second ||
+                pendingCard.GetCardType() != CardType::BATTLEGROUND_TRINKET ||
+                pendingCard.normalDbfID != 0 ||
+                !TrinketIsInLobby(pendingCard, activeTribes,
+                                  excludedLobbyRace) ||
+                (pending.discount != 0 && pending.discount != 2))
+                return false;
+        }
+        if (scheduled) {
+            // The ordinary offer is tied to the current scheduled turn.  Do
+            // not accept a replayed four-choice list after the boundary, and
+            // require every option to belong to the same expected tier.
+            if (season14.recruitTurnNumber != 6 &&
+                season14.recruitTurnNumber != 9)
+                return false;
+            greater = season14.recruitTurnNumber == 9;
+            const auto expected = greater ? "GREATER_TRINKET"
+                                          : "LESSER_TRINKET";
+            if (card.trinketType != expected ||
+                std::any_of(season14.pendingOfferings.begin(),
+                            season14.pendingOfferings.end(),
+                    [expected](const Season14Offering& offering) {
+                        return Cards::FindCardByDbfID(offering.dbfID).trinketType !=
+                               expected;
+                    }))
+                return false;
+        } else if (card.trinketType !=
+                   (greater ? "GREATER_TRINKET" : "LESSER_TRINKET")) {
+            return false;
+        }
         if (!AcquireTrinket({selected, 1, true}) ||
             !season14.SelectDecision(offeringIdx))
             return false;
@@ -5933,7 +6386,7 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
         const auto valid =
             card.dbfID != 0 && card.normalDbfID == 0 &&
             card.GetCardType() == CardType::MINION && card.hasBehavior &&
-            card.isBattlegroundsPoolMinion &&
+            card.isBattlegroundsPoolMinion && HasActiveTribe(activeTribes, card) &&
             ((source == 59891 && (card.GetTier() == 3 || card.GetTier() == 4)) ||
              (source == 63127 &&
               card.HasRace(static_cast<Race>(season14.pendingHeroPowerReplayRace))) ||
@@ -5967,6 +6420,7 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
                 if (source == 59891 && candidate.GetTier() != 3 &&
                     candidate.GetTier() != 4)
                     continue;
+                if (!HasActiveTribe(activeTribes, candidate)) continue;
                 if (source == 63127 && !candidate.HasRace(static_cast<Race>(
                                               season14.pendingHeroPowerReplayRace)))
                     continue;
@@ -6022,7 +6476,8 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
             std::vector<Card> candidates;
             for (const auto& candidate : Cards::GetAllCards())
                 if (candidate.isBattlegroundsPoolMinion && candidate.normalDbfID == 0 &&
-                    candidate.HasRace(Race::UNDEAD)) candidates.push_back(candidate);
+                    candidate.HasRace(Race::UNDEAD) &&
+                    HasActiveTribe(activeTribes, candidate)) candidates.push_back(candidate);
             if (candidates.empty()) return false;
             Random::shuffle(candidates.begin(), candidates.end());
             season14.pendingOfferings.clear();
@@ -6089,7 +6544,8 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
             std::vector<Card> candidates;
             for (const auto& card : Cards::GetAllCards())
                 if (card.isBattlegroundsPoolMinion && card.normalDbfID == 0 &&
-                    card.HasRace(Race::DEMON)) candidates.push_back(card);
+                    card.HasRace(Race::DEMON) && HasActiveTribe(activeTribes, card))
+                    candidates.push_back(card);
             if (candidates.empty()) return false;
             Random::shuffle(candidates.begin(), candidates.end());
             season14.pendingOfferings.clear();
@@ -6165,6 +6621,7 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
                 if (candidate.isBattlegroundsPoolMinion &&
                     candidate.normalDbfID == 0 && candidate.hasBehavior &&
                     candidate.GetCardType() == CardType::MINION &&
+                    HasActiveTribe(activeTribes, candidate) &&
                     candidate.HasRace(Race::MECHANICAL) &&
                     candidate.gameTags.contains(GameTag::MAGNETIC) &&
                     candidate.gameTags.at(GameTag::MAGNETIC) != 0)
@@ -6341,6 +6798,7 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
             if (candidate.GetCardType() != CardType::MINION ||
                 !candidate.isBattlegroundsPoolMinion ||
                 candidate.normalDbfID != 0 || !candidate.hasBehavior ||
+                !HasActiveTribe(activeTribes, candidate) ||
                 candidate.GetTier() != 6 ||
                 !globeOfferings.insert(candidate.dbfID).second)
                 return false;
@@ -6356,7 +6814,7 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
         if (season14.pendingOfferings.empty() ||
             season14.pendingOfferings.size() > 3)
             return false;
-        const auto supported = SupportedDeathrattleMinions();
+        const auto supported = SupportedDeathrattleMinions(activeTribes);
         for (const auto& pending : season14.pendingOfferings)
         {
             const auto candidate = Cards::FindCardByDbfID(pending.dbfID);
@@ -6606,7 +7064,8 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
     if (championChoice) {
         const auto card = Cards::FindCardByDbfID(offering.dbfID);
         if (card.GetCardType() != CardType::MINION || card.GetTier() != 7 ||
-            !card.isBattlegroundsPoolMinion || card.normalDbfID != 0 || !card.hasBehavior)
+            !card.isBattlegroundsPoolMinion || card.normalDbfID != 0 ||
+            !card.hasBehavior || !HasActiveTribe(activeTribes, card))
             return false;
         season14.SetChampionReward(card.dbfID);
         TryDeliverChampionReward();
@@ -6696,6 +7155,7 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
             if (candidate.GetCardType() != CardType::MINION ||
                 !candidate.isBattlegroundsPoolMinion ||
                 candidate.normalDbfID != 0 || !candidate.hasBehavior ||
+                !HasActiveTribe(activeTribes, candidate) ||
                 !candidate.HasRace(Race::NAGA) ||
                 !nagaOfferings.insert(candidate.dbfID).second)
                 return false;
@@ -6831,7 +7291,8 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
     if (nagaConquest &&
         (card.GetCardType() != CardType::MINION ||
          !card.isBattlegroundsPoolMinion || card.normalDbfID != 0 ||
-         !card.hasBehavior || !card.HasRace(Race::NAGA)))
+         !card.hasBehavior || !HasActiveTribe(activeTribes, card) ||
+         !card.HasRace(Race::NAGA)))
         return false;
 
     if (galakrondGreed)
@@ -6841,7 +7302,8 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
         const auto slot = season14.pendingTavernReplacementSlot;
         if (card.GetCardType() != CardType::MINION ||
             !card.isBattlegroundsPoolMinion || card.normalDbfID != 0 ||
-            !card.hasBehavior || card.GetTier() <= season14.pendingTavernReplacementTier ||
+            !card.hasBehavior || !HasActiveTribe(activeTribes, card) ||
+            card.GetTier() <= season14.pendingTavernReplacementTier ||
             card.GetTier() > 6 ||
             slot < 0 || slot >= tavern.fieldZone.GetCount() ||
             tavern.fieldZone[static_cast<std::size_t>(slot)].IsDestroyed())
@@ -7371,7 +7833,7 @@ bool Player::ResolveFlightpathCompletion()
     for (const auto& card : Cards::GetAllCards())
         if (card.isBattlegroundsPoolMinion && card.normalDbfID == 0 &&
             card.hasBehavior && card.GetCardType() == CardType::MINION &&
-            card.GetTier() == currentTier)
+            HasActiveTribe(activeTribes, card) && card.GetTier() == currentTier)
             candidates.push_back(card);
     if (candidates.empty()) return false;
     Random::shuffle(candidates.begin(), candidates.end());
@@ -8020,6 +8482,7 @@ void Player::ApplyStartCombatTrinkets()
                 if (candidate.GetCardType() == CardType::MINION &&
                     candidate.isBattlegroundsPoolMinion &&
                     candidate.normalDbfID == 0 && candidate.hasBehavior &&
+                    HasActiveTribe(activeTribes, candidate) &&
                     candidate.HasRace(Race::PIRATE))
                     pirates.push_back(candidate);
             if (pirates.empty()) continue;
@@ -8964,7 +9427,8 @@ void Player::ResolveLockboxAtRecruitStart()
         if (!candidate.isBattlegroundsPoolMinion || !candidate.hasBehavior ||
             candidate.GetCardType() != CardType::MINION ||
             candidate.normalDbfID != 0 || candidate.premiumDbfID == 0 ||
-            candidate.GetRace() == Race::INVALID)
+            candidate.GetRace() == Race::INVALID ||
+            !HasActiveTribe(activeTribes, candidate))
             continue;
         const auto golden = Cards::FindCardByDbfID(candidate.premiumDbfID);
         if (golden.dbfID != 0 && golden.hasBehavior &&
@@ -9455,7 +9919,7 @@ bool Player::ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx)
                  season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_332_G").dbfID)
         {
             if (offeringIdx == 0 || trailblazer) {
-                const auto candidates = SupportedMinionsForRace(Race::QUILBOAR);
+                const auto candidates = SupportedMinionsForRace(Race::QUILBOAR, activeTribes);
                 const int count = golden ? 2 : 1;
                 for (int i = 0; i < count && !hand.IsFull(); ++i)
                     AddRandomMinionToHand(*this, candidates);
@@ -9556,7 +10020,8 @@ bool Player::ResolveSneedShredderDeathrattle(bool golden)
     {
         if (card.GetCardType() != CardType::MINION ||
             !card.isBattlegroundsPoolMinion || card.normalDbfID != 0 ||
-            !card.hasBehavior || card.GetTier() < 1 ||
+            !card.hasBehavior || !HasActiveTribe(activeTribes, card) ||
+            card.GetTier() < 1 ||
             card.GetTier() >= currentTier)
             continue;
         candidates.push_back(card);
@@ -9749,7 +10214,8 @@ bool Player::AcquireTrinket(Season14PersistentEffect effect)
     {
         std::vector<Card> tier4Candidates;
         AppendSupportedNormalMinions(Cards::GetTier4Minions(),
-                                     tier4Candidates, Race::INVALID);
+                                     tier4Candidates, Race::INVALID,
+                                     activeTribes);
         if (tier4Candidates.empty()) return false;
     }
     if (behavior.effect == TrinketEffect::WARBAND_COPY_REFRESH &&
@@ -10010,6 +10476,7 @@ bool Player::AcquireTrinket(Season14PersistentEffect effect)
                 candidate.normalDbfID != 0 || candidate.dbfID <= 0 ||
                 candidate.trinketType != (greater ? "GREATER_TRINKET"
                                                   : "LESSER_TRINKET") ||
+                !TrinketIsInLobby(candidate, activeTribes, excludedLobbyRace) ||
                 FindTrinketBehavior(candidate.id).effect == TrinketEffect::NONE ||
                 // Neither Orb form is a valid replacement.  Excluding only
                 // the source ID still lets the Golden Orb choose the normal
@@ -10080,7 +10547,7 @@ bool Player::AcquireTrinket(Season14PersistentEffect effect)
         // from executable card definitions and retain the ordinary public
         // three-choice Discover lifecycle; no random hand insertion may
         // bypass the modal or hand-cap/replay validation.
-        (void)BeginMinionDiscover(*this, SupportedDeathrattleMinions(),
+        (void)BeginMinionDiscover(*this, SupportedDeathrattleMinions(activeTribes),
                                    card.dbfID, false);
     }
     if (behavior.effect == TrinketEffect::TICKATUS_DARKMOON_PRIZE &&
@@ -10250,7 +10717,7 @@ bool Player::AcquireTrinket(Season14PersistentEffect effect)
         // the golden form is promoted only after a valid selection.
         std::vector<Card> candidates;
         AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates,
-                                     Race::INVALID);
+                                     Race::INVALID, activeTribes);
         const bool golden = card.id == "BG35_MagicItem_821t";
         candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
             [golden](const Card& candidate) {
@@ -10341,7 +10808,7 @@ bool Player::AcquireTrinket(Season14PersistentEffect effect)
         // clears transient state; no Tavern pool entity is consumed.
         std::vector<Card> candidates;
         AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates,
-                                     Race::INVALID);
+                                     Race::INVALID, activeTribes);
         if (!candidates.empty()) {
             recruitField.ForEachAlive([&candidates](MinionData& data) {
                 auto& minion = data.value();
@@ -10815,12 +11282,14 @@ bool ValidFriendlyBoardTarget(const Player& player, int targetIdx)
 
 template <std::size_t N>
 void AppendSupportedNormalMinions(const std::array<Card, N>& cards,
-                                  std::vector<Card>& result, Race race)
+                                  std::vector<Card>& result, Race race,
+                                  const ActiveTribeSet& activeTribes)
 {
     for (const auto& card : cards)
     {
         if (card.id.empty() || !card.hasBehavior ||
             card.normalDbfID != 0 || card.GetCardType() != CardType::MINION ||
+            !HasActiveTribe(activeTribes, card) ||
             (race != Race::INVALID && !card.HasRace(race)))
         {
             continue;
@@ -10829,35 +11298,37 @@ void AppendSupportedNormalMinions(const std::array<Card, N>& cards,
     }
 }
 
-bool HasSupportedTier1Minion()
+bool HasSupportedTier1Minion(const ActiveTribeSet& activeTribes)
 {
     std::vector<Card> candidates;
     AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates,
-                                 Race::INVALID);
+                                 Race::INVALID, activeTribes);
     return !candidates.empty();
 }
 
-std::vector<Card> SupportedMinionsForRace(Race race)
+std::vector<Card> SupportedMinionsForRace(Race race,
+                                          const ActiveTribeSet& activeTribes)
 {
     std::vector<Card> result;
-    AppendSupportedNormalMinions(Cards::GetTier1Minions(), result, race);
-    AppendSupportedNormalMinions(Cards::GetTier2Minions(), result, race);
-    AppendSupportedNormalMinions(Cards::GetTier3Minions(), result, race);
-    AppendSupportedNormalMinions(Cards::GetTier4Minions(), result, race);
-    AppendSupportedNormalMinions(Cards::GetTier5Minions(), result, race);
-    AppendSupportedNormalMinions(Cards::GetTier6Minions(), result, race);
-    AppendSupportedNormalMinions(Cards::GetTier7Minions(), result, race);
+    AppendSupportedNormalMinions(Cards::GetTier1Minions(), result, race, activeTribes);
+    AppendSupportedNormalMinions(Cards::GetTier2Minions(), result, race, activeTribes);
+    AppendSupportedNormalMinions(Cards::GetTier3Minions(), result, race, activeTribes);
+    AppendSupportedNormalMinions(Cards::GetTier4Minions(), result, race, activeTribes);
+    AppendSupportedNormalMinions(Cards::GetTier5Minions(), result, race, activeTribes);
+    AppendSupportedNormalMinions(Cards::GetTier6Minions(), result, race, activeTribes);
+    AppendSupportedNormalMinions(Cards::GetTier7Minions(), result, race, activeTribes);
     return result;
 }
 
-std::vector<Card> SupportedEndTurnMinions()
+std::vector<Card> SupportedEndTurnMinions(const ActiveTribeSet& activeTribes)
 {
     std::vector<Card> result;
-    const auto append = [&result](const auto& cards) {
+    const auto append = [&result, &activeTribes](const auto& cards) {
         for (const auto& card : cards) {
             if (card.id.empty() || !card.hasBehavior ||
                 card.normalDbfID != 0 ||
-                card.GetCardType() != CardType::MINION)
+                card.GetCardType() != CardType::MINION ||
+                !HasActiveTribe(activeTribes, card))
                 continue;
             auto def = CardDefs::FindCardDefByID(card.id);
             const auto& trigger = def.power.GetTrigger();
@@ -10873,25 +11344,30 @@ std::vector<Card> SupportedEndTurnMinions()
     return result;
 }
 
-std::vector<Card> SupportedDeathrattleMinions()
+std::vector<Card> SupportedDeathrattleMinions(const ActiveTribeSet& activeTribes)
 {
     std::vector<Card> result;
-    const auto append = [&result](const auto& cards) {
+    const auto append = [&result, &activeTribes](const auto& cards) {
         for (const auto& card : cards)
-            if (card.hasBehavior && !card.power.GetDeathrattleTask().empty()) result.push_back(card);
+            if (card.hasBehavior && card.normalDbfID == 0 &&
+                card.GetCardType() == CardType::MINION &&
+                HasActiveTribe(activeTribes, card) &&
+                !card.power.GetDeathrattleTask().empty())
+                result.push_back(card);
     };
     append(Cards::GetTier1Minions()); append(Cards::GetTier2Minions()); append(Cards::GetTier3Minions());
     append(Cards::GetTier4Minions()); append(Cards::GetTier5Minions()); append(Cards::GetTier6Minions()); append(Cards::GetTier7Minions());
     return result;
 }
 
-std::vector<Card> SupportedBattlecryMinions()
+std::vector<Card> SupportedBattlecryMinions(const ActiveTribeSet& activeTribes)
 {
     std::vector<Card> result;
-    const auto append = [&result](const auto& cards) {
+    const auto append = [&result, &activeTribes](const auto& cards) {
         for (const auto& card : cards)
             if (card.hasBehavior && card.normalDbfID == 0 &&
                 card.GetCardType() == CardType::MINION &&
+                HasActiveTribe(activeTribes, card) &&
                 CardDefs::FindCardDefByID(card.id).HasBattlecry())
                 result.push_back(card);
     };
@@ -10905,13 +11381,13 @@ std::vector<Card> SupportedBattlecryMinions()
 std::vector<Card> SupportedTierMinions(const Player& player)
 {
     std::vector<Card> result;
-    if (player.currentTier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), result, Race::INVALID);
-    else if (player.currentTier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), result, Race::INVALID);
-    else if (player.currentTier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), result, Race::INVALID);
-    else if (player.currentTier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), result, Race::INVALID);
-    else if (player.currentTier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), result, Race::INVALID);
-    else if (player.currentTier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), result, Race::INVALID);
-    else if (player.currentTier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), result, Race::INVALID);
+    if (player.currentTier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), result, Race::INVALID, player.activeTribes);
+    else if (player.currentTier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), result, Race::INVALID, player.activeTribes);
+    else if (player.currentTier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), result, Race::INVALID, player.activeTribes);
+    else if (player.currentTier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), result, Race::INVALID, player.activeTribes);
+    else if (player.currentTier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), result, Race::INVALID, player.activeTribes);
+    else if (player.currentTier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), result, Race::INVALID, player.activeTribes);
+    else if (player.currentTier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), result, Race::INVALID, player.activeTribes);
     return result;
 }
 
@@ -10987,7 +11463,8 @@ bool BeginTrinketMinionDiscover(Player& player, std::int32_t sourceCardDbfID,
         if (card.id.empty() || card.dbfID <= 0 ||
             card.GetCardType() != CardType::MINION ||
             !card.isBattlegroundsPoolMinion || card.normalDbfID != 0 ||
-            !card.hasBehavior || (tier > 0 && card.GetTier() != tier) ||
+            !card.hasBehavior || !HasActiveTribe(player.activeTribes, card) ||
+            (tier > 0 && card.GetTier() != tier) ||
             (requiredRace != Race::INVALID && !card.HasRace(requiredRace)))
             continue;
         if (battlecryOnly && !CardDefs::FindCardDefByID(card.id).HasBattlecry())
@@ -11012,8 +11489,6 @@ bool BeginPutricideStickerDiscover(Player& player, std::int32_t sourceCardDbfID,
     if (player.season14.pendingDecision != Season14Decision::NONE ||
         player.hand.IsFull() || sourceCardDbfID != 120827)
         return false;
-    const auto& pool = second ? BUILD_AN_UNDEAD_POOL_2
-                              : BUILD_AN_UNDEAD_POOL_1;
     const auto first = Cards::FindCardByDbfID(
         player.season14.pendingPutricideStickerFirstDbfID);
     const bool excludeKeywords = second &&
@@ -11022,20 +11497,25 @@ bool BeginPutricideStickerDiscover(Player& player, std::int32_t sourceCardDbfID,
          first.gameTags.contains(GameTag::POISONOUS) ||
          first.gameTags.contains(GameTag::VENOMOUS));
     std::vector<Card> candidates;
-    for (const auto dbfID : pool) {
-        const auto card = Cards::FindCardByDbfID(dbfID);
-        if (card.dbfID == 0 || card.GetCardType() != CardType::MINION ||
-            card.normalDbfID != 0 || !card.hasBehavior ||
-            card.GetTier() > player.currentTier)
-            continue;
-        if (excludeKeywords &&
-            (card.dbfID == 99527 || card.dbfID == 98867 ||
-             card.gameTags.contains(GameTag::REBORN) ||
-             card.gameTags.contains(GameTag::POISONOUS) ||
-             card.gameTags.contains(GameTag::VENOMOUS)))
-            continue;
-        candidates.push_back(card);
-    }
+    const auto appendPool = [&](const auto& pool) {
+        for (const auto dbfID : pool) {
+            const auto card = Cards::FindCardByDbfID(dbfID);
+            if (card.dbfID == 0 || card.GetCardType() != CardType::MINION ||
+                card.normalDbfID != 0 || !card.hasBehavior ||
+                !HasActiveTribe(player.activeTribes, card) ||
+                card.GetTier() > player.currentTier)
+                continue;
+            if (excludeKeywords &&
+                (card.dbfID == 99527 || card.dbfID == 98867 ||
+                 card.gameTags.contains(GameTag::REBORN) ||
+                 card.gameTags.contains(GameTag::POISONOUS) ||
+                 card.gameTags.contains(GameTag::VENOMOUS)))
+                continue;
+            candidates.push_back(card);
+        }
+    };
+    if (second) appendPool(BUILD_AN_UNDEAD_POOL_2);
+    else appendPool(BUILD_AN_UNDEAD_POOL_1);
     if (candidates.size() < 3) return false;
     Random::shuffle(candidates.begin(), candidates.end());
     player.season14.BeginOfferingDecision(
@@ -11086,7 +11566,8 @@ bool BeginInnkeepersHearthDiscover(Player& player,
     {
         if (card.id.empty() || card.GetCardType() != CardType::MINION ||
             !card.isBattlegroundsPoolMinion || card.normalDbfID != 0 ||
-            !card.hasBehavior || card.GetTier() != tier ||
+            !card.hasBehavior || !HasActiveTribe(player.activeTribes, card) ||
+            card.GetTier() != tier ||
             (sourceCardDbfID == 121684 &&
              player.season14.pendingInnkeepersHearthSelectedDbfID != 0 &&
              card.dbfID ==
@@ -11163,6 +11644,7 @@ bool BeginElectromagneticDiscover(Player& player,
         if (card.id.empty() || !card.isBattlegroundsPoolMinion ||
             card.normalDbfID != 0 || !card.hasBehavior ||
             card.GetCardType() != CardType::MINION ||
+            !HasActiveTribe(player.activeTribes, card) ||
             !card.HasRace(Race::MECHANICAL) ||
             !card.gameTags.contains(GameTag::MAGNETIC) ||
             card.gameTags.at(GameTag::MAGNETIC) == 0)
@@ -11195,6 +11677,7 @@ bool BeginWindfallDiscover(Player& player, std::int32_t sourceCardDbfID,
     for (const auto& card : Cards::GetAllCards())
         if (card.isBattlegroundsPoolMinion && card.hasBehavior &&
             card.normalDbfID == 0 && card.GetCardType() == CardType::MINION &&
+            HasActiveTribe(player.activeTribes, card) &&
             card.HasRace(Race::ELEMENTAL))
             candidates.push_back(card);
     if (candidates.empty()) return false;
@@ -11233,7 +11716,8 @@ bool Player::BeginOminousStoneDiscover(const std::int32_t sourceCardDbfID)
     if (race == Race::INVALID) return false;
 
     std::vector<Card> candidates;
-    AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, race);
+    AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, race,
+                                 activeTribes);
     if (candidates.empty()) return false;
 
     std::vector<Card> gifts;
@@ -11283,7 +11767,7 @@ bool Player::BeginWaxLanceDiscover(const std::int32_t sourceCardDbfID)
 
     std::vector<Card> candidates;
     AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates,
-                                  Race::INVALID);
+                                  Race::INVALID, activeTribes);
     candidates.erase(
         std::remove_if(candidates.begin(), candidates.end(),
                        [](const Card& candidate) {
@@ -11414,9 +11898,9 @@ bool HasRandomGoldenShopTarget(const Player& player)
     return found;
 }
 
-bool HasSupportedRaceMinion(Race race)
+bool HasSupportedRaceMinion(Race race, const ActiveTribeSet& activeTribes)
 {
-    return !SupportedMinionsForRace(race).empty();
+    return !SupportedMinionsForRace(race, activeTribes).empty();
 }
 
 std::size_t AliveFriendlyMinionCount(const Player& player)
@@ -12182,13 +12666,15 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
                 player, [&] {
                     std::vector<Card> result;
                     AppendSupportedNormalMinions(
-                        Cards::GetTier1Minions(), result, Race::INVALID);
+                        Cards::GetTier1Minions(), result, Race::INVALID,
+                        player.activeTribes);
                     return result;
                 }()));
             return;
         case TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND:
         {
-            std::vector<Card> candidates = SupportedMinionsForRace(Race::NAGA);
+            std::vector<Card> candidates =
+                SupportedMinionsForRace(Race::NAGA, player.activeTribes);
             if (effect.value > 0)
                 candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
                     [&](const Card& card) { return card.GetTier() != effect.value; }),
@@ -12202,37 +12688,37 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         {
             const Race race = MostCommonFriendlyRace(player);
             static_cast<void>(AddRandomMinionToHand(
-                player, SupportedMinionsForRace(race)));
+                player, SupportedMinionsForRace(race, player.activeTribes)));
             return;
         }
         case TavernSpellEffect::DISCOVER_MINION:
         {
             std::vector<Card> candidates;
             if (effect.race != Race::INVALID)
-                candidates = SupportedMinionsForRace(effect.race);
+                candidates = SupportedMinionsForRace(effect.race, player.activeTribes);
             else if (effect.value == 1)
-                AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID);
+                AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID, player.activeTribes);
             else if (effect.value == 7)
-                AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID);
+                AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID, player.activeTribes);
             else if (effect.value == 8)
-                candidates = SupportedDeathrattleMinions();
+                candidates = SupportedDeathrattleMinions(player.activeTribes);
             else if (effect.lockHand) {
-                if (player.currentTier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID);
-                else if (player.currentTier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), candidates, Race::INVALID);
-                else if (player.currentTier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), candidates, Race::INVALID);
-                else if (player.currentTier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, Race::INVALID);
-                else if (player.currentTier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), candidates, Race::INVALID);
-                else if (player.currentTier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), candidates, Race::INVALID);
-                else if (player.currentTier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID);
+                if (player.currentTier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID, player.activeTribes);
+                else if (player.currentTier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), candidates, Race::INVALID, player.activeTribes);
+                else if (player.currentTier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), candidates, Race::INVALID, player.activeTribes);
+                else if (player.currentTier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, Race::INVALID, player.activeTribes);
+                else if (player.currentTier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), candidates, Race::INVALID, player.activeTribes);
+                else if (player.currentTier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), candidates, Race::INVALID, player.activeTribes);
+                else if (player.currentTier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID, player.activeTribes);
             }
             else
-                candidates = SupportedMinionsForRace(MostCommonFriendlyRace(player));
+                candidates = SupportedMinionsForRace(MostCommonFriendlyRace(player), player.activeTribes);
             if (BeginMinionDiscover(player, std::move(candidates), sourceCardDbfID, effect.lockHand))
                 armDiscoverReplay();
             return;
         }
         case TavernSpellEffect::DISCOVER_BATTLECRY_MINION:
-            if (BeginMinionDiscover(player, SupportedBattlecryMinions(), sourceCardDbfID))
+            if (BeginMinionDiscover(player, SupportedBattlecryMinions(player.activeTribes), sourceCardDbfID))
                 armDiscoverReplay();
             return;
         case TavernSpellEffect::TRANSFORM_HIGHER_TIER:
@@ -12240,8 +12726,9 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
             std::vector<Card> candidates;
             for (int tier = player.recruitField[static_cast<std::size_t>(targetIdx)].GetTier() + 1;
                  tier <= TIER_UPPER_LIMIT; ++tier) {
-                const auto append = [&candidates](const auto& cards) {
-                    AppendSupportedNormalMinions(cards, candidates, Race::INVALID);
+                const auto append = [&candidates, &player](const auto& cards) {
+                    AppendSupportedNormalMinions(cards, candidates, Race::INVALID,
+                                                 player.activeTribes);
                 };
                 if (tier == 1) append(Cards::GetTier1Minions());
                 else if (tier == 2) append(Cards::GetTier2Minions());
@@ -12263,7 +12750,7 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         case TavernSpellEffect::DISCOVER_DIFFERENT_RACE:
         {
             const auto& target = player.recruitField[static_cast<std::size_t>(targetIdx)];
-            std::vector<Card> candidates = SupportedMinionsForRace(target.GetRace());
+            std::vector<Card> candidates = SupportedMinionsForRace(target.GetRace(), player.activeTribes);
             candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
                 [&target](const Card& card) { return card.id == target.GetCardID(); }), candidates.end());
             if (BeginMinionDiscover(player, std::move(candidates), sourceCardDbfID))
@@ -12272,7 +12759,7 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
         }
         case TavernSpellEffect::RANDOM_MINION_AND_COPY:
         {
-            auto candidates = SupportedMinionsForRace(effect.race);
+            auto candidates = SupportedMinionsForRace(effect.race, player.activeTribes);
             if (candidates.empty() || player.hand.GetCount() + 2 > MAX_HAND_SIZE)
                 return;
             Random::shuffle(candidates.begin(), candidates.end());
@@ -12534,7 +13021,8 @@ void ApplySpellBoardEffect(Player& player, const TavernSpellBehavior& effect,
                 !target.HasRace(effect.race) ||
                 player.hand.GetCount() + effect.randomCount > MAX_HAND_SIZE)
                 return;
-            auto candidates = SupportedMinionsForRace(effect.race);
+            auto candidates =
+                SupportedMinionsForRace(effect.race, player.activeTribes);
             if (candidates.empty()) return;
             // Destroyed minions still resolve their deathrattle and leave the
             // pool before the generated rewards are created.  This is the
@@ -12810,7 +13298,7 @@ bool Player::CastTavernSpellFree(const std::string& cardID, int amount,
             if (behavior.effect == TavernSpellEffect::DESTROY_UNDEAD_RANDOM_TO_HAND &&
                 (behavior.randomCount <= 0 ||
                  hand.GetCount() + behavior.randomCount > MAX_HAND_SIZE ||
-                 SupportedMinionsForRace(behavior.race).empty()))
+                 SupportedMinionsForRace(behavior.race, activeTribes).empty()))
                 return false;
         }
     }
@@ -12862,7 +13350,7 @@ bool Player::CastTavernSpellFree(const std::string& cardID, int amount,
                     behavior.effect != TavernSpellEffect::DESTROY_UNDEAD_RANDOM_TO_HAND ||
                     (behavior.randomCount > 0 &&
                      hand.GetCount() + behavior.randomCount <= MAX_HAND_SIZE &&
-                     !SupportedMinionsForRace(behavior.race).empty());
+                     !SupportedMinionsForRace(behavior.race, activeTribes).empty());
                 if (slot < 7 && effectLegal && rewardCapacity) {
                     season14.spellModal.legalTargetMask |=
                         std::uint32_t{1} << slot;
@@ -13137,7 +13625,7 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
              // hand still contains the spell at this point; after it is
              // removed, every printed random reward must have a slot.
              hand.GetCount() - 1 + behavior.randomCount > MAX_HAND_SIZE ||
-             SupportedMinionsForRace(behavior.race).empty()))
+             SupportedMinionsForRace(behavior.race, activeTribes).empty()))
         {
             return false;
         }
@@ -13200,37 +13688,37 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         if (!available) return false;
     }
     if (behavior.effect == TavernSpellEffect::RANDOM_MINION_TO_HAND &&
-        !HasSupportedTier1Minion())
+        !HasSupportedTier1Minion(activeTribes))
     {
         return false;
-    if (behavior.effect == TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND &&
-        SupportedMinionsForRace(Race::NAGA).empty())
-        return false;
     }
+    if (behavior.effect == TavernSpellEffect::RANDOM_NAGA_MINION_TO_HAND &&
+        SupportedMinionsForRace(Race::NAGA, activeTribes).empty())
+        return false;
     if (behavior.effect == TavernSpellEffect::DISCOVER_MINION) {
         if (hand.IsFull()) return false;
         std::vector<Card> candidates;
         if (behavior.value == 1)
-            AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID);
+            AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID, activeTribes);
         else if (behavior.value == 7)
-            AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID);
+            AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID, activeTribes);
         else if (behavior.value == 8)
-            candidates = SupportedDeathrattleMinions();
+            candidates = SupportedDeathrattleMinions(activeTribes);
         else if (behavior.lockHand) {
-            if (currentTier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID);
-            else if (currentTier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), candidates, Race::INVALID);
-            else if (currentTier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), candidates, Race::INVALID);
-            else if (currentTier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, Race::INVALID);
-            else if (currentTier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), candidates, Race::INVALID);
-            else if (currentTier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), candidates, Race::INVALID);
-            else if (currentTier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID);
+            if (currentTier == 1) AppendSupportedNormalMinions(Cards::GetTier1Minions(), candidates, Race::INVALID, activeTribes);
+            else if (currentTier == 2) AppendSupportedNormalMinions(Cards::GetTier2Minions(), candidates, Race::INVALID, activeTribes);
+            else if (currentTier == 3) AppendSupportedNormalMinions(Cards::GetTier3Minions(), candidates, Race::INVALID, activeTribes);
+            else if (currentTier == 4) AppendSupportedNormalMinions(Cards::GetTier4Minions(), candidates, Race::INVALID, activeTribes);
+            else if (currentTier == 5) AppendSupportedNormalMinions(Cards::GetTier5Minions(), candidates, Race::INVALID, activeTribes);
+            else if (currentTier == 6) AppendSupportedNormalMinions(Cards::GetTier6Minions(), candidates, Race::INVALID, activeTribes);
+            else if (currentTier == 7) AppendSupportedNormalMinions(Cards::GetTier7Minions(), candidates, Race::INVALID, activeTribes);
         }
         else
-            candidates = SupportedMinionsForRace(MostCommonFriendlyRace(*this));
+                candidates = SupportedMinionsForRace(MostCommonFriendlyRace(*this), activeTribes);
         if (candidates.empty()) return false;
     }
     if (behavior.effect == TavernSpellEffect::DISCOVER_BATTLECRY_MINION &&
-        SupportedBattlecryMinions().empty())
+        SupportedBattlecryMinions(activeTribes).empty())
     {
         return false;
     }
@@ -13245,7 +13733,7 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         return false;
     }
     if (behavior.effect == TavernSpellEffect::DISCOVER_UNDEAD_DIES_THIS_TURN &&
-        SupportedMinionsForRace(Race::UNDEAD).empty())
+        SupportedMinionsForRace(Race::UNDEAD, activeTribes).empty())
     {
         return false;
     }
@@ -13264,14 +13752,14 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
     if (behavior.effect == TavernSpellEffect::DISCOVER_DIFFERENT_RACE) {
         if (targetIdx < 0 || targetIdx >= recruitField.GetCount()) return false;
         const auto& target = recruitField[static_cast<std::size_t>(targetIdx)];
-        auto candidates = SupportedMinionsForRace(target.GetRace());
+        auto candidates = SupportedMinionsForRace(target.GetRace(), activeTribes);
         candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
             [&target](const Card& card) { return card.id == target.GetCardID(); }), candidates.end());
         if (candidates.empty()) return false;
     }
     if (behavior.effect == TavernSpellEffect::RANDOM_MINION_AND_COPY) {
         if (hand.GetCount() + 2 > MAX_HAND_SIZE ||
-            SupportedMinionsForRace(behavior.race).empty()) return false;
+            SupportedMinionsForRace(behavior.race, activeTribes).empty()) return false;
     }
     if (behavior.effect == TavernSpellEffect::FIXED_CARDS) {
         const int count = behavior.cardB.empty() ? behavior.randomCount : 2;
@@ -13285,7 +13773,8 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
     if (behavior.effect == TavernSpellEffect::RANDOM_COMMON_RACE_MINION_TO_HAND)
     {
         const Race race = MostCommonFriendlyRace(*this);
-        if (race == Race::INVALID || !HasSupportedRaceMinion(race))
+        if (race == Race::INVALID ||
+            !HasSupportedRaceMinion(race, activeTribes))
         {
             return false;
         }
@@ -13481,6 +13970,9 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
         else if (id.find("801ptc") != std::string::npos) {
             constexpr std::array<int, 7> damage = {3, 6, 9, 18, 24, 30, 40};
             season14.liftOffYamatoDamage = std::max(season14.liftOffYamatoDamage, damage[amount]);
+            (void)RecordReviewedExternalLifecycleEnchantment(
+                *cruiser, id, id.find("801ptc") != std::string::npos
+                             ? "BG31_HERO_801ptce" : "");
         } else if (id.find("801ptd") != std::string::npos) {
             constexpr std::array<int, 7> rally = {2, 3, 4, 5, 6, 8, 10};
             season14.liftOffRallyAttack = std::max(season14.liftOffRallyAttack, rally[amount]);
@@ -13488,8 +13980,14 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
             constexpr std::array<int, 7> reactor = {1, 2, 4, 7, 10, 15, 25};
             season14.liftOffDeathrattleAttack = std::max(season14.liftOffDeathrattleAttack, reactor[amount]);
             season14.liftOffDeathrattleHealth = std::max(season14.liftOffDeathrattleHealth, reactor[amount]);
+            (void)RecordReviewedExternalLifecycleEnchantment(
+                *cruiser, id, "BG31_HERO_801ptee");
         } else if (id.find("801ptf") != std::string::npos) season14.liftOffFreeUpgradeAvailable = true;
-        else if (id.find("801pth") != std::string::npos) season14.liftOffFortifiedBunker = true;
+        else if (id.find("801pth") != std::string::npos) {
+            season14.liftOffFortifiedBunker = true;
+            (void)RecordReviewedExternalLifecycleEnchantment(
+                *cruiser, id, "BG31_HERO_801pthe");
+        }
         else if (id.find("801pti") != std::string::npos) season14.liftOffMissilePod = true;
         else if (id.find("801ptj") != std::string::npos) season14.liftOffUltraCapacitor = true;
         ++season14.liftOffUpgradesBoughtThisTurn;
@@ -13850,7 +14348,7 @@ bool Player::PlaySpell(std::size_t handIdx, int targetIdx)
     }
     if (effect.effect == TavernSpellEffect::DISCOVER_UNDEAD_DIES_THIS_TURN)
     {
-        auto candidates = SupportedMinionsForRace(Race::UNDEAD);
+        auto candidates = SupportedMinionsForRace(Race::UNDEAD, activeTribes);
         if (candidates.empty() || hand.IsFull()) return false;
         Random::shuffle(candidates.begin(), candidates.end());
         std::vector<Season14Offering> offerings;
@@ -14282,7 +14780,8 @@ bool Player::ApplyArcaneAlteration(std::size_t slot, std::uint64_t entityID,
     auto replacement = Cards::FindCardByDbfID(replacementDbfID);
     if (replacement.dbfID == 0 || replacement.GetCardType() != CardType::MINION ||
         !replacement.isBattlegroundsPoolMinion || replacement.normalDbfID != 0 ||
-        !replacement.hasBehavior || replacement.GetTier() != replacementTier)
+        !replacement.hasBehavior || !HasActiveTribe(activeTribes, replacement) ||
+        replacement.GetTier() != replacementTier)
         return false;
     tavern.fieldZone.Remove(old);
     Minion minion(replacement);
@@ -14637,7 +15136,8 @@ bool Player::BeginClockworkAssistantDiscover(bool golden)
     for (const auto& card : Cards::GetAllCards())
         if (card.GetCardType() == CardType::MINION &&
             card.isBattlegroundsPoolMinion && card.hasBehavior &&
-            card.normalDbfID == 0 && card.GetTier() == tier)
+            card.normalDbfID == 0 && card.GetTier() == tier &&
+            HasActiveTribe(activeTribes, card))
             candidates.push_back(card);
     if (candidates.size() < 3) return false;
     Random::shuffle(candidates.begin(), candidates.end());
@@ -14663,7 +15163,8 @@ bool Player::ResolveSparkfinSoothsayer(bool golden)
         for (const auto& card : Cards::GetAllCards())
             if (card.GetCardType() == CardType::MINION &&
                 card.isBattlegroundsPoolMinion && card.hasBehavior &&
-                card.normalDbfID == 0 && card.HasRace(Race::MURLOC) &&
+                card.normalDbfID == 0 && HasActiveTribe(activeTribes, card) &&
+                card.HasRace(Race::MURLOC) &&
                 card.GetTier() == targetTier)
                 candidates.push_back(card);
         if (candidates.empty()) continue;
@@ -15011,7 +15512,8 @@ void Player::SellMinion(std::size_t idx)
             for (const auto& card : Cards::GetAllCards())
                 if (card.GetCardType() == CardType::MINION &&
                     card.normalDbfID == 0 && card.isBattlegroundsPoolMinion &&
-                    card.hasBehavior && card.HasRace(Race::MURLOC))
+                    card.hasBehavior && HasActiveTribe(activeTribes, card) &&
+                    card.HasRace(Race::MURLOC))
                     murlocs.push_back(card);
             if (!murlocs.empty()) {
                 const auto& card = murlocs[Random::get<std::size_t>(
@@ -15170,7 +15672,9 @@ void Player::RefreshTavern(bool freeRefresh)
             if (candidate.normalDbfID != 0 ||
                 candidate.GetCardType() != CardType::MINION ||
                 !candidate.isBattlegroundsPoolMinion ||
-                !candidate.hasBehavior || candidate.GetTier() != offerTier)
+                !candidate.hasBehavior ||
+                !HasActiveTribe(activeTribes, candidate) ||
+                candidate.GetTier() != offerTier)
                 continue;
             if (!candidate.HasRace(Race::ELEMENTAL))
                 continue;
@@ -15851,7 +16355,9 @@ void Player::RecordGoldSpent(std::int32_t amount)
         {
             if (!candidate.isBattlegroundsPoolMinion || !candidate.hasBehavior ||
                 candidate.GetCardType() != CardType::MINION ||
-                candidate.normalDbfID == 0 || candidate.GetTier() != behavior.tier)
+                candidate.normalDbfID == 0 ||
+                !HasActiveTribe(activeTribes, candidate) ||
+                candidate.GetTier() != behavior.tier)
                 continue;
             candidates.push_back(&candidate);
         }
@@ -16120,7 +16626,8 @@ void Player::ResolveTierMinionStartCombat()
     std::vector<Card> candidates;
     for (const auto& card : Cards::GetAllCards())
         if (card.isBattlegroundsPoolMinion && card.GetCardType() == CardType::MINION &&
-            card.normalDbfID == 0 && card.hasBehavior && card.GetTier() == tier)
+            card.normalDbfID == 0 && card.hasBehavior &&
+            HasActiveTribe(activeTribes, card) && card.GetTier() == tier)
             candidates.push_back(card);
     if (candidates.empty()) return;
     const auto card = candidates[Random::get<std::size_t>(0, candidates.size() - 1)];
@@ -16166,6 +16673,7 @@ void Player::ResolveLiftOffEndTurn()
     for (const auto& card : Cards::GetAllCards()) {
         if (!card.isBattlegroundsPoolMinion || !card.hasBehavior ||
             card.GetCardType() != CardType::MINION || card.normalDbfID != 0 ||
+            !HasActiveTribe(activeTribes, card) ||
             !card.HasRace(Race::MECHANICAL) ||
             !card.gameTags.contains(GameTag::MAGNETIC) ||
             card.gameTags.at(GameTag::MAGNETIC) == 0)

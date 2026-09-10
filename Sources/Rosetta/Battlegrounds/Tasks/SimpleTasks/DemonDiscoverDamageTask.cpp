@@ -8,7 +8,7 @@ namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus DemonDiscoverDamageTask::Run(Player& p, Minion& source) {
  if(m_count<=0 || p.hand.IsFull()) return TaskStatus::STOP;
  std::vector<Card> candidates;
- for(const auto& c:Cards::GetAllCards()) if(c.isBattlegroundsPoolMinion && c.normalDbfID==0 && c.HasRace(Race::DEMON)) candidates.push_back(c);
+ for(const auto& c:Cards::GetAllCards()) if(c.isBattlegroundsPoolMinion && c.normalDbfID==0 && HasActiveTribe(p.activeTribes,c) && c.HasRace(Race::DEMON)) candidates.push_back(c);
  if(candidates.empty()) return TaskStatus::STOP;
  effolkronium::random_thread_local::shuffle(candidates.begin(),candidates.end());
  std::vector<Season14Offering> offerings;

@@ -15,6 +15,10 @@ TaskStatus DarkGiftRandomPoolTask::Run(Player& player, Minion&) {
     static constexpr Race races[] = {Race::BLOODELF, Race::DRAENEI, Race::DWARF, Race::GNOME, Race::GOBLIN, Race::HUMAN, Race::NIGHTELF, Race::ORC, Race::TAUREN, Race::TROLL, Race::UNDEAD, Race::MURLOC, Race::DEMON, Race::MECHANICAL, Race::ELEMENTAL, Race::BEAST, Race::PIRATE, Race::DRAGON, Race::QUILBOAR, Race::NAGA, Race::CELESTIAL};
     int best = 0;
     for (const auto candidate : races) {
+      // The warband may contain stale/off-lobby tribes (for example from a
+      // replay or a generated entity).  They must not widen a lobby-scoped
+      // Dark Gift pool, and an inactive typed race has no valid candidates.
+      if (!IsActiveTribe(player.activeTribes, candidate)) continue;
       int count = 0;
       player.recruitField.ForEachAlive([&](const MinionData& data) { if (data.value().HasRace(candidate)) ++count; });
       if (count > best) { best = count; race = candidate; }
@@ -26,7 +30,10 @@ TaskStatus DarkGiftRandomPoolTask::Run(Player& player, Minion&) {
   std::unordered_set<std::string_view> seen;
   for (const auto& card : Cards::GetAllCards()) {
     const bool spell = card.isBattlegroundsPoolSpell && (card.GetCardType() == CardType::SPELL || card.GetCardType() == CardType::BATTLEGROUND_SPELL);
-    const bool minion = card.isBattlegroundsPoolMinion && card.GetCardType() == CardType::MINION && card.normalDbfID == 0 && (race == Race::ALL || card.HasRace(race));
+    const bool minion = card.isBattlegroundsPoolMinion &&
+      card.GetCardType() == CardType::MINION && card.normalDbfID == 0 &&
+      HasActiveTribe(player.activeTribes, card) &&
+      (race == Race::ALL || card.HasRace(race));
     if ((m_pool == Pool::TAVERN_SPELL ? spell : minion) && seen.insert(card.id).second) candidates.push_back(&card);
   }
   if (candidates.empty()) return TaskStatus::STOP;

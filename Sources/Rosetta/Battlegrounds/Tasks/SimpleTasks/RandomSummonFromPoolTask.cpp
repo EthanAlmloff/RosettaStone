@@ -23,6 +23,7 @@ TaskStatus RandomSummonFromPoolTask::Run(Player& player, Minion& source) {
           : m_maxTier;
   for (const auto& card : Cards::GetAllCards()) {
     if (!card.isBattlegroundsPoolMinion || card.GetCardType() != CardType::MINION) continue;
+    if (!HasActiveTribe(player.activeTribes, card)) continue;
     if (m_race != Race::INVALID && m_race != Race::ALL && !card.HasRace(m_race)) continue;
     if (card.GetTier() < m_minTier ||
         (effectiveMaxTier > 0 && card.GetTier() > effectiveMaxTier)) continue;

@@ -4,6 +4,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/BloodGemRaceBonusTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/GainGoldTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/AddEnchantmentTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemGolemTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RallyBloodGemSelfTask.hpp>
@@ -230,8 +231,8 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG_ICC_026t_G", 4}); cards.emplace("BG28_300_G", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG_BOT_312t", 1}); cards.emplace("BG29_611", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"TB_BaconUps_032t", 1}); cards.emplace("BG29_611_G", CardDef{std::move(p)}); }
-  { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG28_603t", 1}); cards.emplace("BG31_803", CardDef{std::move(p)}); }
-  { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG28_603t_G", 2}); cards.emplace("BG31_803_G", CardDef{std::move(p)}); }
+  { Power p; p.AddDeathrattleTask(SimpleTasks::AddEnchantmentTask{"BG28_603e", EntityType::SOURCE}); cards.emplace("BG31_803", CardDef{std::move(p)}); }
+  { Power p; p.AddDeathrattleTask(SimpleTasks::SummonTask{"BG28_603t", 2}); cards.emplace("BG31_803_G", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::AddCardTask{"BG34_689", 1}); cards.emplace("BG34_682", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::AddCardTask{"BG34_689", 2}); cards.emplace("BG34_682_G", CardDef{std::move(p)}); }
   { Power p; p.AddBattlecryTask(SimpleTasks::AddCardTask{"BG35_149", 1}); p.AddDeathrattleTask(SimpleTasks::AddCardTask{"BG35_149", 1}); cards.emplace("BG35_143", CardDef{std::move(p)}); }
@@ -438,7 +439,6 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddStartCombatTask(SimpleTasks::StartCombatPirateScallywagTask{1, true}); cards.emplace("BG30_119_G", CardDef{std::move(p)}); }
   { Power p; p.AddStartCombatTask(SimpleTasks::MagnetizationSelfBuffTask{2, 2}); cards.emplace("BG31_176", CardDef{std::move(p)}); }
   { Power p; p.AddStartCombatTask(SimpleTasks::MagnetizationSelfBuffTask{4, 4}); cards.emplace("BG31_176_G", CardDef{std::move(p)}); }
-  { Power p; p.AddDeathrattleTask(SimpleTasks::RandomSummonFromPoolTask{Race::INVALID, 1, 6, 0, false}); cards.emplace("BG21_HERO_030pe", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnWindfallPortraitTask{1}}); p.AddTrigger(std::move(t)); cards.emplace("BG32_MagicItem_832", CardDef{std::move(p)}); }
   { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnWindfallPortraitTask{2}}); p.AddTrigger(std::move(t)); cards.emplace("BG32_MagicItem_832t", CardDef{std::move(p)}); }
   { cards.emplace("BG23_HERO_304p", CardDef{}); }

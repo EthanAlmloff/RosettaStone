@@ -8,6 +8,7 @@
 #define ROSETTASTONE_BATTLEGROUNDS_PLAYER_HPP
 
 #include <Rosetta/Battlegrounds/Models/Hero.hpp>
+#include <Rosetta/Battlegrounds/Models/ActiveTribes.hpp>
 #include <Rosetta/Battlegrounds/Models/Season14.hpp>
 #include <Rosetta/Battlegrounds/Models/Tavern.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
@@ -36,6 +37,10 @@ class Battle;
 class Player
 {
  public:
+    // Immutable lobby tribe set copied from GameState at lobby start.  This
+    // is used by card-generation helpers that only receive a Player and
+    // prevents them from accidentally falling back to the ten-tribe universe.
+    ActiveTribeSet activeTribes = PINNED_ACTIVE_TRIBES;
     //! Returns the field according the status.
     //! \return The field according the status.
     FieldZone& GetField();
@@ -194,6 +199,14 @@ class Player
     //! room; returns false while a full field still defers the reward.
     bool TryResolveSoulFermenterIfSpace(FieldZone& field);
     bool BeginFantasticTreasureOffer();
+    //! Opens the canonical four-choice Lesser/Greater offer on turns 6/9.
+    //! The normal scheduled offer uses source dbfID 0; its tier is validated
+    //! from the immutable pending card list during ApplyChoice.
+    bool BeginScheduledTrinketOffer();
+    //! Shared Patch 36.4 Trinket selection policy used by all offer paths.
+    std::vector<Season14Offering> BuildTrinketOfferings(
+        bool greater, std::size_t count = 4, bool requireCheap = true,
+        bool requireTypeless = true) const;
     //! Opens the Greater Trinket offer moved by Ornate Clock, if armed.
     bool BeginOrnateClockOffer();
     //! Opens Mystery Cube's free two-choice Lesser replacement modal.
@@ -235,6 +248,9 @@ class Player
     bool BeginMaldraxxusDaggerDiscover(std::int32_t sourceCardDbfID);
     bool CanPurchaseTavernSlot(std::size_t idx) const;
     bool PurchaseTavernSlot(std::size_t idx);
+
+    //! The lobby type excluded from the shared Tavern pool.
+    Race excludedLobbyRace = Race::INVALID;
 
     //! Plays a minion or spell card.
     //! \param handIdx The index of a list of cards in player's hand.
