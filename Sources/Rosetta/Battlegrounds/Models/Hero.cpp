@@ -8,6 +8,7 @@
 #include <Rosetta/Battlegrounds/Models/Player.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
+#include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 
 #include <algorithm>
 
@@ -34,12 +35,12 @@ HeroDamageEvent Hero::TakeDamage(Player& player, int amount,
     player.armor -= absorbed;
     event.absorbedByArmor = absorbed;
     event.healthLost = event.requested - absorbed;
-    // Safety Patch casts the Battlegrounds Ice Block secret.  Secrets protect
-    // against hostile/combat damage, not a player's own recruit-phase
-    // payment.  Keep this source check beside the lethal boundary so a
-    // lethal self-damage effect cannot consume the one-shot protection.
-    if (source == HeroDamageSource::COMBAT_OPPONENT &&
-        health - event.healthLost <= 0)
+    // Safety Patch casts the Battlegrounds Ice Block secret.  Its printed
+    // contract is source-independent: whenever the hero takes fatal damage,
+    // prevent it and become immune for the turn.  In particular, do not
+    // special-case recruit self-damage here; the source is still retained on
+    // the event for other listeners, but Ice Block itself has no source gate.
+    if (health - event.healthLost <= 0)
     {
         for (std::size_t i = 0; i < player.season14.trinkets.size(); ++i)
         {
@@ -48,6 +49,12 @@ HeroDamageEvent Hero::TakeDamage(Player& player, int amount,
             const auto behavior = FindTrinketBehavior(
                 Cards::FindCardByDbfID(effect.dbfID).id);
             if (behavior.effect != TrinketEffect::SAFETY_PATCH) continue;
+            // Keep the generated secret registration authoritative. Safety
+            // Patch owns the acquisition trigger, while this entity tag owns
+            // the lethal-hit runtime effect.
+            if (CardDefs::FindCardDefByID("TB_Bacon_Secrets_12").lifecycle !=
+                CardLifecycle::GENERATED_ICE_BLOCK)
+                continue;
             if (!player.season14.ConsumeEffect(player.season14.trinkets, i))
                 continue;
             player.season14.iceBlockImmune = true;

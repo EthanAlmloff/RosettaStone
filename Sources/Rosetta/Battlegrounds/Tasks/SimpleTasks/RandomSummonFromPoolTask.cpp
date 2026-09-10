@@ -12,10 +12,20 @@ TaskStatus RandomSummonFromPoolTask::Run(Player& player, Minion& source) {
     return TaskStatus::STOP;
   }
   std::vector<const Card*> candidates;
+  // Sneed's Replicator is the one reviewed generated child whose printed
+  // range is relative to the owner's current Tavern tier rather than the
+  // fixed [1, 6] range encoded in its CardDef.  The starting Shredder now
+  // carries this child task, so resolve the relative upper bound here and do
+  // not also run Player's bespoke fallback resolver for that instance.
+  const int effectiveMaxTier =
+      (source.GetCardID() == "BG21_HERO_030t" && player.currentTier > 0)
+          ? player.currentTier - 1
+          : m_maxTier;
   for (const auto& card : Cards::GetAllCards()) {
     if (!card.isBattlegroundsPoolMinion || card.GetCardType() != CardType::MINION) continue;
     if (m_race != Race::INVALID && m_race != Race::ALL && !card.HasRace(m_race)) continue;
-    if (card.GetTier() < m_minTier || (m_maxTier > 0 && card.GetTier() > m_maxTier)) continue;
+    if (card.GetTier() < m_minTier ||
+        (effectiveMaxTier > 0 && card.GetTier() > effectiveMaxTier)) continue;
     if (m_golden && card.premiumDbfID == 0) continue;
     if (m_battlecryOnly && (!card.gameTags.contains(GameTag::BATTLECRY) ||
                             card.gameTags.at(GameTag::BATTLECRY) == 0)) continue;

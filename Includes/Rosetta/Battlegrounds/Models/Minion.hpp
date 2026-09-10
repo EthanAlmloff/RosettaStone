@@ -257,6 +257,12 @@ class Minion
     //! provenance.  This is used by effects whose text explicitly says that
     //! copied minions keep enchantments.
     bool TransformToKeepingInstanceState(Card replacement);
+    //! Compose a generated custom card from two minion components.  The first
+    //! card remains the display/art identity; stats, executable powers and
+    //! tribes from the second component are merged into the fresh instance.
+    //! Generated compositions deliberately clear premium linkage so they can
+    //! never participate in a normal Triple.
+    bool ComposeCustomFrom(const Minion& component, int tier);
 
     //! Returns the value of attack.
     //! \return The value of attack.

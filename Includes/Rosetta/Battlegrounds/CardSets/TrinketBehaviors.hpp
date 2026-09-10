@@ -21,6 +21,10 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // A shop-stat portrait whose text sets an
                            // absolute minimum Tavern offer count.
                            SHOP_STATS_AND_TAVERN_SLOTS,
+                           // System cards shown while the Lesser/Greater
+                           // Trinket shop countdown is running.  These are
+                           // markers, not acquireable passive effects.
+                           TRINKET_SHOP_TIMER,
                            START_TURN_GOLD_PER_MINION_TYPE, IMMEDIATE_GOLD,
                            // Mysterious Orb pays immediately and restricts
                            // the next valid Trinket offer to the Lesser pool.
@@ -141,10 +145,21 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // Undead after its combat Reborn resolves.  The
                            // value is the per-recruit-turn trigger cap.
                            AFTER_REBORN_UNDEAD_REBORN,
+                           // S'Thara returns the first friendly Demon that
+                           // died after the last friendly minion death.
+                           AFTER_LAST_FRIENDLY_DEATH_DEMON,
                            DUPLICATE_DRAGON_BATTLECRY,
                            FIRST_MINION_DIVINE_SHIELD,
                            BATTLECRY_BUY_DISCOUNT,
                            REFRESH_SHOP_STATS,
+                           // Finley's Helmet: each successful refresh buffs
+                           // every Murloc offer and grants one random bonus
+                           // keyword to each such offer.
+                           REFRESH_MURLOC_SHOP_STATS,
+                           // Lubber Sticker adds one Tavern spell offer on
+                           // every successful refresh and arms a one-Gold
+                           // discount for the first spell bought each turn.
+                           REFRESH_EXTRA_TAVERN_SPELL,
                            // Lightning in a Bottle copies the highest-Attack
                            // Tavern minion's final stats to the lowest-Attack
                            // offer after each successful refresh.
@@ -161,6 +176,14 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // Trinket instance; the purchase executor owns
                            // the payment boundary.
                            BUY_MINION_HEALTH_CADENCE,
+                           // Bazaar Sticker replaces one Tavern-spell
+                           // purchase per recruit turn with Health.
+                           TAVERN_SPELL_HEALTH_ONCE_PER_TURN,
+                           // Gold-plated Compass arms one next matching
+                           // tribe minion purchase to become Golden.  `race`
+                           // carries the resolved specialization and
+                           // `value` carries its five free Refreshes.
+                           NEXT_RACE_MINION_GOLDEN,
                            REFRESH_UPGRADE_COST_DISCOUNT,
                            HERO_DAMAGE_SHOP_STATS,
                            STATIC_MINION_STATS,
@@ -197,6 +220,9 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            START_COMBAT_HEALTH_FROM_ATTACK,
                            AVENGE_TAVERN_SPELL_ATTACK,
                            REFRESH_EXTRA_SHOP_SLOTS,
+                           // Warband Whistle consumes one free refresh whose
+                           // offers are plain copies of the current warband.
+                           WARBAND_COPY_REFRESH,
                            MAGNETIC_MECH_COST_AND_REFRESH_SLOT,
                            SPELL_COUNT_MINION_ATTACK,
                            END_TURN_UNDEAD_ATTACK,
@@ -345,6 +371,10 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // once-per-turn first-spell replay.
                            AFTER_FRIENDLY_SPELL_REPEAT,
                            SPELLCRAFT_REPEAT,
+                           // Azsharan Statuette grants three random
+                           // temporary Spellcraft spells on acquisition and
+                           // at each subsequent recruit start.
+                           START_TURN_RANDOM_SPELLCRAFT,
                            // Trailblazer Sticker makes every supported
                            // Choose One source resolve both branches.
                            TRAILBLAZER_CHOOSE_ONE,
@@ -453,7 +483,21 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            REFRESH_DOUBLE_HIGHEST_HEALTH,
                            ACQUIRE_FIXED_CARD_AFTER_SELL,
                            SPELLCRAFT_MIGHT_OF_STORMWIND,
-                           AFTER_BUY_MINION_COPY };
+                           // Yogg-Tastic Pastry spins the version-pinned
+                           // six-outcome wheel.  Resolution is centralized
+                           // on Player so each spin consumes the same seeded
+                           // RNG stream and authoritative pool helpers.
+                           YOGG_WHEEL,
+                           AFTER_BUY_MINION_COPY,
+                           // Season 14 low-suffix trinkets whose payloads
+                           // are dispatched by the shared typed lifecycle
+                           // table.  Keep these distinct from approximating
+                           // random/minion effects so coverage and future
+                           // executor work cannot silently widen their pool.
+                           PUTRICIDE_STICKER,
+                           PORTABLE_FACTORY,
+                           BATTLE_HORN,
+                           TARECGOSA_STICKER };
 
 //! Extra text carried by a fixed-portrait Trinket.  This is deliberately
 //! separate from TrinketEffect: the fixed card can be executable while the
@@ -499,6 +543,13 @@ enum class PortraitEffect {
     ,GOOSE_FLEDGLING_REWARD
     ,VINESPEAKER_BLOOD_GEM_HEALTH
     ,PERMANENT_SPELLCRAFT
+    // Portrait auras for the high-suffix fixed-card set.  These are kept
+    // typed so acquisition-only registrations cannot be mistaken for full
+    // lifecycle implementations.
+    ,BATTLECRUISER_REFRESH_UPGRADE
+    ,IMPULSIVE_ADJACENT_DEATHRATTLE
+    ,FELEMENTAL_EXTRA_STATS
+    ,TIDE_RAISER_COMBAT_SPELL_COPY
 };
 // End-of-recruit persistent race aura.
 // Effects whose trigger is a successful recruit-phase refresh or self-damage

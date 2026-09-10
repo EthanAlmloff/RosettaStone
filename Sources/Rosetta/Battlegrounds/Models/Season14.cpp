@@ -40,6 +40,23 @@ std::optional<Minion> Season14State::CopyLastCombatDeadMinion() const
                                : card;
     return Minion{plainCard};
 }
+
+std::optional<Minion> Season14State::CopyFirstCombatDeadDemonWithMaxStats() const
+{
+    const auto it = std::find_if(
+        combatDeadMinions.begin(), combatDeadMinions.end(),
+        [](const Minion& minion) { return minion.HasRace(Race::DEMON); });
+    if (it == combatDeadMinions.end()) return std::nullopt;
+    const auto card = Cards::FindCardByID(it->GetCardID());
+    if (card.id.empty()) return std::nullopt;
+    const auto plainCard = card.normalDbfID != 0
+                               ? Cards::FindCardByDbfID(card.normalDbfID)
+                               : card;
+    Minion copy{plainCard};
+    copy.SetAttack(it->GetAttack());
+    copy.SetHealth(it->GetMaxHealth());
+    return copy;
+}
 bool Season14State::ApplyGeneratedQuestReward(std::int32_t dbfID) noexcept
 {
     const auto* definition = FindSeason14GeneratedQuestReward(dbfID);
@@ -674,6 +691,9 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
         const auto card = Cards::FindCardByDbfID(trinket.dbfID);
         if (FindTrinketBehavior(card.id).effect ==
             TrinketEffect::AFTER_FIRST_SELL_BLOOD_GEMS_TAVERN)
+            trinket.triggerProgress = 0;
+        if (FindTrinketBehavior(card.id).effect ==
+            TrinketEffect::TAVERN_SPELL_HEALTH_ONCE_PER_TURN)
             trinket.triggerProgress = 0;
     }
     repeatedPlayCardIDs.clear();
@@ -1353,6 +1373,8 @@ void Season14State::ResetTrinketAvengeProgress() noexcept
                 Cards::FindCardByDbfID(trinket.dbfID).id);
             if (behavior.effect == TrinketEffect::AVENGE_MINION_STATS)
                 trinket.triggerProgress = 0;
+            if (behavior.effect == TrinketEffect::BATTLE_HORN)
+                trinket.triggerProgress = 0;
             // Avenge progress is combat-local for every Avenge Trinket,
             // including Beetle Band and the Tavern-spell Avenge variant.
             // Leaving these out would carry partial deaths into the next
@@ -1449,7 +1471,8 @@ Season14State::OnTrinketFriendlyMinionDied()
         if ((behavior.effect != TrinketEffect::AVENGE_MINION_STATS &&
              behavior.effect != TrinketEffect::AVENGE_RIGHTMOST_ATTACK_TO_DRAGON &&
              behavior.effect != TrinketEffect::AVENGE_SUMMON_BEETLES &&
-             behavior.effect != TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK) ||
+             behavior.effect != TrinketEffect::AVENGE_TAVERN_SPELL_ATTACK &&
+             behavior.effect != TrinketEffect::BATTLE_HORN) ||
             behavior.value <= 0) continue;
         if (++trinket.triggerProgress >= behavior.value)
         {
@@ -1468,6 +1491,10 @@ Season14State::OnTrinketFriendlyMinionDied()
             {
                 AddTavernSpellAttackBonus(behavior.attack);
                 AddTavernSpellHealthBonus(behavior.health);
+                continue;
+            }
+            if (behavior.effect == TrinketEffect::BATTLE_HORN) {
+                ++result.triggerFriendlyBattlecry;
                 continue;
             }
             result.attack += behavior.attack;
@@ -2071,6 +2098,13 @@ void Season14State::AddTrinket(Season14PersistentEffect effect)
                 AddPersistentShopStats(behavior.attack, behavior.health);
                 trinketMinimumShopSlots =
                     std::max(trinketMinimumShopSlots, behavior.value);
+                break;
+            case TrinketEffect::TRINKET_SHOP_TIMER:
+            case TrinketEffect::REFRESH_MURLOC_SHOP_STATS:
+            case TrinketEffect::REFRESH_EXTRA_TAVERN_SPELL:
+            case TrinketEffect::START_TURN_RANDOM_SPELLCRAFT:
+                // Resolved by the exact public Game/Player lifecycle
+                // boundary; no acquisition-time aura is installed here.
                 break;
             case TrinketEffect::ACQUIRE_RANDOM_FRIENDLY_COPY:
                 // The copy is resolved by Player at acquisition/start-turn;

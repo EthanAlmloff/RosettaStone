@@ -98,8 +98,12 @@ constexpr bool IsWarpGateHeroPowerDbfID(std::int32_t dbfID) noexcept
 // Protoss rewards are hero-generated and therefore are not required to be in
 // the ordinary Tavern pool. Keep the pinned DBF boundary explicit: a missing
 // generated behavior must fail closed instead of substituting another race.
-inline constexpr std::array<std::int32_t, 9> WARP_GATE_PROTOSS_DBF_IDS = {
-    113732, 113165, 113174, 113177, 113203,
+inline constexpr std::array<std::int32_t, 10> WARP_GATE_PROTOSS_DBF_IDS = {
+    // Zealot, Dark Templar, Carrier, and the generated Carrier Interceptor
+    // are all members of the pinned Warp Gate reward pool.  Keep the linked
+    // Interceptor here as well as in the combat spawn path: Mothership and
+    // Warp Gate use this same allowlist for hand rewards.
+    113732, 113165, 113174, 113175, 113177, 113203,
     113735, 113738, 113739, 113733};
 
 constexpr bool IsWarpGateProtossDbfID(std::int32_t dbfID) noexcept
@@ -109,13 +113,9 @@ constexpr bool IsWarpGateProtossDbfID(std::int32_t dbfID) noexcept
     return false;
 }
 
-// Empty CardDefs are enough to let the loader construct linked/generated
-// records, but they are not executable Protoss behavior. Keep this allowlist
-// closed so Warp Gate cannot offer a metadata-only record and strand a reward
-// that the simulator cannot resolve.
 constexpr bool IsExecutableWarpGateProtossDbfID(std::int32_t dbfID) noexcept
 {
-    return IsWarpGateProtossDbfID(dbfID) && dbfID != 113732;
+    return IsWarpGateProtossDbfID(dbfID);
 }
 
 // Whodunit's public start-game pool is the authoritative Season 14 quest

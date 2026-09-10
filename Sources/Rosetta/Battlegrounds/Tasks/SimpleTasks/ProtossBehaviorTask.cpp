@@ -7,22 +7,18 @@
 using Random = effolkronium::random_thread_local;
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 namespace {
-// Zealot (113732) and Interceptor (113175) are generated metadata records,
-// not executable Protoss rewards.  Keep this pool restricted to the eight
-// playable Protoss minions and let the shared executable allowlist enforce
-// the same boundary at runtime.
-constexpr int PROTOSS[] = {113165, 113174, 113177, 113203,
+// Warp Gate's complete pinned Protoss pool, including its generated Zealot
+// and Interceptor entities. Their card mechanics are supplied by the normal
+// Minion/Battle runtime; this helper owns eligibility and hand-cap handling.
+constexpr int PROTOSS[] = {113732, 113165, 113174, 113175, 113177, 113203,
                            113735, 113738, 113739, 113733};
 void AddProtoss(Player& player, int count) {
   if (player.hand.IsFull()) return;
   std::vector<Card> pool;
   for (const auto dbf : PROTOSS) {
     const auto card = Cards::FindCardByDbfID(dbf);
-    // The linked Protoss inventory contains metadata-only Zealot and
-    // Interceptor records.  CardDefs markers intentionally make those
-    // records loadable, so `hasBehavior` alone is not an executable-pool
-    // predicate.  Reuse Warp Gate's closed allowlist for both Warp Gate and
-    // Mothership rewards.
+    // CardDefs carries the explicit generated-token lifecycle tag. Reuse the
+    // same allowlist for Warp Gate and Mothership rewards.
     if (IsExecutableWarpGateProtossDbfID(dbf) && card.hasBehavior &&
         card.normalDbfID == 0)
       pool.push_back(card);

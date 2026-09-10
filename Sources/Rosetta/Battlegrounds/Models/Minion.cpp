@@ -933,6 +933,78 @@ bool Minion::TransformToKeepingInstanceState(Card replacement)
     return true;
 }
 
+bool Minion::ComposeCustomFrom(const Minion& component, int tier)
+{
+    if (&component == this || component.GetDbfID() == 0 || tier <= 0)
+        return false;
+
+    // Power currently models Activate and Avenge as single optional
+    // definitions rather than ordered task lists.  Refuse an ambiguous
+    // collision instead of silently dropping the second component's printed
+    // effect; the Putricide path is intentionally fail-closed for this case.
+    if ((m_card.power.GetActivate() && component.m_card.power.GetActivate()) ||
+        (m_card.power.GetAvenge() && component.m_card.power.GetAvenge()))
+        return false;
+
+    // The first pick supplies the visible identity/art.  Merge the complete
+    // executable payload of the second pick, including manually attached
+    // tasks, without replacing the surviving entity's zone/index/callback.
+    const auto append = [](auto& dst, const auto& src) {
+        for (const auto& task : src) dst.emplace_back(task);
+    };
+    append(m_card.power.GetBattlecryTask(),
+           component.m_card.power.GetBattlecryTask());
+    append(m_card.power.GetStartCombatTask(),
+           component.m_card.power.GetStartCombatTask());
+    append(m_card.power.GetDeathrattleTask(),
+           component.m_card.power.GetDeathrattleTask());
+    append(m_card.power.GetRallyTask(), component.m_card.power.GetRallyTask());
+    if (!m_card.power.GetActivate() && component.m_card.power.GetActivate())
+        m_card.power.GetActivate() = component.m_card.power.GetActivate();
+    if (!m_card.power.GetAvenge() && component.m_card.power.GetAvenge())
+        m_card.power.GetAvenge() = component.m_card.power.GetAvenge();
+
+    m_attack += component.GetAttack();
+    m_health += component.GetHealth();
+    m_maxHealth += component.GetMaxHealth();
+    m_card.gameTags[GameTag::TECH_LEVEL] = tier;
+    m_card.normalDbfID = 0;
+    m_card.premiumDbfID = 0;
+    m_card.isBattlegroundsPoolMinion = false;
+    if (!m_card.text.empty() && !component.m_card.text.empty())
+        m_card.text += "\n" + component.m_card.text;
+    else if (m_card.text.empty())
+        m_card.text = component.m_card.text;
+
+    for (const auto race : component.m_card.races) {
+        if (std::find(m_card.races.begin(), m_card.races.end(), race) ==
+            m_card.races.end())
+            m_card.races.push_back(race);
+        AddRace(race);
+    }
+    // Older/generated card records may expose only CARDRACE rather than the
+    // normalized `races` vector.  Preserve that primary tribe as well.
+    for (const auto race : RACES_IN_BATTLEGROUNDS)
+        if (component.HasRace(race)) AddRace(race);
+    for (const auto& tag : component.m_card.gameTags) {
+        if (tag.first == GameTag::DEATHRATTLE || tag.first == GameTag::TAUNT ||
+            tag.first == GameTag::DIVINE_SHIELD || tag.first == GameTag::REBORN ||
+            tag.first == GameTag::WINDFURY || tag.first == GameTag::MEGA_WINDFURY ||
+            tag.first == GameTag::POISONOUS || tag.first == GameTag::VENOMOUS ||
+            tag.first == GameTag::STEALTH)
+            m_card.gameTags[tag.first] = tag.second;
+    }
+    if (component.HasTaunt()) SetTaunt(true);
+    if (component.HasDivineShield()) SetGameTag(GameTag::DIVINE_SHIELD, 1);
+    if (component.HasReborn()) SetReborn(true);
+    if (component.HasWindfury()) SetGameTag(GameTag::WINDFURY, 1);
+    if (component.HasVenomous()) SetGameTag(GameTag::POISONOUS, 1);
+    if (component.HasDeathrattle()) m_hasDeathrattle = true;
+    m_hasStealth = m_hasStealth || component.m_hasStealth;
+    m_hasMegaWindfury = m_hasMegaWindfury || component.m_hasMegaWindfury;
+    return true;
+}
+
 void Minion::ApplyGlobalMinionAttack(int attack)
 {
     if (attack <= m_globalMinionAttack)

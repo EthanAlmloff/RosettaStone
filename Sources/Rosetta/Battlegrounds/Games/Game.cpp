@@ -179,6 +179,27 @@ void Game::Start()
         tavern.fieldZone.Add(replacement, ZonePositionForIndex(slot));
         return true;
     };
+    auto replaceTavernMinionWithCardCallback = [this](
+        Player& player, Tavern& tavern, std::size_t slot, std::string_view cardID) {
+        if (slot >= static_cast<std::size_t>(tavern.fieldZone.GetCount()))
+            return false;
+        auto candidates = m_gameState.minionPool.GetMinions(1, TIER_UPPER_LIMIT, true);
+        candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
+            [cardID](const Minion& minion) {
+                return minion.GetCardID() != cardID;
+            }), candidates.end());
+        if (candidates.empty()) return false;
+        Random::shuffle(candidates.begin(), candidates.end());
+        auto replacement = std::move(candidates.front());
+        if (!m_gameState.minionPool.TakeMinion(replacement.GetPoolIndex()))
+            return false;
+        auto old = tavern.fieldZone.Remove(tavern.fieldZone[slot]);
+        m_gameState.minionPool.ReturnMinion(old.GetPoolIndex());
+        player.ApplyFreshTavernMinionModifiers(replacement);
+        replacement.SetFrozen(false);
+        tavern.fieldZone.Add(replacement, ZonePositionForIndex(slot));
+        return true;
+    };
 
     // Create callback to clear a list of minions in Tavern's field
     auto clearTavernMinionsCallback = [this](Player& player) {
@@ -354,6 +375,8 @@ void Game::Start()
         player.returnMinionCallback = returnMinionCallback;
         player.replaceTavernMinionWithRaceCallback =
             replaceTavernMinionWithRaceCallback;
+        player.replaceTavernMinionWithCardCallback =
+            replaceTavernMinionWithCardCallback;
         player.clearTavernMinionsCallback = clearTavernMinionsCallback;
         player.hand.SetAddCallback([playerPtr = &player](const CardData& card) {
             playerPtr->OnCardAcquired(card);
@@ -459,6 +482,17 @@ void Game::Recruit()
         player.season14.battlecriesTriggered = 0;
         player.season14.heroPowerUsed = false;
         player.season14.heroPowerBatch3State = 0;
+        // Lubber Sticker's discount is a one-shot entitlement scoped to the
+        // recruit turn.  Reset stale progress first, then arm one discount
+        // for each active copy for the new turn.
+        player.season14.nextTavernSpellDiscount = 0;
+        for (const auto& trinket : player.season14.trinkets) {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            if (FindTrinketBehavior(
+                    Cards::FindCardByDbfID(trinket.dbfID).id).effect ==
+                TrinketEffect::REFRESH_EXTRA_TAVERN_SPELL)
+                ++player.season14.nextTavernSpellDiscount;
+        }
         player.recruitField.ForEach([](MinionData& minion) {
             minion.value().ResetActivateUses();
             minion.value().ResetBuyTriggerUses();

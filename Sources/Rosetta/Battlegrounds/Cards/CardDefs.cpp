@@ -270,8 +270,16 @@ CardDefs::CardDefs()
     for (const auto id : liftOffUpgrades) m_data.emplace(id, CardDef{});
     constexpr std::array<const char*, 9> warpGateProtoss = {"SC_751t", "SC_752", "SC_756", "SC_758", "SC_762", "SC_763", "SC_764", "SC_765", "SC_783"};
     for (const auto id : warpGateProtoss) m_data.emplace(id, CardDef{});
-    m_data.emplace("SC_756t", CardDef{});
+    // These two linked records are generated combat/reward entities. Their
+    // actual effects are resolved by the shared Protoss/Battle lifecycle,
+    // while the explicit tag makes Card::hasBehavior an executable contract.
+    m_data.insert_or_assign("SC_751t", CardDef{CardLifecycle::GENERATED_PROTOSS_TOKEN});
+    m_data.insert_or_assign("SC_756t", CardDef{CardLifecycle::GENERATED_PROTOSS_TOKEN});
     m_data.emplace("SC_671t1", CardDef{});
+    // Safety Patch creates the Battlegrounds Ice Block secret. The lethal-hit
+    // trigger is owned by Hero::TakeDamage, but the generated entity remains
+    // registered as a real runtime lifecycle rather than a metadata row.
+    m_data.emplace("TB_Bacon_Secrets_12", CardDef{CardLifecycle::GENERATED_ICE_BLOCK});
     {
         Power p;
         p.AddBattlecryTask(SimpleTasks::ProtossBehaviorTask{

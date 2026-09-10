@@ -11,6 +11,12 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Sous Chef Sticker is an extra he
           TrinketEffect::HERO_POWER_EXTRA_USE);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Yogg wheel is a typed repeatable executor")
+{
+    CHECK(FindTrinketBehavior("BG30_MagicItem_994").effect ==
+          TrinketEffect::YOGG_WHEEL);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Sinstone Sticker is a two-copy Discover marker")
 {
     const auto behavior = FindTrinketBehavior("BG30_MagicItem_801");
@@ -489,6 +495,26 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - refresh and self damage progress
     CHECK(candle.value == 2);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - bespoke late season paths")
+{
+    const auto yogg = FindTrinketBehavior("BG30_MagicItem_994");
+    CHECK(yogg.effect == TrinketEffect::NONE);
+
+    const auto sthara = FindTrinketBehavior("BG32_MagicItem_907");
+    CHECK(sthara.effect == TrinketEffect::AFTER_LAST_FRIENDLY_DEATH_DEMON);
+    CHECK(sthara.race == Race::DEMON);
+    CHECK(sthara.value == 1);
+
+    const auto whistle = FindTrinketBehavior("BG35_MagicItem_930");
+    CHECK(whistle.effect == TrinketEffect::WARBAND_COPY_REFRESH);
+
+    const auto tide = FindTrinketBehavior("BG35_MagicItem_922");
+    CHECK(tide.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+    CHECK(tide.cardID == "BG34_920");
+    CHECK(tide.portraitEffect == PortraitEffect::TIDE_RAISER_COMBAT_SPELL_COPY);
+    CHECK(tide.portraitExecutable);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - permanent minion and Blood Gem auras")
 {
     const auto talisman = FindTrinketBehavior("BG30_MagicItem_880");
@@ -823,6 +849,28 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - sell and death random-minion thr
           Race::BEAST, 7);
     check("BG35_MagicItem_302", TrinketEffect::AFTER_FRIENDLY_DEATH_RANDOM_MINION,
           Race::MECHANICAL, 8);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - shop timers and refresh Spellcraft Trinkets")
+{
+    const auto lesser = FindTrinketBehavior("BG30_Trinket_1st");
+    CHECK(lesser.effect == TrinketEffect::TRINKET_SHOP_TIMER);
+    CHECK(lesser.value == 5);
+    const auto greater = FindTrinketBehavior("BG30_Trinket_2nd");
+    CHECK(greater.effect == TrinketEffect::TRINKET_SHOP_TIMER);
+    CHECK(greater.value == 8);
+
+    const auto helmet = FindTrinketBehavior("BG32_MagicItem_891");
+    CHECK(helmet.effect == TrinketEffect::REFRESH_MURLOC_SHOP_STATS);
+    CHECK(helmet.attack == 5);
+    CHECK(helmet.health == 5);
+    const auto statuette = FindTrinketBehavior("BG32_MagicItem_931");
+    CHECK(statuette.effect == TrinketEffect::START_TURN_RANDOM_SPELLCRAFT);
+    CHECK(statuette.amount == 3);
+    CHECK(statuette.repeatAtStartTurn);
+    const auto lubber = FindTrinketBehavior("BG32_MagicItem_935");
+    CHECK(lubber.effect == TrinketEffect::REFRESH_EXTRA_TAVERN_SPELL);
+    CHECK(lubber.value == 1);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - spell-count trinkets")

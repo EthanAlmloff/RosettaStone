@@ -49,6 +49,17 @@ bool ApplyReviewedTemporaryChildEnchantment(Minion& target,
 bool RecordReviewedLifecycleEnchantment(Minion& target,
                                         std::string_view parentID);
 
+//! Record the exact child marker for a Dark Gift whose payload lives in the
+//! DarkGiftBehavior state machine.  This is deliberately parent-qualified;
+//! arbitrary enchantment IDs must not become provenance through this helper.
+bool RecordReviewedDarkGiftChild(Minion& target, std::string_view parentID);
+
+//! Validate the canonical child for a deferred next-combat reward.  The
+//! reward payload is player-owned, so the child identity is recorded at the
+//! arm boundary rather than attached to a minion.
+bool IsReviewedDeferredLifecycle(std::string_view parentID,
+                                std::string_view childID);
+
 //! Apply Ichoron's exact normal/golden child identity.  Normal Ichoron grants
 //! a Divine Shield only until the next recruit turn; the golden child is a
 //! permanent shield.  Keeping this distinction here prevents a generic card
@@ -65,6 +76,12 @@ bool ApplyIchoronLifecycleEnchantment(Minion& target,
 //! token.  The caller still owns target selection and stack-number semantics.
 bool ApplyReviewedPersistentChildEnchantment(
     Minion& target, std::string_view childID, int stackNumber = 0);
+
+// Parent-qualified overload.  The closed parent/child allowlist prevents a
+// generated enchantment CardDef from being promoted without its owner path.
+bool ApplyReviewedPersistentChildEnchantment(
+    Minion& target, std::string_view parentID, std::string_view childID,
+    int stackNumber = 0);
 }
 
 #endif

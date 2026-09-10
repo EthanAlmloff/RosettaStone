@@ -161,6 +161,37 @@ Battle::Battle(Player& player1, Player& player2)
     m_player2.season14.ClearBoomControllerMech();
     m_player1.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
     m_player2.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
+    // Tarecgosa Sticker arms the current left/right-most friendly Dragons at
+    // the combat boundary.  The marker lives on the entity, so the normal
+    // combat-copy/reconciliation path permanently retains later combat stats
+    // and bonus keywords.  Existing Tarecgosa Blessing markers (for example
+    // from a Dark Gift) are intentionally left untouched.
+    const auto armTarecgosaSticker = [](Player& owner) {
+        bool active = false;
+        for (const auto& trinket : owner.season14.trinkets) {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto behavior = FindTrinketBehavior(
+                Cards::FindCardByDbfID(trinket.dbfID).id);
+            if (behavior.effect == TrinketEffect::TARECGOSA_STICKER) {
+                active = true;
+                break;
+            }
+        }
+        if (!active) return;
+        std::vector<Minion*> dragons;
+        owner.recruitField.ForEachAlive([&dragons](MinionData& data) {
+            if (data.value().HasRace(Race::DRAGON))
+                dragons.push_back(&data.value());
+        });
+        std::sort(dragons.begin(), dragons.end(),
+                  [](const Minion* lhs, const Minion* rhs) {
+                      return lhs->GetZonePosition() < rhs->GetZonePosition();
+                  });
+        if (!dragons.empty()) dragons.front()->SetTarecgosaBlessing();
+        if (dragons.size() > 1) dragons.back()->SetTarecgosaBlessing();
+    };
+    armTarecgosaSticker(m_player1);
+    armTarecgosaSticker(m_player2);
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
     // Powder Keg is a combat-copy aura.  Arm only the first three friendly
@@ -581,6 +612,15 @@ void Battle::Initialize()
             TrinketEffect::START_COMBAT_FIRST_SUMMON_COPY) {
             trinket.triggerProgress = 0;
             trinket.pendingFirstSummon.reset();
+        }
+    for (auto* owner : {&m_player1, &m_player2})
+        for (auto& trinket : owner->season14.trinkets) {
+            const auto effect = FindTrinketBehavior(
+                Cards::FindCardByDbfID(trinket.dbfID).id).effect;
+            if (effect == TrinketEffect::AFTER_LAST_FRIENDLY_DEATH_DEMON ||
+                FindTrinketBehavior(Cards::FindCardByDbfID(trinket.dbfID).id)
+                        .portraitEffect == PortraitEffect::TIDE_RAISER_COMBAT_SPELL_COPY)
+                trinket.triggerProgress = 0;
         }
     m_player1.season14.ResetBroodmotherAvenge();
     m_player2.season14.ResetBroodmotherAvenge();
@@ -1962,13 +2002,20 @@ void Battle::ProcessDestroy(bool beforeAttack)
                     removedMinion.CopyDeathrattleTo(data.value());
             });
         }
-        // Sneed's New Shredder is a pinned generated token whose card data is
-        // not a normal CardDef task. Resolve its exact highest-health hand
-        // summon through the owning Player lifecycle before generic tasks.
+        // Sneed's golden token has no reviewed child CardDef task and keeps
+        // the bespoke two-roll fallback.  The normal starting Shredder has
+        // BG21_HERO_030pe attached at hero-selection time; its generated
+        // child task is authoritative and is allowed to run below, avoiding
+        // a duplicate summon.
         if (removedMinion.GetCardID() == "BG21_HERO_030t" ||
             removedMinion.GetCardID() == "BG21_HERO_030t_G")
+        {
+            const bool hasReviewedChild = removedMinion.HasDeathrattle();
+            if (!hasReviewedChild ||
+                removedMinion.GetCardID() == "BG21_HERO_030t_G")
             owner.ResolveSneedShredderDeathrattle(
                 removedMinion.GetCardID() == "BG21_HERO_030t_G");
+        }
 
         // Process deathrattle tasks
         if (removedMinion.HasDeathrattle())
@@ -2508,7 +2555,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
         const auto trinketAvenger = owner.season14.OnTrinketFriendlyMinionDied();
         if (trinketAvenger.attack != 0 || trinketAvenger.health != 0 ||
             trinketAvenger.summonBeetles > 0 ||
-            trinketAvenger.transferRightmostAttackToDragon)
+            trinketAvenger.transferRightmostAttackToDragon ||
+            trinketAvenger.triggerFriendlyBattlecry > 0)
         {
             ApplyPermanentAvengeBonus(
                 owner, combatField, trinketAvenger.attack,
@@ -2544,7 +2592,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 owner.ApplySummonTrinkets(summoned);
             }
         }
-        owner.ResolveBoomController(combatField);
+            owner.ResolveBoomController(combatField);
         // Cloud Serpent Horn resolves after the complete death boundary:
         // choose the current right-most surviving friendly minion as the
         // source, then a different friendly Dragon as the recipient.  The
@@ -2581,6 +2629,22 @@ void Battle::ProcessDestroy(bool beforeAttack)
                         });
                 }
             }
+        }
+        // Battle Horn fires one friendly Battlecry for each completed Avenge
+        // threshold.  Resolve the selected source directly through its
+        // canonical POWER task so the normal Battlecry payload runs without
+        // recursively counting another Trinket trigger.
+        for (std::int32_t trigger = 0;
+             trigger < trinketAvenger.triggerFriendlyBattlecry; ++trigger) {
+            std::vector<Minion*> candidates;
+            combatField.ForEachAlive([&candidates](MinionData& data) {
+                if (data.value().HasBattlecry())
+                    candidates.push_back(&data.value());
+            });
+            if (candidates.empty()) break;
+            auto* selected = candidates[
+                Random::get<std::size_t>(0, candidates.size() - 1)];
+            selected->ActivateTask(PowerType::POWER, owner);
         }
         }
     }
@@ -2619,6 +2683,11 @@ void Battle::ProcessDestroy(bool beforeAttack)
     (void)m_player2.TryResolveRapidReanimationIfSpace(m_p2Field);
     (void)m_player1.TryResolveSoulFermenterIfSpace(m_p1Field);
     (void)m_player2.TryResolveSoulFermenterIfSpace(m_p2Field);
+    // S'Thara is a post-death empty-board trigger.  Resolve only after the
+    // complete death/deathrattle boundary so Reborn and generated summons
+    // can legitimately prevent the "last minion" condition.
+    (void)m_player1.ResolveLastFriendlyDeathDemon();
+    (void)m_player2.ResolveLastFriendlyDeathDemon();
     TryFireQueuedLockAndLoad();
 }
 

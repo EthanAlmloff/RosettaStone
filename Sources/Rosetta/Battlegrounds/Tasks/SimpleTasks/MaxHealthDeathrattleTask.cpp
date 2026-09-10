@@ -4,6 +4,20 @@
 namespace RosettaStone::Battlegrounds::SimpleTasks {
 TaskStatus MaxHealthDeathrattleTask::Run(Player& player, Minion& source) {
   if (m_repeats <= 0) return TaskStatus::STOP;
+  if (player.HasActivePortrait(PortraitEffect::IMPULSIVE_ADJACENT_DEATHRATTLE)) {
+    const int sourcePosition = source.GetZonePosition();
+    bool applied = false;
+    player.GetField().ForEachAlive([&](MinionData& data) {
+      auto& target = data.value();
+      if (&target == &source) return;
+      const int position = target.GetZonePosition();
+      if (position == sourcePosition - 1 || position == sourcePosition + 1) {
+        target.SetHealth(target.GetHealth() + source.GetMaxHealth() * m_repeats);
+        applied = true;
+      }
+    });
+    return applied ? TaskStatus::COMPLETE : TaskStatus::STOP;
+  }
   Minion* target = nullptr;
   player.GetField().ForEachAlive([&](MinionData& data) {
     if (target == nullptr && &data.value() != &source) target = &data.value();

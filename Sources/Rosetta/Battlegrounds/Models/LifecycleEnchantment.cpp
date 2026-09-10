@@ -141,6 +141,20 @@ constexpr std::string_view REVIEWED_PERSISTENT_CHILDREN[] = {
     // child: the child owns the canonical Deathrattle payload, while the
     // portrait resolver owns timing and the copied-board target set.
     "BG35_MagicItem_740e2",
+    // Sneed's starting Shredder hero power installs this exact deathrattle
+    // child on the generated Shredder instance.  The parent resolver owns
+    // the tier-lower pool selection; this child owns the canonical task.
+    "BG21_HERO_030pe",
+};
+
+struct ReviewedPersistentChildParent
+{
+    std::string_view parent;
+    std::string_view child;
+};
+
+constexpr ReviewedPersistentChildParent REVIEWED_PERSISTENT_CHILD_PARENTS[] = {
+    { "BG21_HERO_030p", "BG21_HERO_030pe" },
 };
 }
 
@@ -263,6 +277,31 @@ bool RecordReviewedLifecycleEnchantment(Minion& target,
     return false;
 }
 
+bool RecordReviewedDarkGiftChild(Minion& target, std::string_view parentID)
+{
+    // The Dark Gift executor owns the actual persistent state (steady-growth
+    // counters or deathrattle stat transfer).  Keep only the exact pinned
+    // child identity here for replay/provenance; never attach a second stat
+    // or deathrattle payload through the generic enchantment path.
+    if (parentID == "BG36_MidGameEffect_000t51")
+    {
+        target.RecordTemporaryEnchantment("BG36_MidGameEffect_000t51e");
+        return true;
+    }
+    if (parentID == "BG36_MidGameEffect_000t")
+    {
+        target.RecordTemporaryEnchantment("BG36_MidGameEffect_000te2");
+        return true;
+    }
+    return false;
+}
+
+bool IsReviewedDeferredLifecycle(std::string_view parentID,
+                                std::string_view childID)
+{
+    return parentID == "BG28_884" && childID == "BG28_884e";
+}
+
 bool ApplyIchoronLifecycleEnchantment(Minion& target,
                                       std::string_view childID)
 {
@@ -343,6 +382,20 @@ bool ApplyReviewedPersistentChildEnchantment(Minion& target,
         for (const auto& task : enchantmentCard.power.GetDeathrattleTask())
             target.AddDarkGiftDeathrattleTask(TaskType{ task });
         return true;
+    }
+    return false;
+}
+
+bool ApplyReviewedPersistentChildEnchantment(Minion& target,
+                                             std::string_view parentID,
+                                             std::string_view childID,
+                                             int stackNumber)
+{
+    for (const auto& pair : REVIEWED_PERSISTENT_CHILD_PARENTS)
+    {
+        if (pair.parent == parentID && pair.child == childID)
+            return ApplyReviewedPersistentChildEnchantment(target, childID,
+                                                           stackNumber);
     }
     return false;
 }

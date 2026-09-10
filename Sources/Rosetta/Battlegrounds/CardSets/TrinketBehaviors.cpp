@@ -5,6 +5,27 @@ namespace RosettaStone::Battlegrounds
 TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
 {
     if (id == "BG30_MagicItem_416") return {TrinketEffect::SPELLCRAFT_TRANSFORM_HIGHER_TIER};
+    // Putricide Sticker opens two sequential, tier-banded Undead component
+    // Discovers.  The Player modal composes the selected components into a
+    // fresh executable Creation; this marker is never treated as a generic
+    // random Undead reward.
+    if (id == "BG32_MagicItem_300") return {TrinketEffect::PUTRICIDE_STICKER};
+    // These Patch 36.4 descriptors intentionally retain the printed card
+    // identity instead of collapsing bespoke Discover/cadence effects into
+    // a broader random-minion marker.  Their event executors consume the
+    // typed effect and the payload fields below.
+    // Putricide Sticker (BG32_MagicItem_300) says "Craft a custom Undead".
+    // Player owns the pinned two-stage modal and materializes a fresh
+    // non-golden custom minion after the second component is committed.  Do
+    // not collapse this into a generic Undead Discover.
+    if (id == "BG32_MagicItem_361") return {TrinketEffect::PORTABLE_FACTORY, 0, 0, 4, Race::INVALID, 4, 1};
+    if (id == "BG32_MagicItem_361t") return {TrinketEffect::PORTABLE_FACTORY, 0, 0, 5, Race::INVALID, 5, 1};
+    // Yogg-Tastic Pastry uses the locally pinned current 36.4 wheel payload.
+    // The executor owns the six weighted outcomes; this registry row only
+    // identifies the repeatable lifecycle trigger.
+    if (id == "BG30_MagicItem_994") return {TrinketEffect::YOGG_WHEEL};
+    if (id == "BG32_MagicItem_415") return {TrinketEffect::BATTLE_HORN, 0, 0, 2, Race::INVALID, 0, 1};
+    if (id == "BG32_MagicItem_417") return {TrinketEffect::TARECGOSA_STICKER, 0, 0, 0, Race::DRAGON};
     // Demonblood Gourd and Floating Candle Set emit Spellcraft tokens whose
     // complete target executors already live in TavernSpellBehaviors.hpp.
     // The typed markers keep acquisition separate from token resolution.
@@ -20,6 +41,12 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     // Power activation. The bridge executor owns the multiplier; this marker
     // must never expand CanUseHeroPower or UseHeroPower.
     if (id == "BG30_MagicItem_804") return {TrinketEffect::HERO_POWER_TWICE};
+    // Countdown system cards are public shop-opening markers.  They are
+    // never offered as owned Trinkets; keeping the exact printed timers in
+    // the typed registry prevents them from being mistaken for metadata-only
+    // entities by coverage and card-definition audits.
+    if (id == "BG30_Trinket_1st") return {TrinketEffect::TRINKET_SHOP_TIMER, 0, 0, 5};
+    if (id == "BG30_Trinket_2nd") return {TrinketEffect::TRINKET_SHOP_TIMER, 0, 0, 8};
     // Sous Chef Sticker grants one additional Hero Power use each recruit
     // turn.  The shared marker is consumed by the recruit-start refresh.
     if (id == "BG35_MagicItem_801") return {TrinketEffect::HERO_POWER_EXTRA_USE};
@@ -129,6 +156,10 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     // Player owns the hand-cap retry boundary.
     if (id == "BG36_MagicItem_217") return {TrinketEffect::AFTER_REBORN_COPY, 0, 0, 3};
     if (id == "BG35_MagicItem_731") return {TrinketEffect::AFTER_REBORN_UNDEAD_REBORN, 0, 0, 3};
+    // S'Thara Sticker returns the first Demon that died this combat, with
+    // its maximum (not combat-damaged) stats, after the owner's last minion
+    // death.  The death executor owns the empty-board boundary.
+    if (id == "BG32_MagicItem_907") return {TrinketEffect::AFTER_LAST_FRIENDLY_DEATH_DEMON, 0, 0, 1, Race::DEMON};
     if (id == "BG36_MagicItem_215") return {TrinketEffect::DUPLICATE_DRAGON_BATTLECRY};
     if (id == "BG36_MagicItem_811") return {TrinketEffect::FIRST_MINION_DIVINE_SHIELD};
     if (id == "BG36_MagicItem_202") return {TrinketEffect::BATTLECRY_BUY_DISCOUNT, 0, 0, 2};
@@ -137,6 +168,12 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     // the permanent +A/+H improvement; the initial aura is attack/health.
     if (id == "BG30_MagicItem_879") return {TrinketEffect::REFRESH_SHOP_STATS, 1, 1, 4, Race::INVALID, 0, 1};
     if (id == "BG30_MagicItem_879t") return {TrinketEffect::REFRESH_SHOP_STATS, 2, 2, 4, Race::INVALID, 0, 1};
+    if (id == "BG32_MagicItem_891") return {TrinketEffect::REFRESH_MURLOC_SHOP_STATS, 5, 5};
+    if (id == "BG32_MagicItem_935") return {TrinketEffect::REFRESH_EXTRA_TAVERN_SPELL, 0, 0, 1};
+    // Warband Whistle is an acquisition-time, one-shot free refresh.  Its
+    // shop replacement is performed by Player::RefreshTavern so normal
+    // refresh payment/pool lifecycle remains shared.
+    if (id == "BG35_MagicItem_930") return {TrinketEffect::WARBAND_COPY_REFRESH};
     if (id == "BG35_MagicItem_852") return {TrinketEffect::REFRESH_HIGHEST_ATTACK_TO_LOWEST_STATS};
     if (id == "BG30_MagicItem_541") return {TrinketEffect::HERO_DAMAGE_SHOP_STATS, 2, 2, 3, Race::INVALID, 0, 1};
     if (id == "BG30_MagicItem_423") return {TrinketEffect::HIGHER_TIER_REFRESH};
@@ -224,6 +261,7 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     // Spitescale Sushi Roll repeats the first two Spellcraft casts each
     // recruit turn.  The per-turn counter lives on this Trinket instance.
     if (id == "BG30_MagicItem_920") return {TrinketEffect::SPELLCRAFT_REPEAT, 0, 0, 2, Race::INVALID, 0, 1};
+    if (id == "BG32_MagicItem_931") return {TrinketEffect::START_TURN_RANDOM_SPELLCRAFT, 0, 0, 0, Race::INVALID, 0, 3, true};
     // The Eye of Dalaran is event-driven: only a friendly no-type death
     // grants a random Tavern spell; typed deaths do not advance it.
     if (id == "BG30_MagicItem_981") return {TrinketEffect::AFTER_FRIENDLY_NO_TYPE_DEATH_RANDOM_SPELL};
@@ -583,6 +621,19 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG35_MagicItem_430") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG24_707", PortraitEffect::SCRAPSMITH_TAUNT_DEATH_GEMS, true};
     if (id == "BG32_MagicItem_301") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG26_350", PortraitEffect::BASSGILL_SUMMON_DIVINE_SHIELD, true};
     if (id == "BG32_MagicItem_804") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG_OG_221", PortraitEffect::SELFLESS_BATTLECRY, true};
+    // These portraits use the shared fixed-card acquisition path and carry
+    // typed executable auras for their printed modifiers.
+    if (id == "BG32_MagicItem_806") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG31_HERO_801pt", PortraitEffect::BATTLECRUISER_REFRESH_UPGRADE, true};
+    if (id == "BG32_MagicItem_820") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG21_006", PortraitEffect::IMPULSIVE_ADJACENT_DEATHRATTLE, true};
+    if (id == "BG32_MagicItem_830") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG25_041", PortraitEffect::FELEMENTAL_EXTRA_STATS, true};
+    if (id == "BG32_MagicItem_894") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, true, false, false, "BG28_845"};
+    if (id == "BG32_MagicItem_906") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG31_HERO_802pt7"};
+    if (id == "BG32_MagicItem_920") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG31_924", PortraitEffect::PERMANENT_SPELLCRAFT, true};
+    if (id == "BG32_MagicItem_950") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, true, false, false, "BG31_891"};
+    // Tide Raiser Portrait grants Tide Raiser and arms the combat spell-copy
+    // listener.  The listener is resolved in CastTavernSpellFree, the shared
+    // combat Spellcraft transaction boundary.
+    if (id == "BG35_MagicItem_922") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG34_920", PortraitEffect::TIDE_RAISER_COMBAT_SPELL_COPY, true};
     if (id == "BG32_MagicItem_831") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, true, false, false, "BGS_115", PortraitEffect::NONE, true};
     if (id == "BG35_MagicItem_741") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG26_149", PortraitEffect::NONE, true};
     if (id == "BG35_MagicItem_742") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG26_147", PortraitEffect::NONE, true};
@@ -696,6 +747,17 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     // full hand or rejected purchase cannot consume the counter.
     if (id == "BG30_MagicItem_701") return {
         TrinketEffect::BUY_MINION_HEALTH_CADENCE, 0, 0, 4};
+    // Bazaar Sticker: one successful Tavern-spell purchase per recruit turn
+    // is paid with Health instead of Gold.  The per-instance progress marker
+    // is reset at recruit start and consumed only after a committed purchase.
+    if (id == "BG32_MagicItem_822") return {
+        TrinketEffect::TAVERN_SPELL_HEALTH_ONCE_PER_TURN, 0, 0, 1};
+    // Gold-plated Compass's card-template payload is "next {0} ..."; the
+    // local resolved specialization for this entity is Naga (the source's
+    // script-data value 92 is not a purchase count).  Keep the specialization
+    // in the typed descriptor so the purchase executor remains generic.
+    if (id == "BG32_MagicItem_901") return {
+        TrinketEffect::NEXT_RACE_MINION_GOLDEN, 0, 0, 5, Race::NAGA};
     // Primalfin Lookout owns the exact Murloc Discover Battlecry. The
     // portrait's after-Discover spell payload is handled at the shared
     // Discover commit boundary, where the selected minion is authoritative.
@@ -741,8 +803,14 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     // behavior table; keep the trinket registry explicit as well so coverage
     // cannot claim a row whose native owner was accidentally removed.
     cards.emplace("BG32_MagicItem_832", CardDef{});
+    cards.emplace("BG32_MagicItem_361", CardDef{});
+    cards.emplace("BG32_MagicItem_361t", CardDef{});
+    cards.emplace("BG32_MagicItem_415", CardDef{});
+    cards.emplace("BG32_MagicItem_417", CardDef{});
     cards.emplace("BG32_MagicItem_832t", CardDef{});
     cards.emplace("BG32_MagicItem_286", CardDef{});
+    cards.emplace("BG30_Trinket_1st", CardDef{});
+    cards.emplace("BG30_Trinket_2nd", CardDef{});
     cards.emplace("BG32_MagicItem_278", CardDef{});
     cards.emplace("BG30_MagicItem_416", CardDef{});
     cards.emplace("BG32_MagicItem_803", CardDef{});
@@ -828,6 +896,16 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG35_MagicItem_430", CardDef{});
     cards.emplace("BG32_MagicItem_301", CardDef{});
     cards.emplace("BG32_MagicItem_804", CardDef{});
+    cards.emplace("BG32_MagicItem_806", CardDef{});
+    cards.emplace("BG32_MagicItem_820", CardDef{});
+    cards.emplace("BG32_MagicItem_830", CardDef{});
+    cards.emplace("BG32_MagicItem_894", CardDef{});
+    cards.emplace("BG32_MagicItem_906", CardDef{});
+    cards.emplace("BG32_MagicItem_920", CardDef{});
+    cards.emplace("BG32_MagicItem_950", CardDef{});
+    cards.emplace("BG32_MagicItem_907", CardDef{});
+    cards.emplace("BG35_MagicItem_930", CardDef{});
+    cards.emplace("BG35_MagicItem_922", CardDef{});
     cards.emplace("BG32_MagicItem_831", CardDef{});
     cards.emplace("BG35_MagicItem_741", CardDef{});
     cards.emplace("BG35_MagicItem_742", CardDef{});
@@ -864,6 +942,8 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG32_MagicItem_890", CardDef{});
     cards.emplace("BG30_MagicItem_879", CardDef{});
     cards.emplace("BG30_MagicItem_879t", CardDef{});
+    cards.emplace("BG32_MagicItem_891", CardDef{});
+    cards.emplace("BG32_MagicItem_935", CardDef{});
     cards.emplace("BG30_MagicItem_541", CardDef{});
     cards.emplace("BG30_MagicItem_423", CardDef{});
     cards.emplace("BG30_MagicItem_880", CardDef{});
@@ -896,6 +976,7 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG30_MagicItem_434", CardDef{});
     cards.emplace("BG36_MagicItem_211", CardDef{});
     cards.emplace("BG30_MagicItem_920", CardDef{});
+    cards.emplace("BG32_MagicItem_931", CardDef{});
     cards.emplace("BG30_MagicItem_981", CardDef{});
     cards.emplace("BG30_MagicItem_438t", CardDef{});
     cards.emplace("BG32_MagicItem_171", CardDef{});
@@ -1030,6 +1111,8 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG35_MagicItem_152", CardDef{});
     cards.emplace("BG35_MagicItem_432", CardDef{});
     cards.emplace("BG30_MagicItem_701", CardDef{});
+    cards.emplace("BG32_MagicItem_822", CardDef{});
+    cards.emplace("BG32_MagicItem_901", CardDef{});
     cards.emplace("BG30_MagicItem_702", CardDef{});
     cards.emplace("BG36_MagicItem_303", CardDef{});
     cards.emplace("BG36_MagicItem_303t", CardDef{});

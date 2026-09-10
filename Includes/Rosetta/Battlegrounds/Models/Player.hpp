@@ -20,6 +20,7 @@
 #include <limits>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -152,6 +153,10 @@ class Player
     //! Applies Burth to a Discover result that may still be a transient
     //! Magnetic attachment rather than an entity in hand or on the board.
     void ApplyBurthDiscoverBuff(Minion& discovered);
+    //! Resolve one seeded Yogg-Tastic Pastry wheel spin.  The wheel is a
+    //! repeatable Trinket lifecycle and uses authoritative Player/Tavern
+    //! pools, hand-capacity, and refresh boundaries.
+    bool ResolveYoggWheel();
     void ApplySpellRaceBuff(Race race, int attack, int health, bool includeHand);
     void ApplySpellSpecialBuff(int mode, int attack, int health);
     //! Resolve a supported Tavern spell without charging gold. Used by
@@ -211,6 +216,8 @@ class Player
     //! identity. Used by Cloning Gallery; does not charge or consume hand.
     bool SummonExactMinionCopy(std::size_t idx);
     bool SummonCombatSnapshot(Minion snapshot);
+    //! Resolves S'Thara's one-per-combat last-death Demon return.
+    bool ResolveLastFriendlyDeathDemon();
     //! Adds a metadata-only (plain) copy of the left-most hand card.
     //! Dynamic buffs/enchantments are intentionally not copied.
     bool AddPlainCopyOfLeftmostHandCard();
@@ -533,6 +540,11 @@ class Player
     //! count. Used by race-adding generated rewards such as Totemic Tavern.
     std::function<bool(Player&, Tavern&, std::size_t, Race)>
         replaceTavernMinionWithRaceCallback;
+    //! Replaces one Tavern offer with a specific plain card through the
+    //! authoritative pool, returning the displaced pool entry.  Used by
+    //! acquisition-time effects whose printed payload names a card identity.
+    std::function<bool(Player&, Tavern&, std::size_t, std::string_view)>
+        replaceTavernMinionWithCardCallback;
     int darkcrestImprovement = 0;
     std::function<void(Player&)> clearTavernMinionsCallback;
     std::function<void(Player&)> upgradeTavernCallback;

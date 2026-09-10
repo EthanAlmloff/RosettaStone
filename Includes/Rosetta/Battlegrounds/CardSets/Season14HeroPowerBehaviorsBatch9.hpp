@@ -3,6 +3,7 @@
 #define ROSETTASTONE_BATTLEGROUNDS_SEASON14_HERO_POWER_BEHAVIORS_BATCH9_HPP
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <string_view>
 
@@ -81,7 +82,32 @@ struct Season14HeroPowerBatch9State
     // single paid activation (Ancient Wishbone can make this greater than 1).
     std::int32_t pendingPrestidigitationRemaining = 0;
     bool activationPending = false;
+    // Build-An-Undead opens Pool 1 first and Pool 2 after the first
+    // selection.  This is explicit state: a generic Undead scan is not the
+    // authoritative offering pool.
+    bool buildAnUndeadSecondPool = false;
 };
+
+// Patch 36.4's two fixed Build-An-Undead pools.  These are the normal DBF
+// identities (never golden/generated derivatives).  The lists intentionally
+// include cards that are not in the ordinary Tavern pool, as the hero power's
+// custom pool is separate from the live minion pool.
+inline constexpr std::array<std::int32_t, 26> BUILD_AN_UNDEAD_POOL_1 = {{
+    99156, 104551, 99116, 99117, 99118, 99167, 113913, 96780, 126947,
+    122485, 99200, 95251, 95265, 95255, 105440, 122481, 99166, 102340,
+    122479, 126955, 95273, 104612, 120104, 99202, 95263, 99203}};
+
+inline constexpr std::array<std::int32_t, 15> BUILD_AN_UNDEAD_POOL_2 = {{
+    98735, 95246, 99578, 99159, 99577, 99160, 99201, 99161, 99524,
+    95253, 99162, 103579, 102938, 99527, 98867}};
+
+constexpr bool IsBuildAnUndeadPoolDbfID(std::int32_t dbfID,
+                                        bool secondPool) noexcept
+{
+    const auto& pool = secondPool ? BUILD_AN_UNDEAD_POOL_2
+                                  : BUILD_AN_UNDEAD_POOL_1;
+    return std::find(pool.begin(), pool.end(), dbfID) != pool.end();
+}
 
 enum class Season14HeroPowerBatch9Event : std::uint8_t
 {

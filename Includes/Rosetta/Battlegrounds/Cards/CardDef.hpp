@@ -34,6 +34,12 @@ enum class CardLifecycle : unsigned char
     // graph (which would execute the branch twice).
     CHOOSE_ONE_SOURCE,
     CHOOSE_ONE_OPTION,
+    // Generated entities whose behavior is owned by the shared Battlegrounds
+    // runtime rather than by a Power task graph.  The explicit tags keep
+    // generated rewards executable without pretending an empty CardDef is
+    // merely metadata.
+    GENERATED_ICE_BLOCK,
+    GENERATED_PROTOSS_TOKEN,
 };
 //!
 //! \brief CardDef class.

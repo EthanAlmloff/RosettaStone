@@ -86,6 +86,10 @@ struct Season14PersistentEffect
     //! space opens.  This is transient combat state and is cleared at combat
     //! start alongside triggerProgress.
     std::optional<Minion> pendingFirstSummon;
+    //! Portable Factory's selected minion.  This is a real instance snapshot
+    //! so each recruit-start copy preserves the selected card's executable
+    //! identity and any deterministic fresh-instance modifiers.
+    std::optional<Minion> capturedMinion;
 };
 
 //! Result of resolving one friendly combat death against Avenge Trinkets.
@@ -101,6 +105,8 @@ struct TrinketAvengeResult
     // Count triggered Horn instances rather than using a flag: multiple
     // copies can independently satisfy Avenge on the same death boundary.
     std::int32_t transferRightmostAttackToDragon = 0;
+    //! Number of friendly Battlecries fired by Battle Horn's Avenge.
+    std::int32_t triggerFriendlyBattlecry = 0;
 };
 struct Season14ChooseOneState { bool pending = false; std::uint64_t sourceEntityID = 0; std::uint32_t targetMask = 0; std::int32_t sourceCardDbfID = 0; };
 
@@ -291,6 +297,12 @@ class Season14State
     std::int32_t pendingHeroPowerReplayRemaining = 0;
     std::int32_t pendingHeroPowerReplayTier = 0;
     std::int32_t pendingHeroPowerReplayRace = 0;
+    //! Putricide Sticker's two-stage custom Undead modal.  The first
+    //! selection is retained as a component and is intentionally not added
+    //! to hand until the second selection has committed.
+    std::int32_t pendingPutricideStickerSourceDbfID = 0;
+    std::int32_t pendingPutricideStickerFirstDbfID = 0;
+    bool pendingPutricideStickerSecondPool = false;
     std::uint64_t pendingMechMagnetizeSourceEntityID = 0;
     std::uint64_t pendingMechMagnetizeTargetEntityID = 0;
     std::int32_t pendingMechMagnetizeRemaining = 0;
@@ -881,6 +893,9 @@ class Season14State
     //! to the same first deaths; it is cleared at the next combat start.
     std::vector<Minion> TakeCombatDeadMinions(Race race, std::size_t count);
     std::optional<Minion> CopyLastCombatDeadMinion() const;
+    //! Returns a plain copy of the first friendly Demon that died this
+    //! combat, restoring the death snapshot's maximum stats.
+    std::optional<Minion> CopyFirstCombatDeadDemonWithMaxStats() const;
     void ClearCombatDeadMinions() noexcept { combatDeadMinions.clear(); }
     void RecordBoomControllerMech(const Minion& minion)
     {
