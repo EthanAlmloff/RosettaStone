@@ -380,6 +380,8 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG31_176","start_of_combat","self","magnetization_count","magnetization_self_buff",2,1,2,0,0,0,false},
   {"BG31_176_G","start_of_combat","self","magnetization_count","magnetization_self_buff",4,2,4,0,0,0,false},
   {"BG21_HERO_030pe","deathrattle","self","always","random_summon_pool",1,1,0,0,0,0,false},
+  {"BG32_MagicItem_832","turn_end","self","always","end_turn_windfall_portrait",1,1,0,0,0,0,false},
+  {"BG32_MagicItem_832t","turn_end","self","always","end_turn_windfall_portrait",2,2,0,0,0,0,false},
 };
 inline constexpr DeclarativeEnchantmentRow DeclarativeEnchantmentRows[] = {
   {"BG26_523e","BG26_523","BG26_523","permanent",3,3,0},

@@ -764,6 +764,7 @@ bool Minion::MergeIntoGolden(const Minion& other)
     m_hasStealth = m_hasStealth || other.m_hasStealth;
     m_isFrozen = m_isFrozen || other.m_isFrozen;
     m_handLocked = m_handLocked || other.m_handLocked;
+    m_handLockTurns = std::max(m_handLockTurns, other.m_handLockTurns);
     m_combinedChooseOne = m_combinedChooseOne || other.m_combinedChooseOne;
     m_diesAtRecruitEnd = m_diesAtRecruitEnd || other.m_diesAtRecruitEnd;
     m_magnetizationArmed = m_magnetizationArmed || other.m_magnetizationArmed;
@@ -2022,6 +2023,16 @@ void Minion::SetEarthElementalDeathrattle(bool enabled)
 bool Minion::HasEarthElementalDeathrattle() const
 {
     return m_earthElementalDeathrattle;
+}
+
+void Minion::SetPowderKegDeathrattleAttack(int attack)
+{
+    m_powderKegDeathrattleAttack = std::max(0, attack);
+}
+
+int Minion::PowderKegDeathrattleAttack() const noexcept
+{
+    return m_powderKegDeathrattleAttack;
 }
 
 void Minion::ApplySkyGolemDeathrattleCount(int count)

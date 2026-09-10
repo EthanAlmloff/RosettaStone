@@ -10,12 +10,11 @@ namespace RosettaStone::Battlegrounds::SimpleTasks {
 namespace {
 TaskStatus Consume(Player& player, Minion& target, int multiplier) {
   if (multiplier <= 0 || target.IsDestroyed() || !target.HasRace(Race::DEMON)) return TaskStatus::STOP;
-  std::vector<int> candidates;
-  player.tavern.fieldZone.ForEachAlive([&candidates](MinionData& data) {
-    if (data.value().GetPoolIndex() >= 0) candidates.push_back(data.value().GetZonePosition());
-  });
-  if (candidates.empty()) return TaskStatus::STOP;
-  const auto slot = candidates[Random::get<std::size_t>(0, candidates.size() - 1)];
+  // SelectDemonConsumeTavernSlot owns DEMON_CONSUME_HIGHEST_HEALTH, the
+  // highestHealth aura, current-stat
+  // comparison, pool filter, and seeded tie-break for this path.
+  const int slot = player.SelectDemonConsumeTavernSlot();
+  if (slot < 0) return TaskStatus::STOP;
   auto consumed = player.tavern.fieldZone.Remove(player.tavern.fieldZone[static_cast<std::size_t>(slot)]);
   player.returnMinionCallback(consumed.GetPoolIndex());
   target.SetAttack(target.GetAttack() + consumed.GetAttack() * multiplier);
@@ -38,6 +37,9 @@ TaskStatus Consume(Player& player, Minion& target, int multiplier) {
     target.SetAttack(target.GetAttack() + behavior.attack);
     target.SetHealth(target.GetHealth() + behavior.health);
   }
+  // Generic successful-consume observers run after all consumer payload and
+  // keyword observers, so generated follow-ups see the settled state.
+  player.ApplyTavernMinionConsumedTrinkets();
   return TaskStatus::COMPLETE;
 }
 }

@@ -513,7 +513,7 @@ void Game::Recruit()
         player.RefreshSpellcraft();
         player.hand.ForEach([](std::optional<CardData>& card) {
             if (card.has_value() && std::holds_alternative<Minion>(card.value()))
-                std::get<Minion>(card.value()).SetHandLocked(false);
+                std::get<Minion>(card.value()).AdvanceHandLockTurn();
         });
 
         const auto heroPowerResult = player.season14.BeginRecruitTurn();
@@ -533,6 +533,7 @@ void Game::Recruit()
         player.ResolveStartTurnTrinkets();
         player.TryResolveWarpGateReward();
         player.BeginSpawningPoolMorphChoice();
+        player.BeginMysteryCubeOffer();
         player.BeginOrnateClockOffer();
         player.BeginFantasticTreasureOffer();
         player.recruitField.ForEachAlive([](MinionData& data) {

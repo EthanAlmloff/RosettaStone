@@ -108,8 +108,8 @@
 #include <Rosetta/Battlegrounds/CardSets/Season14HeroPowerBehaviorsBatch9.hpp>
 #include <Rosetta/Battlegrounds/CardSets/SewerRatTokenBehaviors.hpp>
 #include <Rosetta/Battlegrounds/CardSets/SpellcraftMinionBehaviors.hpp>
+#include <Rosetta/Battlegrounds/CardSets/TRINKETBEHAVIORS.HPP>
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
-#include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/Card.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDef.hpp>
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
@@ -177,6 +177,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DestroyUndeadBuffSelfTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DiscardSpellGainGoldTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DistinctSpellRaceBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ElementalStatGiverTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnConsumeHighestTavernTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnDestroyAdjacentCopyTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnGoldenCountSelfBuffTask.hpp>
@@ -184,6 +185,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnStatTransferTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnTavernSpellStatsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnTierHealthTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnWindfallPortraitTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ExactCopyDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FreeRefreshTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/FriendlyRaceEnchantmentTask.hpp>

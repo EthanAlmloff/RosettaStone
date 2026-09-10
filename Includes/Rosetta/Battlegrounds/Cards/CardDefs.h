@@ -9,7 +9,6 @@ struct DeclarativeBehaviorRow { std::string_view id, trigger, selector, conditio
 struct DeclarativeEnchantmentRow { std::string_view id, owner, source, duration; int attack, health; unsigned keywordBits; };
 inline constexpr unsigned DeclarativeBehaviorSchema = 2;
 inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
-  {"BG32_MagicItem_824","on_acquire","self","always","devour_highest_health_tavern",2,2,0,0,0,0,false},
   {"BG31_HERO_811t2","start_of_combat","self","zerg_morph","start_combat_self_copy",1,1,0,0,0,0,false},
   {"BG31_HERO_811t2_G","start_of_combat","self","zerg_morph","start_combat_self_copy",2,2,0,0,0,0,false},
   {"BG31_HERO_811t3","end_of_turn","self","zerg_morph","end_turn_tier_health",1,1,0,1,0,0,false},
@@ -381,8 +380,7 @@ inline constexpr DeclarativeBehaviorRow DeclarativeBehaviorRows[] = {
   {"BG31_176","start_of_combat","self","magnetization_count","magnetization_self_buff",2,1,2,0,0,0,false},
   {"BG31_176_G","start_of_combat","self","magnetization_count","magnetization_self_buff",4,2,4,0,0,0,false},
   {"BG21_HERO_030pe","deathrattle","self","always","random_summon_pool",1,1,0,0,0,0,false},
-  {"BG32_MagicItem_832","turn_end","self","always","end_turn_windfall_portrait",1,1,0,0,0,0,false},
-  {"BG32_MagicItem_832t","turn_end","self","always","end_turn_windfall_portrait",2,2,0,0,0,0,false},
+  {"BG32_MagicItem_824","devour","friendly_demons","implicator_portrait","devour_highest_health_tavern",1,1,0,0,0,0,false},
 };
 inline constexpr DeclarativeEnchantmentRow DeclarativeEnchantmentRows[] = {
   {"BG26_523e","BG26_523","BG26_523","permanent",3,3,0},

@@ -116,6 +116,8 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ConsumeTavernForFriendlyDemonsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnGoldenCountSelfBuffTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/NomiElementalTavernBuffTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/ElementalStatGiverTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnWindfallPortraitTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/SummonRecentDeadMinionsTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/DestroyLastDamageSourceTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomElementalHandAndSummonTask.hpp>
@@ -231,6 +233,8 @@ using TaskType =
                  SimpleTasks::ConsumeTavernForFriendlyDemonsTask,
                  SimpleTasks::EndTurnGoldenCountSelfBuffTask,
                  SimpleTasks::NomiElementalTavernBuffTask,
+                  SimpleTasks::ElementalStatGiverTask,
+                  SimpleTasks::EndTurnWindfallPortraitTask,
                  SimpleTasks::SummonRecentDeadMinionsTask,
                  SimpleTasks::DestroyLastDamageSourceTask,
                  SimpleTasks::RandomElementalHandAndSummonTask,

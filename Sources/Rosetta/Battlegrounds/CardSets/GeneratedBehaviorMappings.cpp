@@ -49,6 +49,7 @@
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomSummonFromPoolTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/RandomElementalHandAndSummonTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/WindfallTornadoDiscoverTask.hpp>
+#include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnWindfallPortraitTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/TriggerLeftmostDeathrattleTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/EndTurnDestroyAdjacentCopyTask.hpp>
 #include <Rosetta/Battlegrounds/Tasks/SimpleTasks/PersistentBeetleBuffTask.hpp>
@@ -438,6 +439,8 @@ void GeneratedBehaviorMappings::AddAll(std::map<std::string, CardDef>& cards) {
   { Power p; p.AddStartCombatTask(SimpleTasks::MagnetizationSelfBuffTask{2, 2}); cards.emplace("BG31_176", CardDef{std::move(p)}); }
   { Power p; p.AddStartCombatTask(SimpleTasks::MagnetizationSelfBuffTask{4, 4}); cards.emplace("BG31_176_G", CardDef{std::move(p)}); }
   { Power p; p.AddDeathrattleTask(SimpleTasks::RandomSummonFromPoolTask{Race::INVALID, 1, 6, 0, false}); cards.emplace("BG21_HERO_030pe", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnWindfallPortraitTask{1}}); p.AddTrigger(std::move(t)); cards.emplace("BG32_MagicItem_832", CardDef{std::move(p)}); }
+  { Power p; Trigger t{TriggerType::TURN_END}; t.SetTriggerSource(TriggerSource::SELF); t.SetTasks({SimpleTasks::EndTurnWindfallPortraitTask{2}}); p.AddTrigger(std::move(t)); cards.emplace("BG32_MagicItem_832t", CardDef{std::move(p)}); }
   { cards.emplace("BG23_HERO_304p", CardDef{}); }
   { cards.emplace("BG23_HERO_305p", CardDef{}); }
   { cards.emplace("BG30_HERO_304p", CardDef{}); }

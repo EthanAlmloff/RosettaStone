@@ -416,7 +416,44 @@ enum class TrinketEffect { NONE, SHOP_STATS, EXTRA_SHOP_SLOT,
                            // Designer Eyepatch lowers the triple threshold
                            // for Pirates only: two matching non-golden copies
                            // become one Golden Pirate.
-                           TWO_COPIES_MAKE_GOLDEN };
+                           TWO_COPIES_MAKE_GOLDEN,
+                           // Patch 36.4 typed trinket lifecycles.  These
+                           // descriptors are intentionally separate from
+                           // generic acquisition markers so the existing
+                           // Player/Battle event paths can dispatch them
+                           // without string-based exceptions.
+                           DEATHLY_PHYLACTERY,
+                           MYSTERY_CUBE_REPLACE_LESSER,
+                           TICKATUS_DARKMOON_PRIZE,
+                           AFTER_PLAY_MINION_RANDOM_TIER_SPELL,
+                           // "After you Discover a minion, add a plain copy"
+                           SINSTONE_DISCOVER_COPY,
+                           SOUVENIR_STAND_GREATER_COPY,
+                           TRIP_VOUCHERS_REPLACE_GREATER,
+                           INNKEEPERS_HEARTH_DISCOVER,
+                           TRANSFORM_WARBAND_TIER,
+                           AFTER_FIRST_SELL_BLOOD_GEMS_TAVERN,
+                           END_TURN_HIGHEST_TIER_TAVERN,
+                           BUY_DEMON_HEALTH_ONCE_PER_TURN,
+                           DEMON_CONSUME_HIGHEST_HEALTH,
+                           AFTER_TAVERN_MINION_CONSUMED_RANDOM_SPELL,
+                           GOLD_PENDANT_GOLDENIZE,
+                           END_TURN_GOLDEN_LEFTMOST_STATS,
+                           AFTER_DEATHRATTLE_TEMP_BLOOD_GEM_BONUS,
+                           JEWELRY_BOX_BLOOD_GEM,
+                           START_COMBAT_POWDER_KEG,
+                           START_COMBAT_SOUL_FERMENTER,
+                           AFTER_SELL_HERO_POWER_BUDDY,
+                           ACQUIRE_RANDOM_TRINKET,
+                           KALEIDOSCOPE_DISCOVER,
+                           SPELLCRAFT_DOUBLE_STITCH,
+                           ACQUIRE_RANDOM_CHROMADRAKES,
+                           POCKET_CYCLONE,
+                           AFTER_PLAY_ELEMENTAL_FIXED_CARD,
+                           REFRESH_DOUBLE_HIGHEST_HEALTH,
+                           ACQUIRE_FIXED_CARD_AFTER_SELL,
+                           SPELLCRAFT_MIGHT_OF_STORMWIND,
+                           AFTER_BUY_MINION_COPY };
 
 //! Extra text carried by a fixed-portrait Trinket.  This is deliberately
 //! separate from TrinketEffect: the fixed card can be executable while the
@@ -459,6 +496,9 @@ enum class PortraitEffect {
     MACAW_LEFTMOST_BATTLECRY,
     SKY_GOLEM_DEATHRATTLE_STATS,
     SCRAPSMITH_TAUNT_DEATH_GEMS
+    ,GOOSE_FLEDGLING_REWARD
+    ,VINESPEAKER_BLOOD_GEM_HEALTH
+    ,PERMANENT_SPELLCRAFT
 };
 // End-of-recruit persistent race aura.
 // Effects whose trigger is a successful recruit-phase refresh or self-damage

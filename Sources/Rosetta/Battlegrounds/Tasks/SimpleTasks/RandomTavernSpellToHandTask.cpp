@@ -30,6 +30,7 @@ TaskStatus RandomTavernSpellToHandTask::Run(Player& player) {
     if (m_maxCost > 0 &&
         (costTag == card.gameTags.end() || costTag->second != m_maxCost))
         continue;
+    if (m_maxTier > 0 && card.GetTier() != m_maxTier) continue;
     pool.push_back(&card);
   }
   if (pool.empty()) return TaskStatus::STOP;

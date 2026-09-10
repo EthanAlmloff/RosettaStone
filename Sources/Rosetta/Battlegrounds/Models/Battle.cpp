@@ -163,6 +163,34 @@ Battle::Battle(Player& player1, Player& player2)
     m_player2.recruitField.ForEachAlive([](MinionData& data) { data.value().BeginPoetCombatSnapshot(false); });
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
+    // Powder Keg is a combat-copy aura.  Arm only the first three friendly
+    // Pirates at the combat boundary; the recruit entities remain untouched
+    // until a real persistent effect is committed by the normal battle path.
+    const auto armPowderKeg = [](Player& owner) {
+        int remaining = 0;
+        for (const auto& trinket : owner.season14.trinkets) {
+            if (!trinket.active || trinket.remainingUses == 0) continue;
+            const auto behavior = FindTrinketBehavior(
+                Cards::FindCardByDbfID(trinket.dbfID).id);
+            if (behavior.effect == TrinketEffect::START_COMBAT_POWDER_KEG)
+                remaining += behavior.value;
+        }
+        if (remaining == 0) return;
+        std::vector<Minion*> pirates;
+        owner.battleField.ForEachAlive([&pirates](MinionData& data) {
+            if (data.value().HasRace(Race::PIRATE))
+                pirates.push_back(&data.value());
+        });
+        // "Give 3 friendly Pirates" selects distinct eligible entities; the
+        // board order must not turn the effect into a leftmost-only buff.
+        Random::shuffle(pirates.begin(), pirates.end());
+        for (auto* pirate : pirates) {
+            if (remaining-- == 0) break;
+            pirate->SetPowderKegDeathrattleAttack(pirate->GetAttack());
+        }
+    };
+    armPowderKeg(m_player1);
+    armPowderKeg(m_player2);
     // Caduceus Reactor is a dynamic Deathrattle payload on the copied
     // Battlecruiser.  Arm the combat entity only; Battle's normal destroy
     // pipeline then applies the transfer to the left-most surviving minion.
@@ -1946,17 +1974,55 @@ void Battle::ProcessDestroy(bool beforeAttack)
         if (removedMinion.HasDeathrattle())
         {
             // BG24_Reward_113_ALT repeats the first friendly Deathrattle of
-            // each combat. The counter is reset at COMBAT_START and bumped
-            // only after this block, so this instance is resolved twice once.
-            const bool repeatFirstDeathrattle =
-                (owner.season14.HasGeneratedRewardRitualDaggerRepeat() &&
-                 owner.season14.deathrattlesTriggered == 0) ||
-                owner.season14.HasGeneratedRewardTurbulentTombs();
+            // each combat. Claim the first-deathrattle slot before executing
+            // any task: a source Deathrattle can synchronously kill another
+            // minion, and that nested death must not recursively qualify for
+            // Phylactery/Ritual Dagger/Tombs. The counter is reset at
+            // COMBAT_START and remains a combat-local event guard.
+            int repeatFirstDeathrattleCount = 0;
+            const bool firstDeathrattle =
+                owner.season14.deathrattlesTriggered == 0;
+            if (firstDeathrattle)
+                ++owner.season14.deathrattlesTriggered;
+            if (owner.season14.HasGeneratedRewardRitualDaggerRepeat() ||
+                owner.season14.HasGeneratedRewardTurbulentTombs())
+                repeatFirstDeathrattleCount = 1;
+            if (firstDeathrattle)
+                for (const auto& trinket : owner.season14.trinkets)
+                {
+                    if (!trinket.active || trinket.remainingUses == 0) continue;
+                    const auto behavior = FindTrinketBehavior(
+                        Cards::FindCardByDbfID(trinket.dbfID).id);
+                    if (behavior.effect == TrinketEffect::DEATHLY_PHYLACTERY)
+                        ++repeatFirstDeathrattleCount;
+                }
+            // Thornspike Pauldron is keyed to each Deathrattle trigger, not
+            // to the removed minion/death boundary.  In particular, a
+            // repeated first Deathrattle is two triggers.  Arm the temporary
+            // Blood Gem modifier immediately after each activation so any
+            // later Deathrattle activation (or other generated Gem) observes
+            // the modifier, while the activation that caused the trigger does
+            // not retroactively change its already-resolved Gems.
+            const auto armThornspike = [&owner]() {
+                for (const auto& trinket : owner.season14.trinkets)
+                {
+                    if (!trinket.active || trinket.remainingUses == 0) continue;
+                    const auto behavior = FindTrinketBehavior(
+                        Cards::FindCardByDbfID(trinket.dbfID).id);
+                    if (behavior.effect ==
+                        TrinketEffect::AFTER_DEATHRATTLE_TEMP_BLOOD_GEM_BONUS)
+                        owner.season14.AddTemporaryBloodGemBonus(behavior.attack, behavior.health);
+                }
+            };
             removedMinion.ActivateTask(
                 PowerType::DEATHRATTLE,
                 owner);
-            if (repeatFirstDeathrattle)
+            armThornspike();
+            for (int repeat = 0; repeat < repeatFirstDeathrattleCount; ++repeat)
+            {
                 removedMinion.ActivateTask(PowerType::DEATHRATTLE, owner);
+                armThornspike();
+            }
             // Unholy Sanctum resolves after the deathrattle and permanently
             // buffs the right-most surviving friendly minion.
             for (const auto& trinket : owner.season14.trinkets)
@@ -1984,7 +2050,6 @@ void Battle::ProcessDestroy(bool beforeAttack)
                 });
             }
             owner.ResolveGeneratedQuestRewardDeath(removedMinion);
-            ++owner.season14.deathrattlesTriggered;
             // Blood Amulet plays three permanent Blood Gems on distinct
             // random friendly minions after the Deathrattle boundary.  Build
             // the candidate list after the Deathrattle so summons/removals
@@ -2071,6 +2136,71 @@ void Battle::ProcessDestroy(bool beforeAttack)
             }
             owner.UpdateSkyGolemsForDeathrattle();
             owner.AdvanceDarkGiftCounters(2);
+        }
+
+        // Powder Keg is deliberately resolved after the source's ordinary
+        // Deathrattle chain.  Its marker is combat-copy state, so a dead
+        // Pirate's current Attack is preserved even when the recruit copy
+        // has a different persistent value.  The Sky Pirate is inserted
+        // through the normal summon lifecycle and immediately attacks via
+        // the same damage/death boundary as other generated attackers.
+        if (removedMinion.PowderKegDeathrattleAttack() > 0)
+        {
+            FieldZone& ownerField = std::get<0>(deadMinion) == 1 ? m_p1Field : m_p2Field;
+            FieldZone& enemyField = std::get<0>(deadMinion) == 1 ? m_p2Field : m_p1Field;
+            const Turn previousTurn = m_turn;
+            // A death pass can process the defending side first.  Immediate
+            // attacks must nevertheless resolve from the summoned Pirate's
+            // side, so target selection and attack-side hooks use ownerField.
+            const Turn ownerTurn = std::get<0>(deadMinion) == 1
+                                       ? Turn::PLAYER1
+                                       : Turn::PLAYER2;
+            const int attack = removedMinion.PowderKegDeathrattleAttack();
+            removedMinion.SetPowderKegDeathrattleAttack(0);
+            if (!ownerField.IsFull())
+            {
+                Player& sourceOwner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+                const Card token = Cards::FindCardByID("BGS_061t");
+                if (!token.id.empty())
+                {
+                    Minion pirate{token};
+                    pirate.SetAttack(attack);
+                    pirate.SetHealth(1);
+                    sourceOwner.ApplyFreshMinionModifiers(pirate);
+                    pirate.getPlayerCallback = [&sourceOwner]() -> Player& { return sourceOwner; };
+                    if (sourceOwner.getNextCardIndexCallback)
+                        pirate.SetIndex(sourceOwner.getNextCardIndexCallback());
+                    ownerField.Add(pirate, ownerField.GetCount());
+                    Minion& summoned = ownerField[ownerField.GetCount() - 1];
+                    ownerField.ForEachAlive([&summoned](MinionData& data) {
+                        data.value().ActivateTrigger(TriggerType::SUMMON, summoned);
+                    });
+                    sourceOwner.ApplySummonTrinkets(summoned);
+                    if (HasAttackableTarget(enemyField))
+                    {
+                        m_turn = ownerTurn;
+                        Minion& target = GetProperTarget(summoned);
+                        AttackingStateGuard attacking(summoned);
+                        if (summoned.HasRace(Race::PIRATE))
+                            sourceOwner.season14.OnFriendlyPirateAttack();
+                        sourceOwner.season14.OnFriendlyMinionAttack();
+                        target.TakeDamage(summoned);
+                        summoned.TakeDamage(target);
+                        m_killContext = KillContext{
+                            summoned.GetIndex(),
+                            ownerTurn == Turn::PLAYER1 ? 1 : 2,
+                            true};
+                        ProcessDestroy(false);
+                        m_killContext = {};
+                    }
+                }
+            }
+            else
+            {
+                Player& sourceOwner = std::get<0>(deadMinion) == 1 ? m_player1 : m_player2;
+                sourceOwner.ApplySummonOverflowTrinkets();
+            }
+            m_turn = previousTurn;
         }
 
         // Sr. Tomb Diver resolves after the deathrattle event has selected
@@ -2487,6 +2617,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
     // space for the exact snapshot.
     (void)m_player1.TryResolveRapidReanimationIfSpace(m_p1Field);
     (void)m_player2.TryResolveRapidReanimationIfSpace(m_p2Field);
+    (void)m_player1.TryResolveSoulFermenterIfSpace(m_p1Field);
+    (void)m_player2.TryResolveSoulFermenterIfSpace(m_p2Field);
     TryFireQueuedLockAndLoad();
 }
 

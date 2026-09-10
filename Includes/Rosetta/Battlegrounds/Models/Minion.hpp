@@ -472,6 +472,9 @@ class Minion
     bool DeathrattleStatTransferToAll() const;
     void SetEarthElementalDeathrattle(bool enabled);
     bool HasEarthElementalDeathrattle() const;
+    //! Arms Powder Keg's combat-only Pirate deathrattle payload.
+    void SetPowderKegDeathrattleAttack(int attack);
+    int PowderKegDeathrattleAttack() const noexcept;
     int DeathrattleAttackTransfer() const;
     int DeathrattleHealthTransfer() const;
     void SetDarkGiftCounter(int attack, int health, int kind,
@@ -506,7 +509,19 @@ class Minion
     //! \return true if this entity is frozen, false otherwise.
     bool IsFrozen() const;
     bool IsHandLocked() const { return m_handLocked; }
-    void SetHandLocked(bool locked) { m_handLocked = locked; }
+    void SetHandLocked(bool locked) {
+        m_handLocked = locked;
+        if (!locked) m_handLockTurns = 0;
+        else if (m_handLockTurns <= 0) m_handLockTurns = 1;
+    }
+    void SetHandLockedForTurns(int turns) {
+        m_handLockTurns = std::max(0, turns);
+        m_handLocked = m_handLockTurns > 0;
+    }
+    void AdvanceHandLockTurn() {
+        if (m_handLockTurns > 0) --m_handLockTurns;
+        m_handLocked = m_handLockTurns > 0;
+    }
     bool HasCombinedChooseOne() const { return m_combinedChooseOne; }
     void SetCombinedChooseOne(bool enabled) { m_combinedChooseOne = enabled; }
     bool DiesAtRecruitEnd() const { return m_diesAtRecruitEnd; }
@@ -689,6 +704,7 @@ class Minion
     int m_deathrattleHealthTransfer = 0;
     bool m_deathrattleStatTransferToAll = false;
     bool m_earthElementalDeathrattle = false;
+    int m_powderKegDeathrattleAttack = 0;
     int m_skyGolemDeathrattleCount = 0;
     int m_eternalKnightDeathCountApplied = 0;
     int m_eternalKnightUndeadDeathCountApplied = 0;
@@ -730,6 +746,7 @@ class Minion
     bool m_magnetizationArmed = false;
     int m_magnetizationCount = 0;
     bool m_handLocked = false;
+    int m_handLockTurns = 0;
     bool m_combinedChooseOne = false;
     bool m_diesAtRecruitEnd = false;
     int m_activateUses = 1;

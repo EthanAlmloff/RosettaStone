@@ -318,10 +318,13 @@ void Season14State::BeginDecision(
         windfallRemaining = 0;
         pendingTavernReplacementSlot = -1;
         pendingTavernReplacementTier = 0;
+        pendingTrinketReplacementSlot = -1;
+        pendingTripVouchersOffer = false;
         chooseOne = {};
         spellModal = {};
         transformModal = {};
         pendingHandLock = false;
+        pendingHandLockTurns = 0;
         return;
     }
 
@@ -329,12 +332,14 @@ void Season14State::BeginDecision(
     pendingOfferings = std::move(offerings);
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
+    pendingTrinketReplacementSlot = -1;
     pendingTavernReplacementSlot = -1;
     pendingTavernReplacementTier = 0;
     chooseOne = {};
     spellModal = {};
     transformModal = {};
     pendingHandLock = false;
+    pendingHandLockTurns = 0;
     if (decision == Season14Decision::CHOICE ||
         decision == Season14Decision::DISCOVER)
     {
@@ -357,9 +362,11 @@ void Season14State::BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t t
     pendingSourceCardDbfID = 0;
     pendingTavernReplacementSlot = -1;
     pendingTavernReplacementTier = 0;
+    pendingTrinketReplacementSlot = -1;
     chooseOne = { true, sourceEntityID, targetMask, sourceCardDbfID };
     spellModal = {};
     pendingHandLock = false;
+    pendingHandLockTurns = 0;
 }
 
 void Season14State::BeginSpellTargetChoice(
@@ -420,6 +427,7 @@ bool Season14State::SelectSpellTargetChoice(std::size_t offeringIndex,
     spellModal = {};
     pendingDecision = Season14Decision::NONE;
     pendingSourceCardDbfID = 0;
+    pendingTrinketReplacementSlot = -1;
     pendingTavernReplacementSlot = -1;
     pendingTavernReplacementTier = 0;
     pendingSourceEntityID = 0;
@@ -658,6 +666,16 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
     liftOffUpgradesBoughtThisTurn = 0;
     liftOffFreeUpgradeAvailable = false;
     soldMinionsThisTurn = 0;
+    // Gem Donation is a first-sale-per-recruit-turn trigger.  Keep its
+    // consumed marker on the owned Trinket instance so duplicate copies do
+    // not share cadence, and reset each copy at the recruit boundary.
+    for (auto& trinket : trinkets) {
+        if (!trinket.active || trinket.remainingUses == 0) continue;
+        const auto card = Cards::FindCardByDbfID(trinket.dbfID);
+        if (FindTrinketBehavior(card.id).effect ==
+            TrinketEffect::AFTER_FIRST_SELL_BLOOD_GEMS_TAVERN)
+            trinket.triggerProgress = 0;
+    }
     repeatedPlayCardIDs.clear();
     temporaryMinionPurchaseCost = -1;
     buddyAvengeDeaths = 0;
@@ -1082,7 +1100,21 @@ std::int32_t Season14State::ConsumeTavernSpellDiscount() noexcept
 
 std::pair<std::int32_t, std::int32_t> Season14State::BloodGemStats() const noexcept
 {
-    return { 1 + bloodGemAttackBonus, 1 + bloodGemHealthBonus };
+    return { 1 + bloodGemAttackBonus + temporaryBloodGemAttackBonus,
+             1 + bloodGemHealthBonus + temporaryBloodGemHealthBonus };
+}
+
+void Season14State::AddTemporaryBloodGemBonus(std::int32_t attack,
+                                              std::int32_t health) noexcept
+{
+    temporaryBloodGemAttackBonus += attack;
+    temporaryBloodGemHealthBonus += health;
+}
+
+void Season14State::ResetTemporaryBloodGemBonus() noexcept
+{
+    temporaryBloodGemAttackBonus = 0;
+    temporaryBloodGemHealthBonus = 0;
 }
 
 void Season14State::AddTavernSpellHealthBonus(std::int32_t health) noexcept
@@ -1841,6 +1873,17 @@ void Season14State::ArmRefreshRandomShopStats(std::int32_t attack,
 {
     refreshRandomShopAttack += attack;
     refreshRandomShopHealth += health;
+    refreshRandomShopStatApplications.emplace_back(attack, health);
+}
+
+std::vector<std::pair<std::int32_t, std::int32_t>>
+Season14State::ConsumeRefreshRandomShopStatApplications() noexcept
+{
+    auto result = std::move(refreshRandomShopStatApplications);
+    refreshRandomShopStatApplications.clear();
+    refreshRandomShopAttack = 0;
+    refreshRandomShopHealth = 0;
+    return result;
 }
 
 std::pair<std::int32_t, std::int32_t>
@@ -1849,6 +1892,7 @@ Season14State::RefreshRandomShopStats() noexcept
     const auto result = std::make_pair(refreshRandomShopAttack, refreshRandomShopHealth);
     refreshRandomShopAttack = 0;
     refreshRandomShopHealth = 0;
+    refreshRandomShopStatApplications.clear();
     return result;
 }
 

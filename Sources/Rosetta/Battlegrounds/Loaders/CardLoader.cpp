@@ -393,7 +393,14 @@ void CardLoader::Load(std::array<Card, NUM_BATTLEGROUNDS_CARDS>& cards)
         card.normalDbfID = normalDbfID;
         card.premiumDbfID = premiumDbfID;
         card.heroPowerDbfID = MetadataInt(cardData, "heroPowerDbfId");
+        // Hero records in the HearthstoneJSON snapshot expose their Buddy
+        // through battlegroundsBuddyDbfId.  Keep battlegroundsRelatedCard as
+        // the generic/generated-card relationship, but use the Buddy field
+        // when it is the only relationship present.  Player code relies on
+        // relatedDbfID for the typed hero-power -> Buddy mapping.
         card.relatedDbfID = MetadataInt(cardData, "battlegroundsRelatedCard");
+        if (card.relatedDbfID == 0)
+            card.relatedDbfID = MetadataInt(cardData, "battlegroundsBuddyDbfId");
         card.name = name;
         card.text = text;
         card.isCurHero = isBattlegroundsHero;

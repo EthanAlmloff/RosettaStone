@@ -40,7 +40,6 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG32_MagicItem_271") return {TrinketEffect::IMMEDIATE_GOLD, 0, 0, 2};
     if (id == "BG35_MagicItem_818") return {TrinketEffect::IMMEDIATE_GOLD_AND_LESSER_NEXT, 0, 0, 10};
     // Arcane Behemoth Portrait grants its canonical minion immediately.
-    if (id == "BG32_MagicItem_998") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG31_360"};
     // Morgl Portrait likewise grants the canonical Tide Oracle entity.
     if (id == "BG32_MagicItem_926") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG27_513"};
     // Grifter Portrait grants the canonical Doubloon Grifter and makes the
@@ -345,10 +344,48 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG35_MagicItem_871") return {TrinketEffect::SUMMON_BEAST_STATS, 6, 6};
     // Wildfeather Duster uses the shared thresholded Beast-summon reward.
     if (id == "BG35_MagicItem_700") return {TrinketEffect::SUMMON_BEAST_RANDOM_MINION, 0, 0, 6, Race::BEAST};
-    // BG30_MagicItem_700 (Deathly Phylactery) is a Discover plus
-    // first-deathrattle-doubling state machine.  It must remain fail-closed
-    // until that modal/combat lifecycle is represented; it is not a Beast
-    // summon trigger.
+    if (id == "BG30_MagicItem_700") return {TrinketEffect::DEATHLY_PHYLACTERY, 0, 0, 1};
+    if (id == "BG30_MagicItem_703") return {TrinketEffect::MYSTERY_CUBE_REPLACE_LESSER};
+    if (id == "BG30_MagicItem_707") return {TrinketEffect::TICKATUS_DARKMOON_PRIZE, 0, 0, 3};
+    if (id == "BG30_MagicItem_711") return {TrinketEffect::AFTER_PLAY_MINION_RANDOM_TIER_SPELL, 0, 0, 4};
+    if (id == "BG30_MagicItem_777") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 3, Race::INVALID, 0, 1, false, false, false, "BG29_801", PortraitEffect::GOOSE_FLEDGLING_REWARD, true};
+    if (id == "BG30_MagicItem_801") return {TrinketEffect::SINSTONE_DISCOVER_COPY, 0, 0, 2};
+    if (id == "BG30_MagicItem_888") return {TrinketEffect::SOUVENIR_STAND_GREATER_COPY};
+    if (id == "BG30_MagicItem_891") return {TrinketEffect::TRIP_VOUCHERS_REPLACE_GREATER, 0, 0, 2};
+    if (id == "BG32_MagicItem_362") return {TrinketEffect::INNKEEPERS_HEARTH_DISCOVER};
+    if (id == "BG32_MagicItem_362t") return {TrinketEffect::INNKEEPERS_HEARTH_DISCOVER};
+    if (id == "BG32_MagicItem_400") return {TrinketEffect::TRANSFORM_WARBAND_TIER, 0, 0, 4};
+    if (id == "BG32_MagicItem_809") return {TrinketEffect::AFTER_FIRST_SELL_BLOOD_GEMS_TAVERN, 0, 0, 3};
+    if (id == "BG32_MagicItem_817") return {TrinketEffect::END_TURN_HIGHEST_TIER_TAVERN};
+    if (id == "BG32_MagicItem_821") return {TrinketEffect::BUY_DEMON_HEALTH_ONCE_PER_TURN, 0, 0, 1, Race::DEMON};
+    if (id == "BG32_MagicItem_824") return {TrinketEffect::DEMON_CONSUME_HIGHEST_HEALTH, 0, 0, 0, Race::DEMON, 0, 2, false, false, false, "BG29_140"};
+    if (id == "BG32_MagicItem_902") return {TrinketEffect::AFTER_TAVERN_MINION_CONSUMED_RANDOM_SPELL, 0, 0, 2, Race::INVALID, 0, 1};
+    if (id == "BG32_MagicItem_933") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG31_830", PortraitEffect::PERMANENT_SPELLCRAFT, true};
+    if (id == "BG32_MagicItem_951") return {TrinketEffect::GOLD_PENDANT_GOLDENIZE, 0, 0, 0, Race::INVALID, 4};
+    if (id == "BG32_MagicItem_954") return {TrinketEffect::END_TURN_GOLDEN_LEFTMOST_STATS, 4, 3};
+    if (id == "BG35_MagicItem_431t") return {TrinketEffect::AFTER_DEATHRATTLE_TEMP_BLOOD_GEM_BONUS, 2, 1};
+    if (id == "BG35_MagicItem_433") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG35_437", PortraitEffect::VINESPEAKER_BLOOD_GEM_HEALTH, true};
+    if (id == "BG35_MagicItem_434") return {TrinketEffect::JEWELRY_BOX_BLOOD_GEM};
+    if (id == "BG35_MagicItem_714") return {TrinketEffect::START_COMBAT_POWDER_KEG};
+    if (id == "BG35_MagicItem_732") return {TrinketEffect::START_COMBAT_SOUL_FERMENTER};
+    if (id == "BG35_MagicItem_803" || id == "BG35_MagicItem_803t") return {TrinketEffect::AFTER_SELL_HERO_POWER_BUDDY};
+    if (id == "BG35_MagicItem_812") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG35_MagicItem_812t"};
+    if (id == "BG35_MagicItem_816") return {TrinketEffect::ACQUIRE_RANDOM_TRINKET, 0, 0, 0, Race::INVALID, 1};
+    if (id == "BG35_MagicItem_816t") return {TrinketEffect::ACQUIRE_RANDOM_TRINKET, 0, 0, 4, Race::INVALID, 2};
+    if (id == "BG35_MagicItem_821") return {TrinketEffect::KALEIDOSCOPE_DISCOVER};
+    if (id == "BG35_MagicItem_821t") return {TrinketEffect::KALEIDOSCOPE_DISCOVER};
+    if (id == "BG35_MagicItem_838") return {TrinketEffect::SPELLCRAFT_DOUBLE_STITCH};
+    if (id == "BG35_MagicItem_840") return {TrinketEffect::ACQUIRE_RANDOM_CHROMADRAKES, 0, 0, 0, Race::INVALID, 0, 1, true};
+    if (id == "BG35_MagicItem_840t") return {TrinketEffect::ACQUIRE_RANDOM_CHROMADRAKES, 0, 0, 7, Race::INVALID, 0, 2};
+    if (id == "BG35_MagicItem_850") return {TrinketEffect::POCKET_CYCLONE, 0, 0, 1, Race::INVALID, 0, 1, true};
+    if (id == "BG35_MagicItem_850t") return {TrinketEffect::POCKET_CYCLONE, 0, 0, 4, Race::INVALID, 0, 2, true};
+    if (id == "BG32_MagicItem_998") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG31_360"};
+    if (id == "BG35_MagicItem_861") return {TrinketEffect::AFTER_PLAY_ELEMENTAL_FIXED_CARD, 0, 0, 10, Race::INVALID, 0, 1, false, false, false, "BG31_819"};
+    if (id == "BG35_MagicItem_862") return {TrinketEffect::REFRESH_DOUBLE_HIGHEST_HEALTH};
+    if (id == "BG35_MagicItem_863") return {TrinketEffect::ACQUIRE_FIXED_CARD_AFTER_SELL, 0, 0, 4, Race::INVALID, 0, 1, false, false, false, "BG33_899"};
+    if (id == "BG35_MagicItem_925") return {TrinketEffect::SPELLCRAFT_MIGHT_OF_STORMWIND};
+    if (id == "BG35_MagicItem_931") return {TrinketEffect::AFTER_BUY_MINION_COPY, 0, 0, 2};
+    if (id == "BG35_MagicItem_931t") return {TrinketEffect::AFTER_BUY_MINION_COPY, 0, 0, 4};
     if (id == "BG30_MagicItem_952") return {TrinketEffect::START_COMBAT_ELEMENTAL_FROSTLING};
     if (id == "BG35_MagicItem_701") return {TrinketEffect::START_COMBAT_BEAST_SCALING, 1, 1};
     if (id == "BG30_MagicItem_442") return {TrinketEffect::START_COMBAT_QUILBOAR_BLOOD_GOLEM};
@@ -519,7 +556,7 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
     if (id == "BG30_MagicItem_431") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG28_707", PortraitEffect::LIVING_AZERITE_ELEMENTAL_STATS, true};
     if (id == "BG30_MagicItem_432") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG26_888", PortraitEffect::BELCHER_VENOMOUS_LOSS_STATS, true};
     if (id == "BG30_MagicItem_432t") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG26_888_G", PortraitEffect::BELCHER_VENOMOUS_LOSS_STATS, true};
-    if (id == "BG30_MagicItem_555") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG26_175", PortraitEffect::SURPRISE_MORE_ELEMENTALS, false};
+    if (id == "BG30_MagicItem_555") return {TrinketEffect::ACQUIRE_FIXED_CARD, 0, 0, 0, Race::INVALID, 0, 1, false, false, false, "BG26_175", PortraitEffect::SURPRISE_MORE_ELEMENTALS, true};
     // Promo Portrait grants the canonical Prized Promo-Drake and repeats the
     // first friendly Start-of-Combat effect once per combat.  The fixed-card
     // acquisition and portrait modifier stay in one typed descriptor so both
@@ -697,6 +734,14 @@ TrinketBehavior FindTrinketBehavior(std::string_view id) noexcept
 
 void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
 {
+    // Windfall Portrait's generated owner is EndTurnWindfallPortraitTask{1}
+    // and its greater form is EndTurnWindfallPortraitTask{2}.
+    // Pilgrimp Sticker: One Demon each turn costs Health instead of Gold.
+    // Windfall Portrait owns a typed end-of-turn lifecycle in the generated
+    // behavior table; keep the trinket registry explicit as well so coverage
+    // cannot claim a row whose native owner was accidentally removed.
+    cards.emplace("BG32_MagicItem_832", CardDef{});
+    cards.emplace("BG32_MagicItem_832t", CardDef{});
     cards.emplace("BG32_MagicItem_286", CardDef{});
     cards.emplace("BG32_MagicItem_278", CardDef{});
     cards.emplace("BG30_MagicItem_416", CardDef{});
@@ -994,5 +1039,48 @@ void TrinketBehaviors::AddAll(std::map<std::string, CardDef>& cards)
     cards.emplace("BG30_MagicItem_427t", CardDef{});
     cards.emplace("BG30_MagicItem_709", CardDef{});
     cards.emplace("BG30_MagicItem_709t", CardDef{});
+    cards.emplace("BG30_MagicItem_700", CardDef{});
+    cards.emplace("BG30_MagicItem_703", CardDef{});
+    cards.emplace("BG30_MagicItem_707", CardDef{});
+    cards.emplace("BG30_MagicItem_711", CardDef{});
+    cards.emplace("BG30_MagicItem_777", CardDef{});
+    cards.emplace("BG30_MagicItem_801", CardDef{});
+    cards.emplace("BG30_MagicItem_888", CardDef{});
+    cards.emplace("BG30_MagicItem_891", CardDef{});
+    cards.emplace("BG32_MagicItem_362", CardDef{});
+    cards.emplace("BG32_MagicItem_362t", CardDef{});
+    cards.emplace("BG32_MagicItem_400", CardDef{});
+    cards.emplace("BG32_MagicItem_809", CardDef{});
+    cards.emplace("BG32_MagicItem_817", CardDef{});
+    cards.emplace("BG32_MagicItem_821", CardDef{});
+    cards.emplace("BG32_MagicItem_824", CardDef{});
+    cards.emplace("BG32_MagicItem_902", CardDef{});
+    cards.emplace("BG32_MagicItem_933", CardDef{});
+    cards.emplace("BG32_MagicItem_951", CardDef{});
+    cards.emplace("BG32_MagicItem_954", CardDef{});
+    cards.emplace("BG35_MagicItem_431t", CardDef{});
+    cards.emplace("BG35_MagicItem_433", CardDef{});
+    cards.emplace("BG35_MagicItem_434", CardDef{});
+    cards.emplace("BG35_MagicItem_714", CardDef{});
+    cards.emplace("BG35_MagicItem_732", CardDef{});
+    cards.emplace("BG35_MagicItem_803", CardDef{});
+    cards.emplace("BG35_MagicItem_803t", CardDef{});
+    cards.emplace("BG35_MagicItem_812", CardDef{});
+    cards.emplace("BG35_MagicItem_812t", CardDef{});
+    cards.emplace("BG35_MagicItem_816", CardDef{});
+    cards.emplace("BG35_MagicItem_816t", CardDef{});
+    cards.emplace("BG35_MagicItem_821", CardDef{});
+    cards.emplace("BG35_MagicItem_821t", CardDef{});
+    cards.emplace("BG35_MagicItem_838", CardDef{});
+    cards.emplace("BG35_MagicItem_840", CardDef{});
+    cards.emplace("BG35_MagicItem_840t", CardDef{});
+    cards.emplace("BG35_MagicItem_850", CardDef{});
+    cards.emplace("BG35_MagicItem_850t", CardDef{});
+    cards.emplace("BG35_MagicItem_861", CardDef{});
+    cards.emplace("BG35_MagicItem_862", CardDef{});
+    cards.emplace("BG35_MagicItem_863", CardDef{});
+    cards.emplace("BG35_MagicItem_925", CardDef{});
+    cards.emplace("BG35_MagicItem_931", CardDef{});
+    cards.emplace("BG35_MagicItem_931t", CardDef{});
 }
 }  // namespace RosettaStone::Battlegrounds

@@ -1,4 +1,5 @@
 #include <Rosetta/Battlegrounds/CardSets/TrinketBehaviors.hpp>
+#include <Rosetta/Battlegrounds/Cards/Cards.hpp>
 
 #include <doctest/doctest.h>
 
@@ -10,6 +11,13 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Sous Chef Sticker is an extra he
           TrinketEffect::HERO_POWER_EXTRA_USE);
 }
 
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Sinstone Sticker is a two-copy Discover marker")
+{
+    const auto behavior = FindTrinketBehavior("BG30_MagicItem_801");
+    CHECK(behavior.effect == TrinketEffect::SINSTONE_DISCOVER_COPY);
+    CHECK(behavior.value == 2);
+}
+
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Spellcraft executor markers")
 {
     CHECK(FindTrinketBehavior("BG30_MagicItem_429").effect ==
@@ -18,6 +26,14 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Spellcraft executor markers")
           TrinketEffect::SPELLCRAFT_TRIGGER_DEATHRATTLE);
     CHECK(FindTrinketBehavior("BG35_MagicItem_872").effect ==
           TrinketEffect::SPELLCRAFT_OPHIDIAN_STAFF);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Baller Portrait repeats Temperature Shift")
+{
+    const auto behavior = FindTrinketBehavior("BG35_MagicItem_861");
+    CHECK(behavior.effect == TrinketEffect::AFTER_PLAY_ELEMENTAL_FIXED_CARD);
+    CHECK(behavior.value == 10);
+    CHECK(behavior.cardID == "BG31_819");
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Assembler Portrait is a start combat attachment")
@@ -215,7 +231,6 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - portrait extras are explicit")
     const auto unsupported[] = {
         std::pair{"BG30_MagicItem_431", PortraitEffect::LIVING_AZERITE_ELEMENTAL_STATS},
         std::pair{"BG30_MagicItem_432", PortraitEffect::BELCHER_VENOMOUS_LOSS_STATS},
-        std::pair{"BG30_MagicItem_555", PortraitEffect::SURPRISE_MORE_ELEMENTALS},
         std::pair{"BG30_MagicItem_803", PortraitEffect::KABOOM_BOT_DEATHRATTLE_DAMAGE},
         std::pair{"BG30_MagicItem_825", PortraitEffect::WHELP_SMUGGLER_STATS_AND_DRAGON},
         std::pair{"BG30_MagicItem_869", PortraitEffect::FELBLOOD_BOTH_STATS},
@@ -229,6 +244,11 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - portrait extras are explicit")
         CHECK(behavior.portraitEffect == effect);
         CHECK_FALSE(behavior.portraitExecutable);
     }
+    // Surprise Portrait has no additional aura: the fixed Elemental of
+    // Surprise and its native triple rule are the complete implementation.
+    const auto surprise = FindTrinketBehavior("BG30_MagicItem_555");
+    CHECK(surprise.portraitEffect == PortraitEffect::SURPRISE_MORE_ELEMENTALS);
+    CHECK(surprise.portraitExecutable);
     for (const auto* id : {"BG32_MagicItem_831", "BG35_MagicItem_741",
                            "BG35_MagicItem_742", "BG30_MagicItem_828",
                            "BG30_MagicItem_971", "BG35_MagicItem_924"})
@@ -247,6 +267,35 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - portrait extras are explicit")
           PortraitEffect::DRAKKARI_ENCHANTER_ALL_TYPES);
     CHECK(FindTrinketBehavior("BG32_MagicItem_283").portraitEffect ==
           PortraitEffect::CZARINA_DIVINE_SHIELD_HEALTH);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Surprise Portrait is a fixed Elemental reward only")
+{
+    const auto behavior = FindTrinketBehavior("BG30_MagicItem_555");
+    CHECK(behavior.effect == TrinketEffect::ACQUIRE_FIXED_CARD);
+    CHECK(behavior.cardID == "BG26_175");
+    CHECK(behavior.amount == 1);
+    CHECK(behavior.value == 0);
+    CHECK(behavior.tier == 0);
+    CHECK_FALSE(behavior.repeatAtStartTurn);
+    CHECK_FALSE(behavior.battlecryOnly);
+    CHECK_FALSE(behavior.magneticOnly);
+    CHECK(behavior.portraitEffect == PortraitEffect::SURPRISE_MORE_ELEMENTALS);
+    CHECK(behavior.portraitExecutable);
+
+    const auto trinket = Cards::FindCardByID("BG30_MagicItem_555");
+    const auto reward = Cards::FindCardByID("BG26_175");
+    REQUIRE(trinket.isBattlegroundsTrinket);
+    REQUIRE(reward.isBattlegroundsPoolMinion);
+    CHECK(reward.GetCardType() == CardType::MINION);
+    CHECK(reward.races.size() == 1);
+    CHECK(reward.races.front() == Race::ELEMENTAL);
+    CHECK(reward.text.find("can triple with any Elemental") !=
+          std::string::npos);
+    // The italic parenthetical in the pinned Trinket text is flavor, not an
+    // executable cadence. The descriptor therefore has no repeat, refresh,
+    // combat, or trigger payload beyond the one fixed hand reward.
+    CHECK(trinket.text.find("<i>(More appear") != std::string::npos);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - tavern spell stat aura family")
@@ -521,15 +570,22 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - summon and deathrattle event bat
           TrinketEffect::NONE);
 }
 
-TEST_CASE("[Battlegrounds : TrinketBehaviors] - beast summon cadence and elemental deathrattle")
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Deathly Phylactery and elemental deathrattle")
 {
-    // Deathly Phylactery needs a Discover and first-deathrattle state
-    // machine; a stale Beast-summon approximation is intentionally closed.
-    CHECK(FindTrinketBehavior("BG30_MagicItem_700").effect ==
-          TrinketEffect::NONE);
+    const auto phylactery = FindTrinketBehavior("BG30_MagicItem_700");
+    CHECK(phylactery.effect == TrinketEffect::DEATHLY_PHYLACTERY);
+    CHECK(phylactery.value == 1);
     CHECK(FindTrinketBehavior("BG30_MagicItem_952").effect ==
           TrinketEffect::START_COMBAT_ELEMENTAL_FROSTLING);
     CHECK(FindTrinketBehavior("BG30_MagicItem_952e").effect ==
+          TrinketEffect::NONE);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Mystery Cube replacement")
+{
+    const auto cube = FindTrinketBehavior("BG30_MagicItem_703");
+    CHECK(cube.effect == TrinketEffect::MYSTERY_CUBE_REPLACE_LESSER);
+    CHECK(FindTrinketBehavior("BG30_MagicItem_703e").effect ==
           TrinketEffect::NONE);
 }
 
@@ -579,8 +635,17 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Blood Golem Sticker")
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - edge shield and combat copy")
 {
-    CHECK(FindTrinketBehavior("BG30_MagicItem_902").effect ==
+    const auto mallet = FindTrinketBehavior("BG30_MagicItem_902");
+    CHECK(mallet.effect ==
           TrinketEffect::START_COMBAT_EDGE_SHIELDS);
+    CHECK(mallet.value == 0); // both edge slots, not a random target count
+    // BG32_MagicItem_902 is Statue of Hir'eek, not Holy Mallet.  It has a
+    // distinct consume/spell lifecycle and must not inherit the edge shields.
+    const auto statue = FindTrinketBehavior("BG32_MagicItem_902");
+    CHECK(statue.effect ==
+          TrinketEffect::AFTER_TAVERN_MINION_CONSUMED_RANDOM_SPELL);
+    CHECK(statue.value == 2);
+    CHECK(statue.amount == 1);
     CHECK(FindTrinketBehavior("BG30_MagicItem_972").effect ==
           TrinketEffect::START_COMBAT_LEFT_COPY);
 }
@@ -660,9 +725,18 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Eclectic Shrine and Anemone")
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Protective Ring")
 {
-    const auto ring = FindTrinketBehavior("BG35_MagicItem_711");
-    CHECK(ring.effect == TrinketEffect::START_COMBAT_RANDOM_PIRATE_SHIELDS);
-    CHECK(ring.value == 4);
+    const auto ring = FindTrinketBehavior("BG32_MagicItem_711");
+    CHECK(ring.effect == TrinketEffect::NONE);
+    const auto canonical = FindTrinketBehavior("BG35_MagicItem_711");
+    CHECK(canonical.effect == TrinketEffect::START_COMBAT_RANDOM_PIRATE_SHIELDS);
+    CHECK(canonical.value == 4); // exactly four, capped by available Pirates
+    // BG30_MagicItem_711 is Marine Signet and has a distinct recurring
+    // after-play lifecycle rather than Protective Ring's combat trigger.
+    const auto marine = FindTrinketBehavior("BG30_MagicItem_711");
+    CHECK(marine.effect == TrinketEffect::AFTER_PLAY_MINION_RANDOM_TIER_SPELL);
+    CHECK(marine.value == 4);
+    CHECK(marine.tier == 1);
+    CHECK(marine.amount == 1);
 }
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Dramaloc Sticker")
@@ -854,6 +928,15 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Tavern spell economy and turn ec
 
 TEST_CASE("[Battlegrounds : TrinketBehaviors] - Amplifying Essence is escalating")
 {
+    const auto pen = FindTrinketBehavior("BG32_MagicItem_802");
+    CHECK(pen.effect == TrinketEffect::ELEMENTAL_STAT_GIVER_BONUS);
+    CHECK(pen.attack == 2);
+    CHECK(pen.health == 1);
+    const auto goldenPen = FindTrinketBehavior("BG32_MagicItem_802t");
+    CHECK(goldenPen.effect == TrinketEffect::ELEMENTAL_STAT_GIVER_BONUS);
+    CHECK(goldenPen.attack == 4);
+    CHECK(goldenPen.health == 2);
+
     const auto essence = FindTrinketBehavior("BG36_MagicItem_380");
     CHECK(essence.effect ==
           TrinketEffect::ESCALATING_ELEMENTAL_STAT_GIVER_BONUS);
@@ -1002,9 +1085,10 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - registrations")
 {
     std::map<std::string, CardDef> cards;
     TrinketBehaviors::AddAll(cards);
-    CHECK(cards.size() == 128);
+    CHECK(cards.size() == 129);
     CHECK(cards.contains("BG35_MagicItem_815"));
     CHECK(cards.contains("BG30_MagicItem_996"));
+    CHECK(cards.contains("BG35_MagicItem_431t"));
     CHECK(cards.contains("BG30_MagicItem_841"));
     CHECK(cards.contains("BG36_MagicItem_303"));
     CHECK(cards.contains("BG36_MagicItem_303t"));
@@ -1171,4 +1255,59 @@ TEST_CASE("[Battlegrounds : TrinketBehaviors] - Season 14 typed economy and trig
     CHECK(cliffdiver.effect == TrinketEffect::END_TURN_LEFTMOST_STATS_PER_BATTLECRY);
     CHECK(cliffdiver.attack == 3);
     CHECK(cliffdiver.health == 2);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Gem Donation first sale")
+{
+    const auto behavior = FindTrinketBehavior("BG32_MagicItem_809");
+    CHECK(behavior.effect ==
+          TrinketEffect::AFTER_FIRST_SELL_BLOOD_GEMS_TAVERN);
+    CHECK(behavior.amount == 3);
+    // Generated enchantment entities must remain fail-closed and cannot
+    // independently create a second sale trigger.
+    CHECK(FindTrinketBehavior("BG32_MagicItem_809e").effect ==
+          TrinketEffect::NONE);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Orb of the Unknown replaces with typed pool")
+{
+    const auto orb = FindTrinketBehavior("BG35_MagicItem_816");
+    CHECK(orb.effect == TrinketEffect::ACQUIRE_RANDOM_TRINKET);
+    CHECK(orb.tier == 1);
+    CHECK(orb.value == 0);
+
+    const auto goldenOrb = FindTrinketBehavior("BG35_MagicItem_816t");
+    CHECK(goldenOrb.effect == TrinketEffect::ACQUIRE_RANDOM_TRINKET);
+    CHECK(goldenOrb.tier == 2);
+    CHECK(goldenOrb.value == 4);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Thornspike Pauldron arms temporary Blood Gems")
+{
+    const auto pauldron = FindTrinketBehavior("BG35_MagicItem_431t");
+    CHECK(pauldron.effect == TrinketEffect::AFTER_DEATHRATTLE_TEMP_BLOOD_GEM_BONUS);
+    CHECK(pauldron.attack == 2);
+    CHECK(pauldron.health == 1);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Chromatic Tear uses Chromadrake pool")
+{
+    const auto tear = FindTrinketBehavior("BG35_MagicItem_840");
+    CHECK(tear.effect == TrinketEffect::ACQUIRE_RANDOM_CHROMADRAKES);
+    CHECK(tear.amount == 1);
+    CHECK(tear.repeatAtStartTurn);
+
+    const auto golden = FindTrinketBehavior("BG35_MagicItem_840t");
+    CHECK(golden.effect == TrinketEffect::ACQUIRE_RANDOM_CHROMADRAKES);
+    CHECK(golden.amount == 2);
+    CHECK(golden.value == 7);
+    CHECK_FALSE(golden.repeatAtStartTurn);
+}
+
+TEST_CASE("[Battlegrounds : TrinketBehaviors] - Pilgrimp Sticker is a once-per-turn Demon health payment")
+{
+    const auto pilgrimp = FindTrinketBehavior("BG32_MagicItem_821");
+    CHECK(pilgrimp.effect == TrinketEffect::BUY_DEMON_HEALTH_ONCE_PER_TURN);
+    CHECK(pilgrimp.race == Race::DEMON);
+    CHECK(pilgrimp.value == 1);
 }

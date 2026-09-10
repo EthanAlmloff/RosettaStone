@@ -91,6 +91,10 @@ class Player
     void ResolveEnigmaticHeadstoneEndTurn();
     void ResolveTrinketEndTurn();
     bool AddGeneratedDiscoverCopy(const Card& card);
+    //! Adds Sinstone's plain copy of a successfully committed Discover.
+    //! This is deliberately separate from generated quest rewards so a
+    //! Discover copy cannot inherit unrelated reward flags.
+    bool AddSinstoneDiscoverCopy(const Card& card);
     //! Applies Tamuzo's combat-only summon multiplier to a newly summoned unit.
     void ApplyTamuzoCombatSummon(Minion& summoned);
     //! Resolves combat-only Trinkets that listen to a newly summoned minion.
@@ -166,6 +170,9 @@ class Player
     //! powers that acquire a shop entity directly; pool ownership remains
     //! with the moved instance.
     bool TakeTavernMinionToHand(std::size_t idx, int attack, int health);
+    //! Steals one randomly selected highest-tier live Tavern offer.  The
+    //! source entity (including Golden/stats state) moves into the hand.
+    bool StealHighestTierTavernMinionToHand();
     //! Steal live Tavern minions in slot order until hand capacity is reached;
     //! remaining offers stay in the Tavern and stolen entities are never
     //! returned to the pool.
@@ -178,15 +185,24 @@ class Player
     // thereafter).  Keeping the field explicit prevents a stale/empty combat
     // snapshot from consuming the queued resurrection during start-of-combat.
     bool TryResolveRapidReanimationIfSpace(FieldZone& field);
+    //! Resolve Soul Fermenter's exact snapshots once the combat field has
+    //! room; returns false while a full field still defers the reward.
+    bool TryResolveSoulFermenterIfSpace(FieldZone& field);
     bool BeginFantasticTreasureOffer();
     //! Opens the Greater Trinket offer moved by Ornate Clock, if armed.
     bool BeginOrnateClockOffer();
+    //! Opens Mystery Cube's free two-choice Lesser replacement modal.
+    bool BeginMysteryCubeOffer();
+    bool BeginTripVouchersOffer();
     bool BeginWarpGateChoice();
     bool BeginWhodunitQuestChoice();
     bool TryResolveWarpGateReward();
     bool BeginSpawningPoolMorphChoice();
     //! Each friendly Demon consumes one random Tavern minion for its stats.
     bool DevourRandomTavernForDemons(int multiplier);
+    //! Select the authoritative Tavern offer for a Demon devour. The
+    //! highest-health aura and seeded tie-break are shared by all executors.
+    int SelectDemonConsumeTavernSlot();
     //! Apply per-owned Consuming Claw payload after a successful Demon devour.
     //! The consumed snapshot must be captured before removing its Tavern slot.
     void ApplyDemonConsumeBonus(Minion& demon, const Minion& consumed);
@@ -297,10 +313,16 @@ class Player
     int ResolveLilKTMinions();
     //! Resolve Maxwell's Battlecry copies using the active hero linkage.
     int ResolveMaxwellBuddyCopies(int copies = 1);
+    //! Resolve Maxwell Sticker from the active hero-power -> Buddy link.
+    //! Returns the number of entities committed to hand; invalid/deferred
+    //! links and a full hand return zero without consuming the Trinket.
+    int ResolveMaxwellStickerBuddy(bool golden);
     //! Starts Ticket Collector's Darkmoon Prize Battlecry Discover.
     //! Golden copies queue two sequential choices so each selection is
     //! committed through the ordinary modal/replay path.
     bool BeginTicketCollectorDiscover(bool golden = false);
+    //! Starts Tickatus Sticker's fixed Tier-3 Darkmoon Prize Discover.
+    bool BeginTickatusDiscover();
     //! Begin Clockwork Assistant's next-tier minion Discover.
     bool BeginClockworkAssistantDiscover(bool golden = false);
     //! Resolve Sparkfin Soothsayer's Tavern-to-Murloc Battlecry.
@@ -321,6 +343,10 @@ class Player
     //! Resolves persistent Trinket effects after any successful Tavern spell,
     //! including modal/Choose-One completion paths.
     void ApplyTavernSpellTrinkets();
+    //! Resolve Upstart Embers against the fully settled Tavern after a
+    //! successful minion refresh. Each owned instance resolves independently
+    //! and sees mutations made by earlier instances in the same refresh.
+    void ApplyUpstartEmbers();
     //! Applies Daggerspine Thrasher's one random temporary keyword after a
     //! successful spell resolution.  Kept beside the shared Tavern-spell
     //! completion hook so modal/free/generated casts cannot bypass it.
@@ -335,6 +361,9 @@ class Player
     //! even when another copy has the same card DBF.
     void ApplyUrZulStickerTriggers(bool playedDemon,
                                    std::uint64_t playedEntityID);
+    //! Notify consume observers after a Tavern minion was successfully
+    //! removed. Owns per-Trinket progress, hand capacity, and use accounting.
+    void ApplyTavernMinionConsumedTrinkets();
     void ApplyAfterRebornTrinkets(const Minion* reborn = nullptr);
     //! Resolve portraits whose trigger is a real recruit-phase destroy.
     //! Selling, consuming, transforming, and ordinary zone removal do not
@@ -346,6 +375,10 @@ class Player
     //! first-Mech snapshot remains armed while the combat board is full.
     void ResolveBoomController(FieldZone& combatField);
     void ResolveStartTurnTrinkets();
+    //! Resolve Gold Pendant's random eligible friendly minion conversion.
+    //! Eligibility is evaluated at the resolution boundary so a full board,
+    //! hand movement, or an already-Golden candidate cannot consume it.
+    void ApplyGoldPendant();
     //! Consumes War Drum's once-per-recruit-turn allowance after a successful
     //! Battlecry and returns the exact number of extra resolutions to run.
     int ConsumeWarDrumRepeats();

@@ -331120,5 +331120,86 @@
     "techLevel": 1,
     "text": "Gain 1 Gold.",
     "type": "BATTLEGROUND_SPELL"
+},
+{
+    "artist": "Tiffany Chiu",
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 130699,
+    "id": "BG20_GEM_Taunt",
+    "name": "Blood Gem",
+    "referencedTags": [
+        "TAUNT"
+    ],
+    "set": "BATTLEGROUNDS",
+    "targetingArrowText": "Give +{0}/+{1}.",
+    "text": "Give a minion +1/+1. If it's a Quilboar, also give it <b>Taunt</b>.",
+    "type": "SPELL"
+},
+{
+    "artist": "Tiffany Chiu",
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 130698,
+    "id": "BG20_GEM_DivineShield",
+    "name": "Blood Gem",
+    "referencedTags": [
+        "DIVINE_SHIELD"
+    ],
+    "set": "BATTLEGROUNDS",
+    "targetingArrowText": "Give +{0}/+{1}.",
+    "text": "Give a minion +1/+1. If it's a Quilboar, also give it <b>Divine Shield</b>.",
+    "type": "SPELL"
+},
+{
+    "artist": "Tiffany Chiu",
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 130700,
+    "id": "BG20_GEM_Reborn",
+    "name": "Blood Gem",
+    "set": "BATTLEGROUNDS",
+    "targetingArrowText": "Give +{0}/+{1}.",
+    "text": "Give a minion +1/+1. If it's a Quilboar, also give it <b>Reborn</b>.",
+    "type": "SPELL"
+},
+{
+    "artist": "Inès Rotzinger",
+    "battlegroundsAssociatedRaces": [
+        "QUILBOAR"
+    ],
+    "cardClass": "NEUTRAL",
+    "cost": 0,
+    "dbfId": 130904,
+    "id": "BG35_MagicItem_434",
+    "mechanics": [
+        "TRIGGER_VISUAL"
+    ],
+    "name": "Jewelry Box",
+    "referencedTags": [
+        "DIVINE_SHIELD",
+        "TAUNT"
+    ],
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "LESSER_TRINKET",
+    "text": "Get a <b>Blood Gem</b> that gives a Quilboar <b>Taunt</b>, <b>Divine Shield</b>, or <b>Reborn</b>. At the start of each turn, repeat this.",
+    "type": "BATTLEGROUND_TRINKET"
+},
+{
+    "battlegroundsAssociatedRaces": [
+        "PIRATE"
+    ],
+    "cardClass": "NEUTRAL",
+    "cost": 1,
+    "dbfId": 120809,
+    "id": "BG32_MagicItem_951",
+    "mechanics": [
+        "TRIGGER_VISUAL"
+    ],
+    "name": "Gold Pendant",
+    "set": "BATTLEGROUNDS",
+    "spellSchool": "LESSER_TRINKET",
+    "text": "[x]Make a random friendly\nminion from Tier 4 or below\nGolden. At the start of\neach turn, repeat this.",
+    "type": "BATTLEGROUND_TRINKET"
 }
 ]

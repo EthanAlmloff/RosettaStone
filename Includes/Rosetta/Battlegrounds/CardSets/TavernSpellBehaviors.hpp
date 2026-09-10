@@ -80,6 +80,11 @@ enum class TavernSpellEffect
     TARGET_CONSUME_SHOP_STATS,
     SELL_TARGET_GIVE_LEFTMOST_RACE_STATS,
     BLOOD_GEM,
+    // Jewelry Box variants retain the canonical Blood Gem scaling and add
+    // one explicit Quilboar-only keyword payload.
+    BLOOD_GEM_TAUNT,
+    BLOOD_GEM_DIVINE_SHIELD,
+    BLOOD_GEM_REBORN,
     DISCOVER_MINION,
     DISCOVER_BATTLECRY_MINION,
     TRANSFORM_HIGHER_TIER,
@@ -375,6 +380,12 @@ inline TavernSpellBehavior FindTavernSpellBehavior(std::string_view id)
     {
         return { 0, 1, 1, TavernSpellEffect::BLOOD_GEM };
     }
+    if (id == "BG20_GEM_Taunt")
+        return { 0, 1, 1, TavernSpellEffect::BLOOD_GEM_TAUNT };
+    if (id == "BG20_GEM_DivineShield")
+        return { 0, 1, 1, TavernSpellEffect::BLOOD_GEM_DIVINE_SHIELD };
+    if (id == "BG20_GEM_Reborn")
+        return { 0, 1, 1, TavernSpellEffect::BLOOD_GEM_REBORN };
 
     // Patch 36.4 generated/tribal batch.  These entries are deliberately
     // limited to effects that can be resolved from public player state and
@@ -547,6 +558,9 @@ inline bool TavernSpellRequiresTarget(TavernSpellEffect effect) noexcept
            effect == TavernSpellEffect::TARGET_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::TARGET_OR_ALL_CHOOSE_ONE_STATS ||
            effect == TavernSpellEffect::BLOOD_GEM ||
+           effect == TavernSpellEffect::BLOOD_GEM_TAUNT ||
+           effect == TavernSpellEffect::BLOOD_GEM_DIVINE_SHIELD ||
+           effect == TavernSpellEffect::BLOOD_GEM_REBORN ||
            effect == TavernSpellEffect::SET_TARGET_STATS ||
            effect == TavernSpellEffect::TARGET_AND_RACE ||
            effect == TavernSpellEffect::TARGET_STATS_REPEAT ||
