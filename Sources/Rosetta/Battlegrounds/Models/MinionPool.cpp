@@ -187,7 +187,8 @@ void MinionPool::Initialize(const ActiveTribeSet& activeTribes)
 }
 
 void MinionPool::InitializeSupported(const std::vector<std::string>& cardIDs,
-                                     const ActiveTribeSet& activeTribes)
+                                     const ActiveTribeSet& activeTribes,
+                                     bool filterByActiveTribes)
 {
     if (cardIDs.empty())
     {
@@ -196,17 +197,34 @@ void MinionPool::InitializeSupported(const std::vector<std::string>& cardIDs,
 
     std::vector<Card> cards;
     cards.reserve(cardIDs.size());
+    std::vector<std::string> invalid;
     for (const auto& id : cardIDs)
     {
         Card card = Cards::FindCardByID(id);
         if (card.id.empty() || card.GetCardType() != CardType::MINION ||
-            card.GetTier() < 1 || !HasActiveTribe(activeTribes, card))
+            card.GetTier() < 1)
         {
-            throw std::invalid_argument("unsupported minion pool card ID: " +
-                                        id);
+            invalid.push_back(id);
+            continue;
         }
+        if (filterByActiveTribes && !HasActiveTribe(activeTribes, card))
+            continue;
+        // InitializeSupported is the explicitly pinned smoke/training pool.
+        // Its IDs are the experiment's complete universe, so requiring every
+        // entry to belong to the five randomly selected lobby tribes would
+        // make a valid pool fail at reset (and would make the result depend on
+        // the lobby seed).  The normal Initialize path below remains the
+        // authoritative active-tribe filter for the full production pool.
         cards.emplace_back(std::move(card));
     }
+
+    if (!invalid.empty()) {
+        std::string message = "unsupported minion pool card IDs:";
+        for (const auto& id : invalid) message += " " + id;
+        throw std::invalid_argument(message);
+    }
+    if (cards.empty())
+        throw std::invalid_argument("active-tribe filter removed every supported minion pool card");
 
     for (std::size_t idx = 0; idx < m_minions.size(); ++idx)
     {

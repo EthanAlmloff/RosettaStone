@@ -38,7 +38,8 @@ class MinionPool
     //! \param cardIDs The supported minion card IDs.
     void InitializeSupported(const std::vector<std::string>& cardIDs,
                              const ActiveTribeSet& activeTribes =
-                                 PINNED_ACTIVE_TRIBES);
+                                 PINNED_ACTIVE_TRIBES,
+                             bool filterByActiveTribes = false);
 
     //! Returns the count of minions in the pool.
     //! \return The count of minions in the pool.

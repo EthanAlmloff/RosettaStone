@@ -11,13 +11,20 @@
 #include <Rosetta/Battlegrounds/Cards/CardDefs.hpp>
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace RosettaStone::Battlegrounds
 {
 void Hero::Initialize(const Card& heroCard)
 {
     card = heroCard;
-    health = heroCard.gameTags.at(GameTag::HEALTH);
+    const auto healthTag = heroCard.gameTags.find(GameTag::HEALTH);
+    if (healthTag == heroCard.gameTags.end())
+    {
+        throw std::invalid_argument("Battlegrounds hero is missing HEALTH tag: " +
+                                    heroCard.id);
+    }
+    health = healthTag->second;
 }
 
 HeroDamageEvent Hero::TakeDamage(Player& player, int amount,

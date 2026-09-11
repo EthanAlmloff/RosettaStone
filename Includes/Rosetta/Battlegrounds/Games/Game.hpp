@@ -38,6 +38,11 @@ class Game
     //! Constructs a seeded game with an explicitly supported minion pool.
     Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs);
 
+    //! Constructs a seeded game with an explicitly supported minion pool,
+    //! filtering that pool against the lobby's selected active tribes.
+    Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs,
+         bool filterSupportedCardIDsByActiveTribes);
+
     //! Gets the game state.
     //! \return The game state.
     GameState& GetGameState();
@@ -99,6 +104,7 @@ class Game
  private:
     std::optional<std::uint64_t> m_seed;
     std::vector<std::string> m_supportedCardIDs;
+    bool m_filterSupportedCardIDsByActiveTribes = false;
     GameState m_gameState{};
 
     std::vector<std::tuple<std::size_t, std::size_t>> m_playerFightPair;

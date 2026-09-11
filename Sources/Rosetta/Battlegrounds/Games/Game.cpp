@@ -85,6 +85,13 @@ Game::Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs)
 {
 }
 
+Game::Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs,
+           bool filterSupportedCardIDsByActiveTribes)
+    : m_seed(seed), m_supportedCardIDs(std::move(supportedCardIDs)),
+      m_filterSupportedCardIDsByActiveTribes(filterSupportedCardIDsByActiveTribes)
+{
+}
+
 GameState& Game::GetGameState()
 {
     return m_gameState;
@@ -144,8 +151,9 @@ void Game::Start()
     }
     else
     {
-        m_gameState.minionPool.InitializeSupported(m_supportedCardIDs,
-                                                   m_gameState.activeTribes);
+        m_gameState.minionPool.InitializeSupported(
+            m_supportedCardIDs, m_gameState.activeTribes,
+            m_filterSupportedCardIDsByActiveTribes);
     }
     m_playerFightPair.reserve(NUM_BATTLEGROUNDS_PLAYERS / 2);
 
@@ -443,8 +451,22 @@ void Game::Start()
 
 void Game::SelectHero()
 {
-    // Shuffle current heroes
-    auto currentHeroes = Cards::GetInstance().GetCurrentHeroes();
+    // The registry uses a fixed-capacity array, so its unused tail contains
+    // default-constructed cards.  Do not let those padding entries enter the
+    // hero draft; doing so made seeded lobbies fail nondeterministically when
+    // SelectHero(0) received an empty card.
+    std::vector<Card> currentHeroes;
+    for (const auto& card : Cards::GetInstance().GetCurrentHeroes())
+    {
+        if (!card.id.empty() && card.dbfID != 0)
+            currentHeroes.push_back(card);
+    }
+    if (currentHeroes.size() <
+        NUM_BATTLEGROUNDS_PLAYERS * NUM_HEROES_ON_SELECTION_LIST)
+    {
+        throw std::length_error("Battlegrounds hero registry has insufficient "
+                                "usable heroes for the selection draft");
+    }
     Random::shuffle(currentHeroes.begin(), currentHeroes.end());
 
     // Assign 4 heroes to each player
