@@ -343,6 +343,9 @@ class Season14State
     //! offering as an anonymous global random result.
     std::uint64_t pendingSourceEntityID = 0;
     std::int32_t pendingSourceCardDbfID = 0;
+    //! Boundless Potential captures the tier when its second-stage Discover
+    //! is generated. Preserve that constraint while the modal is pending.
+    std::int32_t pendingBoundlessDiscoverTier = 0;
     //! Windfall Tornado's sold-instance stats survive the public Discover
     //! modal; golden Windfall keeps one additional sequential choice queued.
     std::int32_t windfallAttack = 0;
@@ -1193,7 +1196,7 @@ class Season14State
 
     //! Applies deterministic hero-power hooks at the start of recruit.
     //! The result contains effects paid immediately by Player/Game.
-    Season14HeroPowerBatch2Result BeginRecruitTurn();
+    Season14HeroPowerBatch2Result BeginRecruitTurn(bool handFull = false);
     //! Arms BG28_843e and records the exact generated child identity.
     void ArmTitusTribute() {
         // Each resolved parent spell contributes one additional activation.

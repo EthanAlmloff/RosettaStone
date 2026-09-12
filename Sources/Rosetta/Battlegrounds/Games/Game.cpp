@@ -92,6 +92,15 @@ Game::Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs,
 {
 }
 
+Game::Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs,
+           bool filterSupportedCardIDsByActiveTribes,
+           std::vector<std::string> supportedHeroIDs)
+    : m_seed(seed), m_supportedCardIDs(std::move(supportedCardIDs)),
+      m_filterSupportedCardIDsByActiveTribes(filterSupportedCardIDsByActiveTribes),
+      m_supportedHeroIDs(std::move(supportedHeroIDs))
+{
+}
+
 GameState& Game::GetGameState()
 {
     return m_gameState;
@@ -459,13 +468,24 @@ void Game::SelectHero()
     for (const auto& card : Cards::GetInstance().GetCurrentHeroes())
     {
         if (!card.id.empty() && card.dbfID != 0)
+        {
+            if (!m_supportedHeroIDs.empty() &&
+                std::find(m_supportedHeroIDs.begin(), m_supportedHeroIDs.end(),
+                          card.id) == m_supportedHeroIDs.end())
+                continue;
             currentHeroes.push_back(card);
+        }
     }
-    if (currentHeroes.size() <
-        NUM_BATTLEGROUNDS_PLAYERS * NUM_HEROES_ON_SELECTION_LIST)
+    // An explicitly filtered training pool can intentionally contain fewer
+    // than the 32 distinct portraits used by the live draft (for example,
+    // when every Buddy-dependent hero is excluded).  Preserve distinct
+    // choices within each player's four-card offer, while allowing portraits
+    // to recur across players when the filtered universe is smaller than the
+    // lobby-wide draft capacity.
+    if (currentHeroes.size() < NUM_HEROES_ON_SELECTION_LIST)
     {
         throw std::length_error("Battlegrounds hero registry has insufficient "
-                                "usable heroes for the selection draft");
+                                "usable heroes for one selection offer");
     }
     Random::shuffle(currentHeroes.begin(), currentHeroes.end());
 
@@ -475,7 +495,8 @@ void Game::SelectHero()
     {
         for (std::size_t i = 0; i < NUM_HEROES_ON_SELECTION_LIST; ++i)
         {
-            player.heroChoices.at(i) = currentHeroes.at(heroIdx + i).dbfID;
+            player.heroChoices.at(i) =
+                currentHeroes.at((heroIdx + i) % currentHeroes.size()).dbfID;
         }
 
         heroIdx += NUM_HEROES_ON_SELECTION_LIST;
@@ -605,7 +626,7 @@ void Game::Recruit()
                 std::get<Minion>(card.value()).AdvanceHandLockTurn();
         });
 
-        const auto heroPowerResult = player.season14.BeginRecruitTurn();
+        const auto heroPowerResult = player.season14.BeginRecruitTurn(player.hand.IsFull());
         player.RefreshSousChefHeroPowerUses();
         player.remainCoin += heroPowerResult.goldDelta;
         // Turn-start CardDef triggers are committed once, at the recruit

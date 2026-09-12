@@ -335,6 +335,7 @@ void Season14State::BeginDecision(
         pendingOfferings.clear();
         pendingSourceEntityID = 0;
         pendingSourceCardDbfID = 0;
+        pendingBoundlessDiscoverTier = 0;
         windfallAttack = 0;
         windfallHealth = 0;
         windfallRemaining = 0;
@@ -354,6 +355,7 @@ void Season14State::BeginDecision(
     pendingOfferings = std::move(offerings);
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
+    pendingBoundlessDiscoverTier = 0;
     pendingTrinketReplacementSlot = -1;
     pendingTavernReplacementSlot = -1;
     pendingTavernReplacementTier = 0;
@@ -382,6 +384,7 @@ void Season14State::BeginChooseOne(std::uint64_t sourceEntityID, std::uint32_t t
     choiceOfferings = pendingOfferings;
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
+    pendingBoundlessDiscoverTier = 0;
     pendingTavernReplacementSlot = -1;
     pendingTavernReplacementTier = 0;
     pendingTrinketReplacementSlot = -1;
@@ -463,6 +466,13 @@ void Season14State::BeginOfferingDecision(
     Season14Decision decision, std::uint64_t sourceEntityID,
     std::int32_t sourceCardDbfID, std::vector<Season14Offering> offerings)
 {
+    // A public modal with no selectable payload cannot make progress and
+    // leaves the bridge with an empty legal-action set.  Callers build their
+    // offerings before entering this boundary; reject an empty construction
+    // without disturbing an already-pending modal (which may be retried by a
+    // later lifecycle hook).
+    if (decision != Season14Decision::NONE && offerings.empty())
+        return;
     BeginDecision(decision, std::move(offerings));
     pendingSourceEntityID = sourceEntityID;
     pendingSourceCardDbfID = sourceCardDbfID;
@@ -480,6 +490,7 @@ bool Season14State::SelectDecision(std::size_t offeringIndex)
     pendingOfferings.clear();
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
+    pendingBoundlessDiscoverTier = 0;
     pendingDecision = Season14Decision::NONE;
     chooseOne = {};
     spellModal = {};
@@ -669,6 +680,7 @@ void Season14State::CancelTransformDecision() noexcept
     pendingDecision = Season14Decision::NONE;
     pendingSourceEntityID = 0;
     pendingSourceCardDbfID = 0;
+    pendingBoundlessDiscoverTier = 0;
     pendingOfferings.clear();
     choiceOfferings.clear();
 }
@@ -711,7 +723,7 @@ void Season14State::RecordReclaimedSoulsDeath(const Minion& minion)
     reclaimedSoulsDeaths.push_back(std::string(minion.GetCardID()));
 }
 
-Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
+Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn(bool handFull)
 {
     successfulSpellCountAtRecruitStart = successfulSpellCount;
     ++recruitTurnNumber;
@@ -813,7 +825,12 @@ Season14HeroPowerBatch2Result Season14State::BeginRecruitTurn()
                 card.normalDbfID == 0 && card.dbfID > 0 &&
                 card.id.starts_with("BGS_Treasures_"))
                 prizes.push_back(card);
-        if (prizes.size() >= 3) {
+        // Prize Wall delivers the selected prize to hand through the normal
+        // Discover path.  A full hand cannot commit that path (unlike the
+        // Buddy Ticket reward, which explicitly burns a selected prize), so
+        // do not open an unselectable modal that would strand the recruit
+        // phase with zero legal actions.
+        if (prizes.size() >= 3 && !handFull) {
             Random::shuffle(prizes.begin(), prizes.end());
             BeginOfferingDecision(Season14Decision::DISCOVER, 0, 67357,
                 {{prizes[0].dbfID, 0}, {prizes[1].dbfID, 0},

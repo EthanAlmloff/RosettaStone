@@ -37,3 +37,4 @@ setup.py
 # External downloads
 Downloads
 /vcpkg_installed
+/target

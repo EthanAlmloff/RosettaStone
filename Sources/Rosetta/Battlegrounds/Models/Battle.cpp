@@ -72,7 +72,7 @@ struct AttackingStateGuard
     ~AttackingStateGuard() { minion.SetAttacking(previous); }
 };
 
-bool HasAttackableTarget(const FieldZone& field)
+bool HasVisibleTarget(const FieldZone& field)
 {
     bool found = false;
     field.ForEachAlive([&found](const MinionData& minion) {
@@ -194,6 +194,20 @@ Battle::Battle(Player& player1, Player& player2)
     armTarecgosaSticker(m_player2);
     m_player1.battleField = m_player1.recruitField;
     m_player2.battleField = m_player2.recruitField;
+    // Combat fields are copied entities.  A hand-built card or a generated
+    // combat copy may not have carried the owner callback from its source
+    // zone, but combat triggers universally use it.  Rebind every copy to
+    // the authoritative player at the boundary so FreezeAndEndTurn cannot
+    // surface std::bad_function_call during combat resolution.
+    const auto bindCombatOwners = [](Player& owner) {
+        owner.battleField.ForEachAlive([&owner](MinionData& data) {
+            data.value().getPlayerCallback = [&owner]() -> Player& {
+                return owner;
+            };
+        });
+    };
+    bindCombatOwners(m_player1);
+    bindCombatOwners(m_player2);
     // Powder Keg is a combat-copy aura.  Arm only the first three friendly
     // Pirates at the combat boundary; the recruit entities remain untouched
     // until a real persistent effect is committed by the normal battle path.
@@ -444,6 +458,11 @@ Battle::Battle(Player& player1, Player& player2)
                 }
                 Minion beetle{ beetleCard };
                 owner.ApplyFreshMinionModifiers(beetle);
+                beetle.getPlayerCallback = [&owner]() -> Player& {
+                    return owner;
+                };
+                if (owner.getNextCardIndexCallback)
+                    beetle.SetIndex(owner.getNextCardIndexCallback());
                 field.Add(beetle);
                 Minion& summoned = field[field.GetCount() - 1];
                 field.ForEachAlive([&summoned](MinionData& alive) {
@@ -564,7 +583,7 @@ void Battle::Initialize()
                                         FieldZone& enemy) {
         const auto before = own.GetCount();
         owner.ResolveLockAndLoad();
-        if (own.GetCount() <= before || !HasAttackableTarget(enemy)) return;
+        if (own.GetCount() <= before || !HasVisibleTarget(enemy)) return;
         Minion& projectile = own[own.GetCount() - 1];
         std::vector<Minion*> targets;
         enemy.ForEachAlive([&targets](MinionData& data) {
@@ -993,7 +1012,7 @@ void Battle::Initialize()
             if (!attacker) continue;
             attacker->SetAttack(attacker->GetAttack() + 2);
             attacker->SetHealth(attacker->GetHealth() + 1);
-            if (!HasAttackableTarget(enemy)) continue;
+            if (!HasVisibleTarget(enemy)) continue;
             auto& target = GetProperTarget(*attacker);
             {
                 AttackingStateGuard attacking(*attacker);
@@ -1048,7 +1067,7 @@ void Battle::Initialize()
     const auto resolveRighteousCharge = [this](Player& owner, FieldZone& own,
                                                 FieldZone& enemy, Turn turn) {
         if (!owner.season14.HasGeneratedRewardRighteousCharge() || own.IsEmpty() ||
-            !HasAttackableTarget(enemy)) return;
+            !HasVisibleTarget(enemy)) return;
         Minion& attacker = own[0];
         m_turn = turn;
         auto& target = GetProperTarget(attacker);
@@ -1160,7 +1179,7 @@ bool Battle::Attack()
     auto& attackerOwner = (m_turn == Turn::PLAYER1) ? m_player1 : m_player2;
     FieldZone& defendingField =
         (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
-    if (!HasAttackableTarget(defendingField))
+    if (!HasVisibleTarget(defendingField))
     {
         // Stealthed minions cannot be selected by a Battlegrounds attack. If
         // every opposing minion is hidden, this side simply has no legal
@@ -1347,6 +1366,15 @@ bool Battle::Attack()
     Minion& attackerAfterRally = *currentAttacker;
     // The first attacker may have killed the original target; choose the
     // ordinary attack target only after that exchange and cleanup.
+    // Rally/deathrattle effects can also leave only stealthed defenders.  In
+    // that state this attacker has no legal target; end this attack turn and
+    // let the normal combat loop advance rather than throwing from target
+    // selection and reporting EndTurn as an internal simulator error.
+    if (!HasVisibleTarget(defendingField)) {
+        pendingAttacks = 0;
+        m_turn = (m_turn == Turn::PLAYER1) ? Turn::PLAYER2 : Turn::PLAYER1;
+        return false;
+    }
     Minion& nextTarget = GetProperTarget(attackerAfterRally);
     const int targetHealthBeforeAttack = nextTarget.GetHealth();
     const bool attackedFriendlyTaunt = nextTarget.HasTaunt();
@@ -1643,12 +1671,19 @@ Minion& Battle::GetProperTarget([[maybe_unused]] Minion& attacker)
     return minions[attackableMinions[idx]];
 }
 
+bool Battle::HasAttackableTarget() const
+{
+    const auto& defendingField =
+        (m_turn == Turn::PLAYER1) ? m_p2Field : m_p1Field;
+    return HasVisibleTarget(defendingField);
+}
+
 void Battle::TryFireQueuedLockAndLoad()
 {
     if (m_lockAndLoadResolving) return;
     m_lockAndLoadResolving = true;
     const auto fire = [this](Player& owner, FieldZone& own, FieldZone& enemy) {
-        if (own.IsFull() || !HasAttackableTarget(enemy)) return;
+        if (own.IsFull() || !HasVisibleTarget(enemy)) return;
         const auto before = own.GetCount();
         owner.ResolveLockAndLoad();
         if (own.GetCount() <= before) return;
@@ -1670,7 +1705,11 @@ void Battle::TryFireQueuedLockAndLoad()
 
 void Battle::ProcessDestroy(bool beforeAttack)
 {
-    std::vector<std::tuple<int, Minion&>> deadMinions;
+    // Keep stable entity IDs rather than references into the field array.
+    // Removing one dead minion shifts later slots and invalidates references;
+    // retaining those references can surface as bad_optional_access while the
+    // next deathrattle is processed.
+    std::vector<std::tuple<int, std::uint64_t>> deadMinions;
 
     if (m_turn == Turn::PLAYER1)
     {
@@ -1678,7 +1717,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
             if (minion.value().IsDestroyed())
             {
                 deadMinions.emplace_back(
-                    std::make_tuple(2, std::ref(minion.value())));
+                    std::make_tuple(2, static_cast<std::uint64_t>(
+                                            minion.value().GetIndex())));
             }
         });
 
@@ -1686,7 +1726,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
             if (minion.value().IsDestroyed())
             {
                 deadMinions.emplace_back(
-                    std::make_tuple(1, std::ref(minion.value())));
+                    std::make_tuple(1, static_cast<std::uint64_t>(
+                                            minion.value().GetIndex())));
             }
         });
     }
@@ -1696,7 +1737,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
             if (minion.value().IsDestroyed())
             {
                 deadMinions.emplace_back(
-                    std::make_tuple(1, std::ref(minion.value())));
+                    std::make_tuple(1, static_cast<std::uint64_t>(
+                                            minion.value().GetIndex())));
             }
         });
 
@@ -1704,7 +1746,8 @@ void Battle::ProcessDestroy(bool beforeAttack)
             if (minion.value().IsDestroyed())
             {
                 deadMinions.emplace_back(
-                    std::make_tuple(2, std::ref(minion.value())));
+                    std::make_tuple(2, static_cast<std::uint64_t>(
+                                            minion.value().GetIndex())));
             }
         });
     }
@@ -1714,7 +1757,19 @@ void Battle::ProcessDestroy(bool beforeAttack)
 
     for (auto& deadMinion : deadMinions)
     {
-        Minion& minion = std::get<1>(deadMinion);
+        const auto ownerSide = std::get<0>(deadMinion);
+        const auto entityID = std::get<1>(deadMinion);
+        FieldZone& ownerField = ownerSide == 1 ? m_p1Field : m_p2Field;
+        Minion* liveMinion = nullptr;
+        ownerField.ForEachAlive([&](MinionData& candidate) {
+            if (static_cast<std::uint64_t>(candidate.value().GetIndex()) == entityID)
+                liveMinion = &candidate.value();
+        });
+        // A nested deathrattle may already have removed this entity.  The
+        // snapshot is still useful for its own pending entry, but there is no
+        // live zone object left to process at this boundary.
+        if (liveMinion == nullptr) continue;
+        Minion& minion = *liveMinion;
         // Radio Star's deathrattle needs the exact attacking enemy instance,
         // including current health and enchantments.  Capture it before any
         // DEATH trigger or zone removal can invalidate the attacker snapshot.
@@ -1747,7 +1802,6 @@ void Battle::ProcessDestroy(bool beforeAttack)
         // it leaves the combat board. Each normal copy triggers once and each
         // golden copy twice per combat; key counters by entity so multiple
         // copies do not incorrectly share a single allowance.
-        const auto ownerSide = std::get<0>(deadMinion);
         Player& owner = ownerSide == 1 ? m_player1 : m_player2;
         owner.battleField.ForEachAlive([&](MinionData& data) {
             auto& construct = data.value();
@@ -2229,7 +2283,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
                         data.value().ActivateTrigger(TriggerType::SUMMON, summoned);
                     });
                     sourceOwner.ApplySummonTrinkets(summoned);
-                    if (HasAttackableTarget(enemyField))
+                if (HasVisibleTarget(enemyField))
                     {
                         m_turn = ownerTurn;
                         Minion& target = GetProperTarget(summoned);
@@ -2547,7 +2601,7 @@ void Battle::ProcessDestroy(bool beforeAttack)
             whelp.SetHealth(whelpStats);
             if (!token.id.empty() && owner.SummonCombatSnapshot(std::move(whelp))) {
                 auto& enemy = (&combatField == &m_p1Field) ? m_p2Field : m_p1Field;
-                if (HasAttackableTarget(enemy)) {
+                if (HasVisibleTarget(enemy)) {
                     Minion& summoned = combatField[combatField.GetCount() - 1];
                     Minion& target = GetProperTarget(summoned);
                     AttackingStateGuard attacking(summoned);

@@ -7,6 +7,7 @@
 #include "doctest_proxy.hpp"
 
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Cards/Card.hpp>
 
 using namespace RosettaStone;
 using namespace Battlegrounds;
@@ -24,4 +25,11 @@ TEST_CASE("[Cards] - Tier 7 registry")
     const auto& cards = Cards::GetTier7Minions();
 
     CHECK_EQ(static_cast<int>(cards.size()), NUM_TIER7_MINIONS);
+}
+
+TEST_CASE("[Card] - Missing card type metadata is invalid, not an exception")
+{
+    Card card;
+
+    CHECK_EQ(card.GetCardType(), CardType::INVALID);
 }

@@ -10,6 +10,10 @@
 #include <Rosetta/Battlegrounds/Games/Game.hpp>
 #include <Rosetta/Battlegrounds/Utils/GameUtils.hpp>
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
 using namespace RosettaStone;
 using namespace Battlegrounds;
 
@@ -298,6 +302,80 @@ TEST_CASE("[Game] - Seeded start is deterministic")
     CHECK_NE(snapshot(123456), snapshot(654321));
 }
 
+TEST_CASE("[Game] - filtered hero draft excludes unsupported heroes")
+{
+    // Build the allow-list from the registry so this regression remains valid
+    // when the live hero inventory changes.  These are the content families
+    // excluded by the training ruleset; if a family is not present in this
+    // RosettaStone data revision it is naturally a no-op.
+    const std::vector<std::string> excluded = {
+        "BG25_HERO_105", "BG34_HERO_000", "BG34_HERO_004"};
+    std::vector<std::string> allowed;
+    for (const auto& hero : Cards::GetInstance().GetCurrentHeroes())
+    {
+        if (hero.id.empty() ||
+            std::find(excluded.begin(), excluded.end(), hero.id) !=
+                excluded.end())
+        {
+            continue;
+        }
+        allowed.push_back(hero.id);
+    }
+    REQUIRE(allowed.size() >=
+            NUM_BATTLEGROUNDS_PLAYERS * NUM_HEROES_ON_SELECTION_LIST);
+    allowed.resize(NUM_BATTLEGROUNDS_PLAYERS * NUM_HEROES_ON_SELECTION_LIST);
+
+    const auto draft = [&allowed, &excluded](std::uint64_t seed) {
+        Game game(seed, {}, false, allowed);
+        game.Start();
+        std::vector<std::string> result;
+        for (const auto& player : game.GetGameState().players)
+        {
+            for (const auto dbfID : player.heroChoices)
+            {
+                const auto hero = Cards::FindCardByDbfID(dbfID);
+                CHECK(std::find(allowed.begin(), allowed.end(), hero.id) !=
+                      allowed.end());
+                CHECK(std::find(excluded.begin(), excluded.end(), hero.id) ==
+                      excluded.end());
+                result.push_back(hero.id);
+            }
+        }
+        return result;
+    };
+
+    // The same seed must produce the same filtered draft, and every offered
+    // choice must remain in the explicit allow-list.
+    CHECK(draft(123456) == draft(123456));
+}
+
+TEST_CASE("[Game] - filtered hero draft reuses a small explicit universe")
+{
+    std::vector<std::string> allowed;
+    for (const auto& hero : Cards::GetInstance().GetCurrentHeroes())
+    {
+        if (!hero.id.empty())
+            allowed.push_back(hero.id);
+        if (allowed.size() == NUM_HEROES_ON_SELECTION_LIST)
+            break;
+    }
+    REQUIRE(allowed.size() == NUM_HEROES_ON_SELECTION_LIST);
+
+    Game game(123456, {}, false, allowed);
+    game.Start();
+    for (const auto& player : game.GetGameState().players)
+    {
+        for (std::size_t i = 0; i < player.heroChoices.size(); ++i)
+        {
+            const auto hero = Cards::FindCardByDbfID(player.heroChoices[i]);
+            CHECK(std::find(allowed.begin(), allowed.end(), hero.id) !=
+                  allowed.end());
+            for (std::size_t j = i + 1; j < player.heroChoices.size(); ++j)
+                CHECK_NE(player.heroChoices[i], player.heroChoices[j]);
+        }
+    }
+}
+
 TEST_CASE("[Game] - Per-card freeze survives normal end turn")
 {
     Game game(42);
@@ -405,6 +483,28 @@ TEST_CASE("[Game] - Ghost")
     }
 
     CHECK_EQ(game.GetGameState().ghostPlayerIdx, 3);
+}
+
+TEST_CASE("[Game] - Playing a non-first hand card uses its board position")
+{
+    Game game;
+    game.Start();
+
+    for (auto& otherPlayer : game.GetGameState().players)
+        otherPlayer.SelectHero(1);
+
+    auto& player = game.GetGameState().players.at(0);
+
+    player.hand.Add(Minion(Cards::FindCardByID("BGS_039")));
+    player.hand.Add(Minion(Cards::FindCardByID("BGS_039")));
+
+    // The source card still has hand position 1 when it is copied into an
+    // empty board. PlayCard must use the inserted board position instead.
+    player.PlayCard(1, 0);
+
+    CHECK_EQ(player.hand.GetCount(), 1);
+    CHECK_EQ(player.recruitField.GetCount(), 1);
+    CHECK_EQ(player.recruitField[0].GetCardID(), "BGS_039");
 }
 
 TEST_CASE("[Game] - Tier 7 offer size")

@@ -207,6 +207,11 @@ class Player
     std::vector<Season14Offering> BuildTrinketOfferings(
         bool greater, std::size_t count = 4, bool requireCheap = true,
         bool requireTypeless = true) const;
+    //! Returns whether a Trinket's acquisition-time payload can execute in
+    //! the current state. Offer builders use this same predicate as the
+    //! acquisition path so a modal cannot advertise a doomed option.
+    bool CanAcquireTrinketPayload(const Card& card,
+                                  const TrinketBehavior& behavior) const;
     //! Opens the Greater Trinket offer moved by Ornate Clock, if armed.
     bool BeginOrnateClockOffer();
     //! Opens Mystery Cube's free two-choice Lesser replacement modal.

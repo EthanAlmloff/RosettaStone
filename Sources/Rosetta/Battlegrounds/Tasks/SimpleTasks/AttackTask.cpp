@@ -44,6 +44,8 @@ TaskStatus AttackTask::Run(Player& player, Minion& source)
     auto attackers = IncludeTask::GetMinions(m_attacker, player, source);
     for (auto& attacker : attackers)
     {
+        if (!battle.HasAttackableTarget())
+            break;
         Minion& battleTarget = battle.GetProperTarget(attacker);
         // Forced/immediate attacks still count as attacks for Dark Gifts such
         // as Invulnerability.  Preserve any enclosing attack state, since a
@@ -66,6 +68,8 @@ TaskStatus AttackTask::Run(Player& player, Minion& source, Minion& target)
         IncludeTask::GetMinions(m_attacker, player, source, target);
     for (auto& attacker : attackers)
     {
+        if (!battle.HasAttackableTarget())
+            break;
         Minion& battleTarget = battle.GetProperTarget(attacker);
         AttackingStateGuard attacking(attacker.get());
         battleTarget.TakeDamage(attacker);

@@ -80,6 +80,12 @@ class Battle
     //! \return A proper target.
     Minion& GetProperTarget(Minion& attacker);
 
+    //! Returns whether the side currently attacking has a visible target.
+    //! Forced attacks can be dispatched after a prior effect removes the last
+    //! non-stealthed defender; callers must skip those attacks instead of
+    //! asking GetProperTarget() to throw.
+    bool HasAttackableTarget() const;
+
     //! Processes a list of minions that are destroyed.
     //! \param beforeAttack The flag that indicates it is called before attack.
     void ProcessDestroy(bool beforeAttack);

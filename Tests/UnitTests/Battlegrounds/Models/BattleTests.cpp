@@ -100,6 +100,50 @@ TEST_CASE("[Battle] - Draw (0 attack minions only)")
     CHECK_EQ(player2.hero.health, 60);
 }
 
+TEST_CASE("[Battle] - Only stealthed defenders do not throw")
+{
+    Game game;
+    game.Start();
+
+    Player& player1 = game.GetGameState().players[0];
+    Player& player2 = game.GetGameState().players[1];
+    player1.hero.Initialize(Cards::FindCardByDbfID(59397));
+    player2.hero.Initialize(Cards::FindCardByDbfID(59397));
+
+    Minion attacker(Cards::FindCardByDbfID(49169));
+    Minion stealthed(Cards::FindCardByDbfID(49169));
+    stealthed.SetGameTag(GameTag::STEALTH, 1);
+    player1.recruitField.Add(attacker);
+    player2.recruitField.Add(stealthed);
+
+    Battle battle(player1, player2);
+    CHECK_NOTHROW(battle.Run());
+}
+
+TEST_CASE("[Battle] - Combat copies always have an owner callback")
+{
+    Game game;
+    game.Start();
+
+    Player& player1 = game.GetGameState().players[0];
+    Player& player2 = game.GetGameState().players[1];
+    player1.hero.Initialize(Cards::FindCardByDbfID(59397));
+    player2.hero.Initialize(Cards::FindCardByDbfID(59397));
+
+    Minion attacker(Cards::FindCardByDbfID(49169));
+    // Simulate a generated/hand-built entity that entered the recruit field
+    // without the normal Game hand callback.
+    attacker.getPlayerCallback = {};
+    player1.recruitField.Add(attacker);
+    player1.season14.ArmCombatStartBeetles(110401);
+
+    Battle battle(player1, player2);
+    auto& combatCopy = battle.GetPlayer1Field()[0];
+    REQUIRE(static_cast<bool>(combatCopy.getPlayerCallback));
+    CHECK_EQ(&combatCopy.getPlayerCallback(), &player1);
+    CHECK_NOTHROW(battle.Initialize());
+}
+
 TEST_CASE("[Battle] - Next Attacker")
 {
     Game game;

@@ -66,9 +66,16 @@ TaskStatus MinionOfferingTask::Run(Player& player, Minion& source) {
   offerings.reserve(count);
   for (std::size_t i = 0; i < count; ++i)
     offerings.push_back({candidates[i].dbfID, 0});
+  // Patient Scout opens its Discover after the source minion has been sold.
+  // Do not pin the modal to an entity that no longer exists on the recruit
+  // board; Player::ApplyChoice correctly treats a zero entity as a
+  // source-independent public offering.
+  const auto sourceEntityID =
+      (source.GetCardID() == "BG24_715" || source.GetCardID() == "BG24_715_G")
+          ? 0ULL
+          : static_cast<std::uint64_t>(source.GetIndex());
   player.season14.BeginOfferingDecision(Season14Decision::DISCOVER,
-      static_cast<std::uint64_t>(source.GetIndex()), source.GetDbfID(),
-      std::move(offerings));
+      sourceEntityID, source.GetDbfID(), std::move(offerings));
   return TaskStatus::COMPLETE;
 }
 TaskStatus MinionOfferingTask::Run(Player& player, Minion& source, Minion&) { return Run(player, source); }

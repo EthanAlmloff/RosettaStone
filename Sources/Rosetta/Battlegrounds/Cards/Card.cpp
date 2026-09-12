@@ -9,6 +9,8 @@
 #include <Rosetta/Common/Enums/TargetingEnums.hpp>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
 namespace RosettaStone::Battlegrounds
 {
@@ -86,6 +88,13 @@ CardSet Card::GetCardSet() const
 
 CardType Card::GetCardType() const
 {
+    if (gameTags.find(GameTag::CARDTYPE) == gameTags.end())
+    {
+        if (std::getenv("HSBG_DEBUG_MISSING_CARD_TAG") != nullptr)
+            std::fprintf(stderr, "hsbg_missing_card_tag CARDTYPE id=%s dbf=%d tags=%zu\\n",
+                         id.c_str(), dbfID, gameTags.size());
+        return CardType::INVALID;
+    }
     return static_cast<CardType>(gameTags.at(GameTag::CARDTYPE));
 }
 

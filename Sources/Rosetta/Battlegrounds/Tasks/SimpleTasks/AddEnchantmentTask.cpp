@@ -56,6 +56,13 @@ TaskStatus AddEnchantmentTask::Run(Player& player, Minion& source)
 TaskStatus AddEnchantmentTask::Run(Player& player, Minion& source,
                                    Minion& target)
 {
+    // Rally dispatch supplies both the attacking source and the selected
+    // target.  A SOURCE selector still refers to the observer/source minion;
+    // route it through the one-argument resolver instead of the target-only
+    // IncludeTask overload (which historically rejected SOURCE as an invalid
+    // entity type).
+    if (m_entityType == EntityType::SOURCE)
+        return Run(player, source);
     auto minions =
         IncludeTask::GetMinions(m_entityType, player, source, target);
     if (m_cardID == "BG31_812e" || m_cardID == "BG31_812e2")

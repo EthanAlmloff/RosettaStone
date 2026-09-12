@@ -43,6 +43,12 @@ class Game
     Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs,
          bool filterSupportedCardIDsByActiveTribes);
 
+    //! Constructs a seeded game with an explicit minion pool and hero draft
+    //! universe. An empty hero list preserves the historical full draft.
+    Game(std::uint64_t seed, std::vector<std::string> supportedCardIDs,
+         bool filterSupportedCardIDsByActiveTribes,
+         std::vector<std::string> supportedHeroIDs);
+
     //! Gets the game state.
     //! \return The game state.
     GameState& GetGameState();
@@ -105,6 +111,7 @@ class Game
     std::optional<std::uint64_t> m_seed;
     std::vector<std::string> m_supportedCardIDs;
     bool m_filterSupportedCardIDsByActiveTribes = false;
+    std::vector<std::string> m_supportedHeroIDs;
     GameState m_gameState{};
 
     std::vector<std::tuple<std::size_t, std::size_t>> m_playerFightPair;
