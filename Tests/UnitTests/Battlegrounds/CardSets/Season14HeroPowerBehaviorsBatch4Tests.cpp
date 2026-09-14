@@ -71,6 +71,13 @@ TEST_CASE("[Season14HeroPowerBehaviorsBatch4] - lifecycle events scale and trigg
         71455, Season14HeroPowerBatch4Event::BEGIN_TURN, state, result);
     CHECK(state.nextBuyAttack == 3);
 
+    // Verdant Spheres counts plays, not purchases.  A purchase must not
+    // advance or accidentally resolve its cadence.
+    ResolveSeason14HeroPowerBatch4Event(
+        61917, Season14HeroPowerBatch4Event::BUY_MINION, state, result);
+    CHECK(result.attack == 0);
+    CHECK(result.health == 0);
+
     for (int i = 0; i < 3; ++i)
     {
         ResolveSeason14HeroPowerBatch4Event(

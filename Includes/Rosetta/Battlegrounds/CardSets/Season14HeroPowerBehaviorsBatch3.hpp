@@ -107,6 +107,16 @@ FindSeason14HeroPowerBehaviorBatch3(std::int32_t dbfID) noexcept
     return nullptr;
 }
 
+//! Lock and Load consumes one live Tavern offer as a combat projectile.  It
+//! is a Tavern-targeted action, but it is not part of the See the Light
+//! acquire-to-hand family and therefore must not share that executor path.
+constexpr bool Season14HeroPowerUsesLockAndLoad(std::int32_t dbfID) noexcept
+{
+    const auto* definition = FindSeason14HeroPowerBehaviorBatch3(dbfID);
+    return definition != nullptr &&
+           definition->kind == Season14HeroPowerBatch3Kind::LOCK_AND_LOAD;
+}
+
 constexpr const Season14HeroPowerBatch3Definition*
 FindSeason14HeroPowerBehaviorBatch3(std::string_view id) noexcept
 {

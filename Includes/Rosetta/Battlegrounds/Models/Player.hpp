@@ -212,6 +212,9 @@ class Player
     //! acquisition path so a modal cannot advertise a doomed option.
     bool CanAcquireTrinketPayload(const Card& card,
                                   const TrinketBehavior& behavior) const;
+    //! Returns whether a normal Lesser/Greater offer may publish this card.
+    //! This adds lobby-affinity and duplicate checks to the acquisition guard.
+    bool CanOfferTrinket(const Card& card, bool greater) const;
     //! Opens the Greater Trinket offer moved by Ornate Clock, if armed.
     bool BeginOrnateClockOffer();
     //! Opens Mystery Cube's free two-choice Lesser replacement modal.
@@ -516,7 +519,7 @@ class Player
     int remainCoin = 0;
     std::string lastBoughtTavernSpellID;
     //! Current stats of the most recently purchased minion. This snapshot is
-    //! consumed by Kael'thas's Buddy when Verdant Spheres triggers.
+    //! consumed by purchase-triggered Buddy effects.
     int totalCoin = 0;
     int armor = 0;
     int currentTier = 0;

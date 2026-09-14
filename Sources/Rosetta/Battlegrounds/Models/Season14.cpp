@@ -2062,7 +2062,8 @@ bool Season14State::UseHeroPower()
     if (!heroPowerAvailable ||
         (heroPowerUsed &&
         !(heroPowerDbfID == 71459 && heroPowerBatch2.bloodboundUsesThisTurn < 2) &&
-         !(heroPowerDbfID == 60378 && heroPowerBatch3State < 2)) ||
+         !(heroPowerDbfID == 60378 && heroPowerBatch3State < 2) &&
+         buddyExtraHeroPowerUses == 0) ||
         heroPowerDbfID == 0)
     {
         return false;

@@ -1,5 +1,6 @@
 #include <Rosetta/Battlegrounds/CardSets/TavernSpellBehaviors.hpp>
 #include <Rosetta/Battlegrounds/Cards/Cards.hpp>
+#include <Rosetta/Battlegrounds/Models/Player.hpp>
 
 #include <doctest/doctest.h>
 
@@ -8,6 +9,25 @@
 
 using namespace RosettaStone;
 using namespace RosettaStone::Battlegrounds;
+
+TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Lost Staff rejects a typeless target atomically")
+{
+    Player player;
+    player.remainCoin = 10;
+    const auto staff = Cards::FindCardByID("EBG_Spell_038");
+    const auto typeless = Cards::FindCardByID("EBG_Spell_014");
+    REQUIRE(staff.GetCardType() == CardType::BATTLEGROUND_SPELL);
+    REQUIRE(typeless.GetRace() == Race::INVALID);
+    player.hand.Add(CardData{ Spell(staff) });
+    // Reproduce the malformed recruit-field entity reached by cursor
+    // 25000221. Lost Staff cannot derive a Tavern tribe from this target.
+    player.recruitField.Add(Minion(typeless));
+
+    CHECK_FALSE(player.CanPlaySpell(0, 0));
+    CHECK_FALSE(player.PlaySpell(0, 0));
+    CHECK(player.hand.GetCount() == 1);
+    CHECK(player.remainCoin == 10);
+}
 
 TEST_CASE("[Battlegrounds : TavernSpellBehaviors] - Season 14 trinket tokens preserve target restrictions")
 {

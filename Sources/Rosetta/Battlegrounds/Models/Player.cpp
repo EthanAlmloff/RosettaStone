@@ -431,6 +431,24 @@ bool IsChooseOneOptionForSource(std::int32_t sourceDbfID,
 {
     const auto source = Cards::FindCardByDbfID(sourceDbfID);
     const auto option = Cards::FindCardByDbfID(optionDbfID);
+    // These generated option rows are intentionally behavior-light: their
+    // executable payload is owned by ApplyChooseOne, and a data refresh can
+    // omit or alter their CardDef lifecycle metadata while retaining the
+    // canonical DBF pair. Keep the authoritative reviewed pair available at
+    // the modal boundary; all other identities still require the lifecycle
+    // checks below and remain fail-closed.
+    if ((source.id == "BG31_320" || sourceDbfID == 116182) &&
+        (optionDbfID == 116200 || optionDbfID == 116201))
+        return true;
+    if ((source.id == "BG31_320_G" || sourceDbfID == 116183) &&
+        (optionDbfID == 116202 || optionDbfID == 116203))
+        return true;
+    if ((source.id == "BG32_237" || sourceDbfID == 120223) &&
+        (optionDbfID == 121719 || optionDbfID == 121721))
+        return true;
+    if ((source.id == "BG32_237_G" || sourceDbfID == 120224) &&
+        (optionDbfID == 121720 || optionDbfID == 121722))
+        return true;
     if (source.dbfID == 0 || option.dbfID == 0 ||
         CardDefs::FindCardDefByID(source.id).lifecycle !=
             CardLifecycle::CHOOSE_ONE_SOURCE ||
@@ -469,6 +487,33 @@ bool IsChooseOneOptionForSource(std::int32_t sourceDbfID,
         }
     }
     return false;
+}
+
+// A few generated Choose One entities can arrive with a zero source DBF after
+// being copied through a temporary CardData path.  The public modal still
+// carries the two canonical option DBFs, so recover the source only when the
+// complete option pair identifies one of the reviewed Choose One families.
+// Unknown pairs remain fail-closed in ApplyChooseOne rather than becoming an
+// arbitrary source with an accidentally compatible option.
+std::int32_t InferChooseOneSourceDbfID(
+    const Season14State& season14) noexcept
+{
+    if (season14.pendingOfferings.size() != 2) return 0;
+    constexpr std::array<std::string_view, 14> sources = {
+        "BG27_084",   "BG27_084_G", "BG30_123",   "BG30_123_G",
+        "BG31_320",   "BG31_320_G", "BG32_237",   "BG32_237_G",
+        "BG36_330",   "BG36_330_G", "BG36_332",   "BG36_332_G",
+        "BG36_341",   "BG36_341_G"};
+    for (const auto sourceID : sources) {
+        const auto source = Cards::FindCardByID(sourceID);
+        if (source.dbfID == 0) continue;
+        if (IsChooseOneOptionForSource(
+                source.dbfID, season14.pendingOfferings[0].dbfID) &&
+            IsChooseOneOptionForSource(
+                source.dbfID, season14.pendingOfferings[1].dbfID))
+            return source.dbfID;
+    }
+    return 0;
 }
 
 bool AddRandomMinionToHand(Player& player, std::vector<Card> candidates);
@@ -3558,24 +3603,6 @@ void Player::PurchaseMinion(std::size_t idx)
             buddy.SetHealth(buddy.GetHealth() +
                             (purchased.GetHealth() * multiplier) / 2);
         });
-        // Verdant Spheres is a successful third-minion-buy boundary.  The
-        // hero power grants one Tavern Coin and Crimson Hand Centurion copies
-        // the current stats of this purchase.  Resolve every owned Buddy
-        // independently so multiple normal/golden copies stack naturally.
-        if (batch4.goldDelta > 0) {
-            AddTavernCoins(batch4.goldDelta);
-            recruitField.ForEachAlive([&purchased](MinionData& data) {
-                auto& buddy = data.value();
-                for (const auto& definition : BUDDY_VERDANT_SPHERES_BEHAVIORS) {
-                    if (buddy.GetCardID() != definition.id) continue;
-                    buddy.SetAttack(buddy.GetAttack() +
-                                    purchased.GetAttack() * definition.statMultiplier);
-                    buddy.SetHealth(buddy.GetHealth() +
-                                    purchased.GetHealth() * definition.statMultiplier);
-                    break;
-                }
-            });
-        }
         if (!nextBoughtStatsArms.empty())
         {
             recruitField.ForEachAlive([&purchased, this](MinionData& data) {
@@ -4151,6 +4178,22 @@ bool Player::CanAcquireTrinketPayload(const Card& card,
     return true;
 }
 
+bool Player::CanOfferTrinket(const Card& card, bool greater) const
+{
+    const auto expectedType = greater ? "GREATER_TRINKET" : "LESSER_TRINKET";
+    const auto behavior = FindTrinketBehavior(card.id);
+    return card.trinketType == expectedType && card.normalDbfID == 0 &&
+           card.dbfID > 0 &&
+           card.GetCardType() == CardType::BATTLEGROUND_TRINKET &&
+           behavior.effect != TrinketEffect::NONE &&
+           TrinketIsInLobby(card, activeTribes, excludedLobbyRace) &&
+           CanAcquireTrinketPayload(card, behavior) &&
+           std::none_of(season14.trinkets.begin(), season14.trinkets.end(),
+                        [&card](const Season14PersistentEffect& owned) {
+                            return owned.dbfID == card.dbfID;
+                        });
+}
+
 std::vector<Season14Offering> Player::BuildTrinketOfferings(
     bool greater, std::size_t count, bool requireCheap, bool requireTypeless) const
 {
@@ -4234,21 +4277,12 @@ std::vector<Season14Offering> Player::BuildTrinketOfferings(
     };
     std::vector<TrinketCandidate> candidates;
     for (const auto& candidate : Cards::GetAllCards()) {
-        if (candidate.trinketType != (greater ? "GREATER_TRINKET" : "LESSER_TRINKET") ||
-            candidate.normalDbfID != 0 || candidate.dbfID <= 0 ||
-            candidate.GetCardType() != CardType::BATTLEGROUND_TRINKET ||
-            FindTrinketBehavior(candidate.id).effect == TrinketEffect::NONE ||
-            std::any_of(season14.trinkets.begin(), season14.trinkets.end(),
-                [&candidate](const Season14PersistentEffect& owned) {
-                    return owned.dbfID == candidate.dbfID;
-                }))
+        if (!CanOfferTrinket(candidate, greater))
             continue;
         // Keep offer construction in lockstep with AcquireTrinket. In
         // particular, Warband Whistle (DBF 131002) is not executable with an
         // empty recruit board; offering it there used to create an
         // UnsupportedContent action at the modal boundary.
-        const auto behavior = FindTrinketBehavior(candidate.id);
-        if (!CanAcquireTrinketPayload(candidate, behavior)) continue;
         // Special source-level restrictions are part of the offer pool, not
         // merely acquisition validation.  Murky Sticker requires multiple
         // Battlecries; cards requiring hand room cannot be offered while full.
@@ -4492,7 +4526,8 @@ std::vector<Season14Offering> Player::BuildTrinketOfferings(
 bool Player::BeginFantasticTreasureOffer()
 {
     if (season14.heroPowerDbfID != 113311 || season14.recruitTurnNumber != 5 ||
-        season14.pendingDecision != Season14Decision::NONE)
+        season14.pendingDecision != Season14Decision::NONE ||
+        !season14.CanAddTrinket())
         return false;
     auto offerings = BuildTrinketOfferings(false, 4, true, true);
     if (offerings.size() < 4) return false;
@@ -4763,7 +4798,8 @@ bool Player::TryResolveWarpGateReward()
 
 bool Player::ArmLockAndLoad(std::size_t idx)
 {
-    if (season14.heroPowerDbfID != 123150 || idx >= static_cast<std::size_t>(tavern.fieldZone.GetCount()) ||
+    if (!Season14HeroPowerUsesLockAndLoad(season14.heroPowerDbfID) ||
+        idx >= static_cast<std::size_t>(tavern.fieldZone.GetCount()) ||
         tavern.fieldZone[idx].IsDestroyed()) return false;
     season14.lockAndLoadProjectile = tavern.fieldZone.Remove(tavern.fieldZone[idx]);
     return true;
@@ -4771,7 +4807,8 @@ bool Player::ArmLockAndLoad(std::size_t idx)
 
 void Player::ResolveLockAndLoad()
 {
-    if (season14.heroPowerDbfID != 123150 || !season14.lockAndLoadProjectile || battleField.IsFull()) return;
+    if (!Season14HeroPowerUsesLockAndLoad(season14.heroPowerDbfID) ||
+        !season14.lockAndLoadProjectile || battleField.IsFull()) return;
     auto projectile = std::move(*season14.lockAndLoadProjectile);
     season14.lockAndLoadProjectile.reset();
     SummonCombatSnapshot(std::move(projectile));
@@ -5759,7 +5796,18 @@ void Player::PlayCard(std::size_t handIdx, std::size_t fieldIdx, int targetIdx)
                             ApplyBloodGemTo(recruitField[static_cast<std::size_t>(candidates[i])]);
                     }
                 }
-            } else if ((targetless || targetMask != 0) && option0.dbfID != 0 && option1.dbfID != 0)
+            } else if ((targetless || targetMask != 0) && option0.dbfID != 0 &&
+                       option1.dbfID != 0 &&
+                       // A generated/temporary minion can carry the generic
+                       // CHOOSE_ONE_SOURCE lifecycle tag without having one
+                       // of the bridge's executable option families. Do not
+                       // publish a modal whose source/options cannot pass
+                       // ApplyChooseOne; that would strand the recruit phase
+                       // behind an UnsupportedContent action.
+                       IsChooseOneOptionForSource(
+                           minion.GetDbfID(), option0.dbfID) &&
+                       IsChooseOneOptionForSource(
+                           minion.GetDbfID(), option1.dbfID))
                 season14.BeginChooseOne(static_cast<std::uint64_t>(minion.GetIndex()),
                                         targetMask, minion.GetDbfID(),
                                         {{option0.dbfID, 0}, {option1.dbfID, 0}});
@@ -6330,8 +6378,16 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
                    (greater ? "GREATER_TRINKET" : "LESSER_TRINKET")) {
             return false;
         }
-        if (!AcquireTrinket({selected, 1, true}) ||
-            !season14.SelectDecision(offeringIdx))
+        // Commit the Trinket modal before running acquisition-time payloads.
+        // Several Trinkets immediately open a Discover (for example,
+        // Kaleidoscope).  Acquiring first lets that new modal overwrite the
+        // four-card Trinket snapshot; the subsequent SelectDecision then
+        // applies the old index to the new three-card Discover and rejects
+        // slot 3.  Every fallible acquisition precondition has been checked
+        // above, so this ordering gives the follow-on modal a free decision
+        // slot without exposing a partially validated selection.
+        if (!season14.SelectDecision(offeringIdx) ||
+            !AcquireTrinket({selected, 1, true}))
             return false;
         // Souvenir Stand is a stateful copy effect: only a successfully
         // committed Greater Trinket purchase transforms it.  Do this after
@@ -6929,7 +6985,13 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
             if (season14.pendingOfferings[i].dbfID != allowed[i])
                 return false;
             const auto gem = Cards::FindCardByDbfID(allowed[i]);
-            if (gem.GetCardType() != CardType::BATTLEGROUND_SPELL ||
+            // HearthstoneJSON classifies the three Jewelry Box variants as
+            // generated SPELL rows (unlike ordinary Tavern spells).  They
+            // are still executable Battlegrounds spells because the closed
+            // DBF snapshot above and the explicit behavior registry jointly
+            // identify their complete payload.
+            if ((gem.GetCardType() != CardType::SPELL &&
+                 gem.GetCardType() != CardType::BATTLEGROUND_SPELL) ||
                 !gem.hasBehavior || FindTavernSpellBehavior(gem.id).effect ==
                     TavernSpellEffect::NONE)
                 return false;
@@ -7540,7 +7602,11 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
               "BG36_MagicItem_370" && [&]() {
                   bool found = false;
                   recruitField.ForEachAlive([&](const MinionData& data) {
-                      found = found || data.value().GetDbfID() == card.dbfID;
+                      const auto warband =
+                          Cards::FindCardByDbfID(data.value().GetDbfID());
+                      const auto plainDbfID = warband.normalDbfID != 0
+                          ? warband.normalDbfID : warband.dbfID;
+                      found = found || plainDbfID == card.dbfID;
                   });
                   return !found;
               }()) ||
@@ -10092,6 +10158,15 @@ bool Player::ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx)
          (targetIdx >= static_cast<std::size_t>(recruitField.GetCount()) ||
           (season14.chooseOne.targetMask & (std::uint32_t{1} << targetIdx)) == 0)))
         return false;
+    // A generated Choose One modal can lose the source DBF while its public
+    // option payload survives the temporary CardData copy.  Recover only from
+    // a complete, reviewed option pair; unknown pairs remain fail-closed.
+    if (season14.chooseOne.sourceCardDbfID == 0)
+    {
+        const auto inferred = InferChooseOneSourceDbfID(season14);
+        if (inferred == 0) return false;
+        season14.chooseOne.sourceCardDbfID = inferred;
+    }
     if (season14.pendingOfferings.size() != 2 ||
         !IsChooseOneOptionForSource(
             season14.chooseOne.sourceCardDbfID,
@@ -10100,23 +10175,50 @@ bool Player::ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx)
     // The source is part of the public modal identity.  Refuse stale/replayed
     // decisions even if a caller presents a currently valid Beast slot.
     bool sourceStillOnBoard = false;
+    int sourceCardMatches = 0;
+    int sourceEntity = -1;
     recruitField.ForEachAlive([&](MinionData& data) {
         const auto& source = data.value();
+        if (source.GetDbfID() == season14.chooseOne.sourceCardDbfID) {
+            ++sourceCardMatches;
+            sourceEntity = source.GetIndex();
+        }
         if (static_cast<std::uint64_t>(source.GetIndex()) ==
                 season14.chooseOne.sourceEntityID &&
             (season14.chooseOne.sourceCardDbfID == 0 ||
-             source.GetDbfID() == season14.chooseOne.sourceCardDbfID))
+             source.GetDbfID() == season14.chooseOne.sourceCardDbfID)) {
             sourceStillOnBoard = true;
+        }
     });
+    // Generated Choose One modals can open through a temporary CardData copy.
+    // In that path the options and source DBF survive but the entity index
+    // does not. Recover the identity only for a reviewed, complete option
+    // pair with exactly one live source card. This also covers BG36_330's
+    // targetless pair (132642/132644), which previously reached a public
+    // modal but rejected either choice despite the source still being on the
+    // board. Duplicate/stale sources remain fail-closed.
+    if (!sourceStillOnBoard &&
+        sourceCardMatches == 1 &&
+        IsChooseOneOptionForSource(
+            season14.chooseOne.sourceCardDbfID,
+            season14.pendingOfferings[0].dbfID) &&
+        IsChooseOneOptionForSource(
+            season14.chooseOne.sourceCardDbfID,
+            season14.pendingOfferings[1].dbfID))
+    {
+        sourceStillOnBoard = true;
+        season14.chooseOne.sourceEntityID = static_cast<std::uint64_t>(sourceEntity);
+    }
     if (!sourceStillOnBoard) return false;
 
     if (!season14.chooseOne.targetMask)
     {
         const bool golden = season14.chooseOne.sourceCardDbfID ==
                             Cards::FindCardByID("BG30_123_G").dbfID ||
-                            season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_330_G").dbfID ||
-                            season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_341_G").dbfID ||
-                            season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG31_320_G").dbfID;
+                         season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_330_G").dbfID ||
+                         season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_341_G").dbfID ||
+                         season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG31_320_G").dbfID ||
+                         season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG36_332_G").dbfID;
             const bool trailblazer = season14.trailblazerCombinedChooseOne;
         if (season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG30_123").dbfID ||
             season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG30_123_G").dbfID)
@@ -10127,13 +10229,21 @@ bool Player::ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx)
                 AddBloodGems(golden ? 8 : 4);
         }
         else if (season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG31_320").dbfID ||
-                 season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG31_320_G").dbfID)
+                 season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG31_320_G").dbfID ||
+                 // Keep the executor aligned with the bridge's stable DBF
+                 // fallback.  Some generated Season-14 card tables can
+                 // resolve the source row by ID while FindCardByID returns
+                 // a refreshed/zero DBF during a replay.
+                 season14.chooseOne.sourceCardDbfID == 116182 ||
+                 season14.chooseOne.sourceCardDbfID == 116183)
         {
             if (offeringIdx == 0 || trailblazer) AddBloodGems(golden ? 4 : 2);
             if (offeringIdx == 1 || trailblazer) gemDays += golden ? 2 : 1;
         }
         else if (season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG32_237").dbfID ||
-                 season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG32_237_G").dbfID)
+                 season14.chooseOne.sourceCardDbfID == Cards::FindCardByID("BG32_237_G").dbfID ||
+                 season14.chooseOne.sourceCardDbfID == 120223 ||
+                 season14.chooseOne.sourceCardDbfID == 120224)
         {
             if (offeringIdx == 0 || trailblazer) season14.AddTavernSpellAttackBonus(golden ? 2 : 1);
             if (offeringIdx == 1 || trailblazer) season14.AddTavernSpellHealthBonus(golden ? 2 : 1);
@@ -10181,7 +10291,9 @@ bool Player::ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx)
                 season14.IncreaseMaxGold(golden ? 2 : 1);
         }
         else
+        {
             return false;
+        }
         const auto sourceID = season14.chooseOne.sourceEntityID;
         int shakerGems = 0;
         recruitField.ForEachAlive([&](MinionData& data) { if (data.value().GetCardID() == "BG31_323") shakerGems = std::max(shakerGems, 1); else if (data.value().GetCardID() == "BG31_323_G") shakerGems = std::max(shakerGems, 2); });
@@ -10190,7 +10302,8 @@ bool Player::ApplyChooseOne(std::size_t offeringIdx, std::size_t targetIdx)
             if (static_cast<std::uint64_t>(other.GetIndex()) != sourceID && other.HasRace(Race::QUILBOAR))
                 for (int i = 0; i < shakerGems; ++i) ApplyBloodGemTo(other);
         });
-        return season14.SelectDecision(offeringIdx);
+        const bool selected = season14.SelectDecision(offeringIdx);
+        return selected;
     }
 
     Minion& target = recruitField[targetIdx];
@@ -11259,14 +11372,19 @@ int Player::GrantTrinketStartTurnCards()
                 if (!candidate.id.empty() && candidate.isBattlegroundsPoolMinion &&
                     candidate.hasBehavior &&
                     candidate.normalDbfID == 0 &&
-                    candidate.GetCardType() == CardType::MINION)
+                    candidate.GetCardType() == CardType::MINION &&
+                    HasActiveTribe(activeTribes, candidate))
                     candidates.push_back(candidate);
-            if (hand.IsFull() || candidates.empty()) continue;
+            // A Discover modal is executable only when it contains the full
+            // three distinct offerings that ApplyChoice validates.  Keep the
+            // trigger armed when the constrained Tier-6 pool is temporarily
+            // too small, rather than publishing a short modal that leaves
+            // the bridge with no legal action.
+            if (hand.IsFull() || candidates.size() < 3) continue;
             Random::shuffle(candidates.begin(), candidates.end());
-            const auto count = std::min<std::size_t>(3, candidates.size());
             std::vector<Season14Offering> offerings;
-            offerings.reserve(count);
-            for (std::size_t i = 0; i < count; ++i)
+            offerings.reserve(3);
+            for (std::size_t i = 0; i < 3; ++i)
                 offerings.push_back({candidates[i].dbfID, 0});
             remainCoin += behavior.amount;
             season14.BeginOfferingDecision(Season14Decision::DISCOVER, 0,
@@ -11707,6 +11825,23 @@ bool BeginPutricideStickerDiscover(Player& player, std::int32_t sourceCardDbfID,
             candidates.push_back(card);
         }
     };
+    // The first selection is only executable when it can reopen the second
+    // three-card modal at the current Tavern tier.  Without this preflight,
+    // low-tier lobbies could publish a valid-looking first offering and then
+    // return false after SelectDecision cleared it because Pool 2 had fewer
+    // than three currently eligible cards.
+    if (!second) {
+        std::size_t secondPoolCount = 0;
+        for (const auto dbfID : BUILD_AN_UNDEAD_POOL_2) {
+            const auto card = Cards::FindCardByDbfID(dbfID);
+            if (card.dbfID != 0 && card.GetCardType() == CardType::MINION &&
+                card.normalDbfID == 0 && card.hasBehavior &&
+                HasActiveTribe(player.activeTribes, card) &&
+                card.GetTier() <= player.currentTier)
+                ++secondPoolCount;
+        }
+        if (secondPoolCount < 3) return false;
+    }
     if (second) appendPool(BUILD_AN_UNDEAD_POOL_2);
     else appendPool(BUILD_AN_UNDEAD_POOL_1);
     if (candidates.size() < 3) return false;
@@ -13792,6 +13927,12 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
             });
     }
     const TavernSpellBehavior behavior = FindTavernSpellBehavior(spell.GetID());
+    // The generic spell path is not an implementation fallback: an
+    // unregistered effect would otherwise pass the cost/target checks, be
+    // advertised by LegalActions, and then disappear as a successful no-op
+    // in ApplySpellBoardEffect(TavernSpellEffect::NONE).
+    if (behavior.effect == TavernSpellEffect::NONE)
+        return false;
     const bool shopTarget = TavernSpellTargetsShop(behavior.effect);
     if (behavior.gold < 0 ||
         TavernSpellRequiresTarget(behavior.effect) != (targetIdx >= 0) ||
@@ -13979,6 +14120,16 @@ bool Player::CanPlaySpell(std::size_t handIdx, int targetIdx) const
         if (targetIdx < 0 || targetIdx >= recruitField.GetCount()) return false;
         const int tier = recruitField[static_cast<std::size_t>(targetIdx)].GetTier();
         if (tier >= TIER_UPPER_LIMIT) return false;
+    }
+    if (behavior.effect == TavernSpellEffect::REFRESH_RACE) {
+        if (targetIdx < 0 || targetIdx >= recruitField.GetCount()) return false;
+        const Race race = recruitField[static_cast<std::size_t>(targetIdx)].GetRace();
+        // Lost Staff resolves by the selected minion's tribe. Reject
+        // typeless/generated entities before payment/removal, matching the
+        // resolver's requirement below and preserving action atomicity.
+        if (race == Race::INVALID ||
+            SupportedMinionsForRace(race, activeTribes).empty())
+            return false;
     }
     if (behavior.effect == TavernSpellEffect::DISCOVER_DIFFERENT_RACE) {
         if (targetIdx < 0 || targetIdx >= recruitField.GetCount()) return false;
@@ -16761,11 +16912,15 @@ void Player::ResolveDarkGiftEndTurnTriggers()
         if (offerings.empty()) continue;
         Random::shuffle(offerings.begin(), offerings.end());
         if (offerings.size() > 3) offerings.resize(3);
-        const auto sourceEntityID = static_cast<std::uint64_t>(egg.GetIndex());
         const auto sourceCardDbfID = egg.GetDbfID();
         hand.Remove(hand[i]);
+        // The Egg is consumed before its Discover is exposed.  Do not retain
+        // its former hand entity as a live-source requirement: ApplyChoice's
+        // generic source guard searches the recruit board and would reject
+        // every otherwise valid Egg offering after the source was removed.
+        // The canonical source DBF remains the modal identity.
         season14.BeginOfferingDecision(Season14Decision::DISCOVER,
-                                       sourceEntityID, sourceCardDbfID,
+                                       0, sourceCardDbfID,
                                        std::move(offerings));
         break;
     }

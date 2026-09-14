@@ -122,6 +122,20 @@ TEST_CASE("[Season14] - Hero power availability is costed and one-shot")
     CHECK(!state.UseHeroPower());
 }
 
+TEST_CASE("[Season14] - Buddy extra hero-power use is consumable")
+{
+    Season14State state;
+    state.SetHeroPower(70957, 2, true);
+
+    CHECK(state.UseHeroPower());
+    state.buddyExtraHeroPowerUses = 1;
+    CHECK(state.CanUseHeroPower(2));
+    CHECK(state.UseHeroPower());
+    CHECK(state.buddyExtraHeroPowerUses == 0);
+    CHECK(!state.CanUseHeroPower(2));
+    CHECK(!state.UseHeroPower());
+}
+
 TEST_CASE("[Season14] - Double Time turns two copies into a golden and Tavern Coin")
 {
     Player player;
@@ -332,6 +346,27 @@ TEST_CASE("[Season14] - golden Egg portrait arms the pinned next-turn countdown"
     const auto& egg = std::get<Minion>(player.hand[0]);
     CHECK(egg.GetCardID() == "BG34_639_G");
     CHECK(egg.EggHatchTurnsRemaining() == 1);
+}
+
+TEST_CASE("[Season14] - consumed Egg Discover remains executable")
+{
+    Player player;
+    const auto eggCard = Cards::FindCardByID("BG34_639");
+    REQUIRE(eggCard.dbfID == 126848);
+    Minion egg(eggCard);
+    egg.SetEggHatch(1);
+    player.hand.Add(CardData{std::move(egg)});
+
+    player.ResolveDarkGiftEndTurnTriggers();
+
+    CHECK(player.hand.GetCount() == 0);
+    CHECK(player.season14.pendingDecision == Season14Decision::DISCOVER);
+    CHECK(player.season14.pendingSourceCardDbfID == 126848);
+    CHECK(player.season14.pendingSourceEntityID == 0);
+    REQUIRE(!player.season14.pendingOfferings.empty());
+    CHECK(player.ApplyChoice(0));
+    CHECK(player.hand.GetCount() == 1);
+    CHECK(player.season14.pendingDecision == Season14Decision::NONE);
 }
 
 TEST_CASE("[Season14] - selected hero installs deterministic lifecycle hooks")

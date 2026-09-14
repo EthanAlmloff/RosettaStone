@@ -74,6 +74,36 @@ TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - verified Patch 36.4 batch")
     CHECK(defensive.health == 10);
 }
 
+TEST_CASE("[Maldraxxus Dagger] - normal offer accepts golden warband copy")
+{
+    Player player;
+    const auto normal = Cards::FindCardByDbfID(70143);
+    const auto golden = Cards::FindCardByDbfID(70150);
+    const auto otherNormal = Cards::FindCardByDbfID(64054);
+    const auto otherGolden = Cards::FindCardByDbfID(otherNormal.premiumDbfID);
+    const auto third = Cards::FindCardByDbfID(116240);
+    const auto gift = Cards::FindCardByID("BG36_MidGameEffect_000t");
+    REQUIRE(normal.dbfID == 70143);
+    REQUIRE(golden.normalDbfID == normal.dbfID);
+    REQUIRE(otherNormal.dbfID == 64054);
+    REQUIRE(otherGolden.normalDbfID == otherNormal.dbfID);
+    REQUIRE(third.dbfID != 0);
+    REQUIRE(gift.dbfID > 0);
+    player.recruitField.Add(Minion(golden));
+    player.recruitField.Add(Minion(otherGolden));
+    player.recruitField.Add(Minion(third));
+    player.season14.BeginOfferingDecision(
+        Season14Decision::DISCOVER, 0, 133713,
+        {{normal.dbfID, 0, gift.dbfID},
+         {otherNormal.dbfID, 0, gift.dbfID},
+         {third.dbfID, 0, gift.dbfID}});
+    REQUIRE(player.ApplyChoice(0));
+    REQUIRE(player.hand.GetCount() == 1);
+    REQUIRE(std::holds_alternative<Minion>(player.hand[0]));
+    CHECK(std::get<Minion>(player.hand[0]).GetDbfID() == normal.dbfID);
+    CHECK(player.season14.pendingDecision == Season14Decision::NONE);
+}
+
 TEST_CASE("[Battlegrounds : DarkGiftBehaviors] - Steady Growth uses corrected cadence")
 {
     Minion target(Cards::FindCardByID("BGS_039"));
