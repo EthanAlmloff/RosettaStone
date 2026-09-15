@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <cctype>
 #include <iterator>
 #include <limits>
@@ -7643,24 +7644,88 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
     if (Cards::FindCardByDbfID(season14.pendingSourceCardDbfID).id ==
         "BG36_MagicItem_370")
     {
+        const auto logDaggerReject = [&](const char* reason) {
+            std::fprintf(stderr,
+                         "hsbg_dagger_apply_reject: reason=%s selected=%zu pending=%d source=%d offerings=%zu board=",
+                         reason, offeringIdx,
+                         static_cast<int>(season14.pendingDecision),
+                         season14.pendingSourceCardDbfID,
+                         season14.pendingOfferings.size());
+            recruitField.ForEachAlive([&](const MinionData& data) {
+                const auto boardCard = Cards::FindCardByDbfID(
+                    data.value().GetDbfID());
+                const auto canonical = boardCard.normalDbfID != 0
+                    ? boardCard.normalDbfID : boardCard.dbfID;
+                std::fprintf(stderr, "%d/%d,", data.value().GetDbfID(),
+                             canonical);
+            });
+            std::fprintf(stderr, " rows=");
+            for (std::size_t row = 0;
+                 row < season14.pendingOfferings.size(); ++row)
+            {
+                const auto& pending = season14.pendingOfferings[row];
+                const auto candidate = Cards::FindCardByDbfID(pending.dbfID);
+                const auto giftCard = Cards::FindCardByDbfID(
+                    pending.darkGiftDbfID);
+                const auto gift = FindDarkGiftBehavior(giftCard.id);
+                bool inWarband = false;
+                recruitField.ForEachAlive([&](const MinionData& data) {
+                    const auto boardCard = Cards::FindCardByDbfID(
+                        data.value().GetDbfID());
+                    const auto canonical = boardCard.normalDbfID != 0
+                        ? boardCard.normalDbfID : boardCard.dbfID;
+                    inWarband = inWarband || canonical == candidate.dbfID;
+                });
+                std::fprintf(stderr,
+                             "[%zu:%d/%s gift=%d/%s effect=%d dark=%d normal=%d behavior=%d pool=%d in_warband=%d target_legal=%d],",
+                             row, candidate.dbfID, candidate.id.c_str(),
+                             pending.darkGiftDbfID, giftCard.id.c_str(),
+                             static_cast<int>(gift.effect),
+                             giftCard.isBattlegroundsDarkGift ? 1 : 0,
+                             candidate.normalDbfID,
+                             candidate.hasBehavior ? 1 : 0,
+                             candidate.isBattlegroundsPoolMinion ? 1 : 0,
+                             inWarband ? 1 : 0,
+                             DarkGiftTargetIsLegal(Minion(candidate), gift)
+                                 ? 1 : 0);
+            }
+            std::fprintf(stderr, "\n");
+        };
         if (season14.pendingDecision != Season14Decision::DISCOVER ||
             season14.pendingOfferings.size() != 3)
+        {
+            logDaggerReject("modal_shape");
             return false;
+        }
         std::set<std::int32_t> daggerMinions;
         for (const auto& pending : season14.pendingOfferings) {
             const auto candidate = Cards::FindCardByDbfID(pending.dbfID);
-            const auto gift = FindDarkGiftBehavior(
-                Cards::FindCardByDbfID(pending.darkGiftDbfID).id);
-            if (candidate.GetCardType() != CardType::MINION ||
-                !candidate.isBattlegroundsPoolMinion ||
-                candidate.normalDbfID != 0 || !candidate.hasBehavior ||
-                pending.darkGiftDbfID <= 0 ||
-                !Cards::FindCardByDbfID(pending.darkGiftDbfID)
-                     .isBattlegroundsDarkGift ||
-                gift.effect == DarkGiftEffect::NONE ||
-                !daggerMinions.insert(candidate.dbfID).second ||
-                !DarkGiftTargetIsLegal(Minion(candidate), gift))
+            const auto giftCard = Cards::FindCardByDbfID(pending.darkGiftDbfID);
+            const auto gift = FindDarkGiftBehavior(giftCard.id);
+            const bool validCandidate =
+                candidate.GetCardType() == CardType::MINION &&
+                candidate.isBattlegroundsPoolMinion &&
+                candidate.normalDbfID == 0 && candidate.hasBehavior;
+            const bool validGift =
+                pending.darkGiftDbfID > 0 &&
+                giftCard.isBattlegroundsDarkGift &&
+                gift.effect != DarkGiftEffect::NONE;
+            bool unique = false;
+            bool targetLegal = false;
+            // Keep the original short-circuit order: diagnostics must not
+            // invoke target validation for malformed card/gift payloads.
+            if (validCandidate && validGift)
+            {
+                unique = daggerMinions.insert(candidate.dbfID).second;
+                if (unique)
+                    targetLegal =
+                        DarkGiftTargetIsLegal(Minion(candidate), gift);
+            }
+            if (!validCandidate || !validGift || !unique || !targetLegal)
+            {
+                logDaggerReject("row_payload");
                 return false;
+            }
             bool inWarband = false;
             recruitField.ForEachAlive([&](const MinionData& data) {
                 const auto warband = Cards::FindCardByDbfID(data.value().GetDbfID());
@@ -7668,7 +7733,11 @@ bool Player::ApplyChoice(std::size_t offeringIdx)
                     ? warband.normalDbfID : warband.dbfID;
                 inWarband = inWarband || plainDbfID == candidate.dbfID;
             });
-            if (!inWarband) return false;
+            if (!inWarband)
+            {
+                logDaggerReject("warband_membership");
+                return false;
+            }
         }
     }
 
